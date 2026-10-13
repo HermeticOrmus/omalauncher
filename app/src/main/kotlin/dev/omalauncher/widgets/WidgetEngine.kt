@@ -2,6 +2,7 @@ package dev.omalauncher.widgets
 
 import dev.omalauncher.widgets.lang.sha256Hex
 import android.content.ComponentCallbacks
+import dev.omalauncher.Ormus
 import android.content.Context
 import android.content.res.Configuration
 import android.os.FileObserver
@@ -1125,10 +1126,11 @@ class WidgetEngine(
             add(asset("widgets/README.md", File(dir, "README.md"), Policy.Owned))
             for (name in assets.list("widgets/docs").orEmpty()) add(asset("widgets/docs/$name", File(dir, "docs/$name"), Policy.Owned))
             for (name in assets.list("widgets/examples").orEmpty()) add(asset("widgets/examples/$name", File(dir, "examples/$name"), Policy.Seeded))
-            for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
+            for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") && it !in Ormus.HIDDEN_WIDGETS }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
             // Always as this launcher ships them, whatever became of drawer.owl and keybar.owl.
             add(asset("widgets/$DRAWER", File(dir, STOCK_DRAWER), Policy.Owned))
             add(asset("widgets/$KEYBAR", File(dir, STOCK_KEYBAR), Policy.Owned))
+            for (name in assets.list("ormus/widgets").orEmpty()) add(asset("ormus/widgets/$name", File(dir, name), Policy.Seeded))
         }
     }
 

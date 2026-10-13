@@ -109,8 +109,15 @@ class Runtime(
     val linuxApps = LinuxAppCatalog(context, proot)
     val androidApps = AndroidAppCatalog(context)
     val usage = AppUsage(context)
+
+    // Omalauncher Ormus: its theme is on disk before the store first looks.
+    init {
+        Ormus.seedTheme(context)
+    }
+
     val themes = ThemeStore(context, proot, style, isLinux = { linux }, onConfigChanged = ::syncGuest)
     private val audio = AudioBridge(proot)
+    private val ormusBridge = OrmusBridge(context, proot)
     private val openBridge = OpenBridge(context, proot, onOpenFiles = ::openFiles, onOpenVoice = ::openVoice, onEdit = ::edit)
     val agents = AgentStore(proot, text = { id, arg -> context.getString(id, arg) }, onChanged = ::syncGuest)
     val pacman = Pacman(context, proot)
@@ -394,6 +401,7 @@ class Runtime(
         withContext(Dispatchers.IO) {
             provisioner.sync()
             audio.start()
+            ormusBridge.start()
             synchronized(server) { server.input.setKeymap(proot.keymap.path) }
             agents.load()
         }

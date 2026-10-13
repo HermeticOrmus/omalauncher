@@ -1,5 +1,6 @@
 package dev.omalauncher.theme
 
+import dev.omalauncher.Ormus
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Context
@@ -552,7 +553,7 @@ class ThemeStore(
         const val OMARCHY_REF = "ac2690cd7be4f47e4a255f5e2e78d904d436b068"
 
         private const val RENDERED_BY = "rendered_by"
-        private const val DEFAULT_THEME = "tokyo-night"
+        private const val DEFAULT_THEME = Ormus.THEME
 
         /** Called on the main thread after the theme or background changes (the live wallpaper listens). */
         val changeListeners = CopyOnWriteArraySet<() -> Unit>()
