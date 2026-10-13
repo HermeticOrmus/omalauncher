@@ -14,7 +14,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.omalauncher"
+        applicationId = "dev.omalauncher.ormus"
         minSdk = 29
         targetSdk = 37
         versionCode = 14
