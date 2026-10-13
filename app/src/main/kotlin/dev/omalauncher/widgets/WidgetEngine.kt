@@ -1,5 +1,6 @@
 package dev.omalauncher.widgets
 
+import dev.omalauncher.Ormus
 import android.content.Context
 import android.os.FileObserver
 import androidx.compose.runtime.derivedStateOf
@@ -801,7 +802,8 @@ class WidgetEngine(
         return buildList {
             add(asset("widgets/README.md", File(dir, "README.md"), Policy.Owned))
             for (name in assets.list("widgets/examples").orEmpty()) add(asset("widgets/examples/$name", File(dir, "examples/$name"), Policy.Seeded))
-            for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
+            for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") && it !in Ormus.HIDDEN_WIDGETS }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
+            for (name in assets.list("ormus/widgets").orEmpty()) add(asset("ormus/widgets/$name", File(dir, name), Policy.Seeded))
         }
     }
 

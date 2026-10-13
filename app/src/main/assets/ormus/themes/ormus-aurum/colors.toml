@@ -1,0 +1,41 @@
+# Ormus Aurum — Omarchy desktop
+# Same palette as Ghostty "Ormus Aurum" and Grok theme=terminal.
+# Bar, borders, lock, GTK, and generated terminal templates all read this.
+mode = "dark"
+
+accent    = "#FFD700"
+# Gold wash — old #2A2A32 sat at 1.38:1 on navy and vanished.
+# #5F512E is ~45% satin gold over #090A16 (~2.5:1 vs bg, cream still reads).
+selection = "#5F512E"
+muted     = "#8A7434"
+
+background         = "#090A16"
+dark_background    = "#07080F"
+darker_background  = "#05060C"
+lighter_background = "#141418"
+
+foreground        = "#F5E6C8"
+dark_foreground   = "#8A7434"
+light_foreground  = "#ECDBA6"
+bright_foreground = "#F5E6C8"
+
+# Active: gold → cream so the focused edge reads on gold wallpaper, not only navy.
+# Inactive: gold wash (same token as text selection), not leftover charcoal #2A2A32.
+hyprland_active_border = "rgba(FFD700ff) rgba(F5E6C8dd) 45deg"
+hyprland_inactive_border = "rgba(5F512Eaa)"
+
+red     = "#CC6633"
+yellow  = "#C8B583"
+orange  = "#E08050"
+green   = "#5A9A7A"
+cyan    = "#5A9A8A"
+blue    = "#6488B4"
+magenta = "#8A6AAA"
+brown   = "#8A7434"
+
+bright_red     = "#E08050"
+bright_yellow  = "#F0D060"
+bright_green   = "#7ABB9A"
+bright_cyan    = "#7ABBAA"
+bright_blue    = "#8FACD6"
+bright_magenta = "#AA8ACC"

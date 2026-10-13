@@ -1,5 +1,6 @@
 package dev.omalauncher.ui
 
+import dev.omalauncher.Ormus
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -63,8 +64,8 @@ import kotlinx.coroutines.launch
 internal fun SetupScreen(runtime: Runtime) {
     val themes = runtime.themes
     var linux by rememberSaveable { mutableStateOf(false) }
-    // Claude Code first, like Omarchy's default agent; the first picked becomes the launcher's default.
-    var picked by rememberSaveable { mutableStateOf(listOf(AGENTS.first().bin)) }
+    // Omalauncher Ormus picks Grok first; the first picked becomes the launcher's default.
+    var picked by rememberSaveable { mutableStateOf(listOf(Ormus.AGENT)) }
     var started by remember { mutableStateOf(false) }
     val install = rememberLinuxInstall(runtime)
     var error by remember { mutableStateOf<String?>(null) }
