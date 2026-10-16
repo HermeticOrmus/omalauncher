@@ -8,6 +8,9 @@ Dates are when the build was uploaded to Play.
 
 - The app drawer has the alphabet down its edge, as in Niagara: drag along it to jump to a letter,
   with a tick on each one.
+- Widgets can read each app's installed version (`version` and `versionCode` on
+  `android.apps`) and the launcher's own (`launcherCode` on `android.system`), so a
+  widget can show which apps have an update waiting.
 
 ## 0.7.2 (versionCode 14) – 2026-10-14
 
