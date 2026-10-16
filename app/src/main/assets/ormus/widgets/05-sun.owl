@@ -15,7 +15,7 @@ widget "sun" {
   Row {
     align: center
     gap: 12
-    Text { text: ""; font: icon; fontSize: 34; color: up == "up" ? accent : muted }
+    Text { text: ""; font: icon; fontSize: 34; width: 44; color: up == "up" ? accent : muted }
     Column {
       weight: 1
       Text { text: "sun"; style: title }

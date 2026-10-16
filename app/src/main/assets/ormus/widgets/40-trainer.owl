@@ -15,9 +15,13 @@ widget "trainer" {
   // Published by the trainer-decks loop on Sun, reachable only on the tailnet. After a tap the widget refreshes its
   // sources, so picking another deck fetches it right away.
   source d = http("https://sun.tailb43a3a.ts.net/trainer-decks/${deck}.json") every 6h json timeout 20s status
-  on d { cards = value.ok && value.out.deck == deck ? value.out.cards : cards }
+  let fresh = d != null && d.ok && d.out.deck == deck ? d.out.cards : null
+  // Shown straight from the fetch: `on` skips a source's first value, so the copy only covers Sun being off.
+  let shown = fresh ?? cards
+  when fresh != null { cards = fresh }
+  on fresh { cards = value ?? cards }
 
-  let card = len(cards) > 0 ? cards[pick % len(cards)] : null
+  let card = len(shown) > 0 ? shown[pick % len(shown)] : null
 
   onTap: flipped = !flipped
 
@@ -42,8 +46,9 @@ widget "trainer" {
     Spacer { weight: 1 }
     Row {
       gap: 8
-      Text { text: len(cards) > 0 ? "${pick % len(cards) + 1} / ${len(cards)}" : ""; style: small; color: muted }
-      Spacer { weight: 1 }
+      align: center
+      // A Text fills its row unless it has a width or weight; weight leaves the buttons their size.
+      Text { text: len(shown) > 0 ? "${pick % len(shown) + 1} / ${len(shown)}" : ""; style: small; color: muted; weight: 1 }
       Button { text: "next"; onTap: { pick = pick + 1; flipped = false } }
       Button { text: "open trainer"; color: muted; onTap: androidApp("solutions.ormus.trainer") }
     }
