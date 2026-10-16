@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
+import android.content.pm.PackageInfo
 import android.content.pm.LauncherApps.ShortcutQuery
 import android.content.pm.ShortcutInfo
 import android.net.Uri
@@ -54,6 +55,10 @@ data class AndroidApp(
     val system: Boolean = false,
     /** [user] is a clone profile, holding a second copy of an app the owner has too, rather than a work profile. */
     val clone: Boolean = false,
+    /** The installed package's versionName, so a widget can tell an app is out of date; null in another profile, which a launcher can't read. */
+    val versionName: String? = null,
+    /** The installed package's versionCode, the number Android compares on an update; null like [versionName]. */
+    val versionCode: Long? = null,
 ) {
     /** Stable across restarts and unique across profiles; icons, usage and pinned apps go by it. */
     val key get() = androidAppKey(component, profile)
@@ -518,11 +523,18 @@ class AndroidAppCatalog(
                                 if (profile != null && !clone) works += profile
                                 // A paused profile's shortcuts can't be listed; they stay, dimmed like its apps, and opening one resumes it.
                                 if (canList) made += if (profile != null && profile in paused) listed.filter { it.profile == profile }.map { null to it } else pinnedShortcuts(user, profile, clone)
+                                // One lookup per package, not per launcher activity. Only our own profile: another profile's packages
+                                // need INTERACT_ACROSS_USERS. An update re-runs this through onPackageChanged, so versions stay current.
+                                val versions = HashMap<String, PackageInfo?>()
                                 runCatching { launcherApps.getActivityList(null, user) }
                                     .onFailure { Log.w(TAG, "cannot list apps in $user", it) }
                                     .getOrDefault(emptyList())
                                     .filter { it.componentName.packageName != context.packageName }
-                                    .map { it to AndroidApp(it.label.toString(), it.componentName, user, profile, it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0, clone = clone) }
+                                    .map {
+                                        val pkg = it.componentName.packageName
+                                        val info = if (profile == null) versions.getOrPut(pkg) { runCatching { context.packageManager.getPackageInfo(pkg, 0) }.getOrNull() } else null
+                                        it to AndroidApp(it.label.toString(), it.componentName, user, profile, it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0, clone = clone, versionName = info?.versionName, versionCode = info?.longVersionCode)
+                                    }
                             }
                             // The same app in two profiles: the owner's one first.
                             .sortedWith(compareBy({ it.second.label.lowercase() }, { it.second.profile != null }))

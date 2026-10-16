@@ -4,6 +4,12 @@ The most important changes in each release. The Play Store notes for a release
 are in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 Dates are when the build was uploaded to Play.
 
+## Unreleased
+
+- Widgets can read each app's installed version (`version` and `versionCode` on
+  `android.apps`) and the launcher's own (`launcherCode` on `android.system`), so a
+  widget can show which apps have an update waiting.
+
 ## 0.7.2 (versionCode 14) – 2026-10-14
 
 - Text files open in the launcher's own touch-first editor, in the Omarchy theme,
