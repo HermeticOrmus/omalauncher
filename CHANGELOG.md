@@ -6,6 +6,9 @@ Dates are when the build was uploaded to Play.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
+- Widgets can read each app's installed version (`version` and `versionCode` on
+  `android.apps`) and the launcher's own (`launcherCode` on `android.system`), so a
+  widget can show which apps have an update waiting.
 - A store update no longer throws away changes made to a widget, app or face:
   settings' update leaves an edited one out and lists it as edited, and its store
   page says updating replaces the changes, as "update anyway" (a Play review).
