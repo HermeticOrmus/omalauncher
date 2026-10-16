@@ -4,7 +4,7 @@ widget "sun" {
   size: 6x2
   minSize: 3x1
 
-  meta { owl: 4; description: "Sun, Ormus's workstation: whether it answers over Tailscale, and a mosh shell into it on tap."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 4; description: "Sun, Ormus's workstation: whether it answers over Tailscale, and a mosh shell into it on tap."; version: "1.1"; license: "MIT"; category: "productivity" }
 
   // A TCP check of Sun's sshd: no login, so Sun's logs stay quiet. Tailscale carries it from anywhere.
   source up = cmd("timeout 3 bash -c '</dev/tcp/100.92.213.61/22' && echo up || echo down") every 60s
@@ -12,14 +12,24 @@ widget "sun" {
   // mosh, not ssh: the session survives the phone switching between Wi-Fi and cellular, and sleeping.
   onTap: terminal("mosh sun", "sun")
 
-  Row {
-    align: center
-    gap: 12
-    Text { text: ""; font: icon; fontSize: 34; width: 44; color: up == "up" ? accent : muted }
-    Column {
-      weight: 1
-      Text { text: "sun"; style: title }
-      Text { text: up == null ? "…" : up == "up" ? "online · tap for a shell" : "offline"; style: muted }
+  // One row tall: glyph and status on a single line, so nothing is clipped.
+  if rows != null && rows < 2 {
+    Row {
+      align: center
+      gap: 10
+      Text { text: ""; font: icon; fontSize: 22; width: 30; color: up == "up" ? accent : muted }
+      Text { text: up == null ? "sun …" : up == "up" ? "sun · online · tap for a shell" : "sun · offline"; style: body; weight: 1; maxLines: 1 }
+    }
+  } else {
+    Row {
+      align: center
+      gap: 12
+      Text { text: ""; font: icon; fontSize: 34; width: 44; color: up == "up" ? accent : muted }
+      Column {
+        weight: 1
+        Text { text: "sun"; style: title }
+        Text { text: up == null ? "…" : up == "up" ? "online · tap for a shell" : "offline"; style: muted }
+      }
     }
   }
 }
