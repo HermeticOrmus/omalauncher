@@ -1,0 +1,45 @@
+widget "mercurio" {
+  page: 2
+  order: 1
+  size: 6x4
+  minSize: 3x2
+
+  meta { owl: 4; description: "Ormus's herdr agents on sg: which wait on him, which work, which finished. Tap to open Mercurio."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // herdr prints its agent list as JSON. BatchMode, so a key sg doesn't know yet shows as an error, not a prompt.
+  source h = cmd("ssh -o BatchMode=yes -o ConnectTimeout=6 sg herdr agent list") every 60s json timeout 20s status
+
+  let agents = h != null && h.ok ? h.out.result.agents : []
+  let waiting = count(agents, a => a.agent_status == "blocked")
+  let working = count(agents, a => a.agent_status == "working")
+  let done = count(agents, a => a.agent_status == "done")
+  // Whoever waits on Ormus first, then the ones at work, then the finished ones.
+  let busy = agents.filter(a => a.agent_status != "idle").sortBy(a => a.agent_status == "blocked" ? 0 : a.agent_status == "working" ? 1 : 2)
+
+  // Mercurio's applicationId kept its first name (solutions.ormus.logos), so the phone keeps its hosts and keys.
+  onTap: androidApp("solutions.ormus.logos")
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "mercurio"; style: muted }
+      Spacer { weight: 1 }
+      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted }
+    }
+    if h != null && !h.ok {
+      Text { text: "sg doesn't answer: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
+    }
+    if h != null && h.ok && len(busy) == 0 {
+      Text { text: "${len(agents)} agents, all idle"; style: body }
+    }
+    for a in busy.take(6) key a.pane_id {
+      Row {
+        gap: 8
+        align: center
+        Text { text: a.agent_status == "blocked" ? "waiting" : a.agent_status; style: small; color: a.agent_status == "blocked" ? yellow : a.agent_status == "working" ? accent : green }
+        Text { text: a.terminal_title_stripped; style: body; maxLines: 1 }
+      }
+    }
+  }
+}

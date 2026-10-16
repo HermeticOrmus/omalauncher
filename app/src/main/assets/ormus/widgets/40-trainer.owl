@@ -1,0 +1,51 @@
+widget "trainer" {
+  page: 2
+  order: 2
+  size: 6x5
+  minSize: 3x3
+
+  meta { owl: 4; description: "A card from Ormus Trainer's decks: tap to flip, next for the following one. The Trainer app keeps the real review schedule."; version: "1.0"; license: "MIT"; category: "learning" }
+
+  state deck = "ai-terms" persist
+  state pick = 0 persist
+  state flipped = false
+  // The last good copy, so the widget still has cards while Sun is off.
+  state cards = [] persist
+
+  // Published by the trainer-decks loop on Sun, reachable only on the tailnet. After a tap the widget refreshes its
+  // sources, so picking another deck fetches it right away.
+  source d = http("https://sun.tailb43a3a.ts.net/trainer-decks/${deck}.json") every 6h json timeout 20s status
+  on d { cards = value.ok && value.out.deck == deck ? value.out.cards : cards }
+
+  let card = len(cards) > 0 ? cards[pick % len(cards)] : null
+
+  onTap: flipped = !flipped
+
+  Column {
+    gap: 8
+    Row {
+      gap: 6
+      for id in ["ai-terms", "herdr", "polish"] {
+        Button { text: id; color: id == deck ? accent : muted; onTap: { deck = id; pick = 0; flipped = false; cards = [] } }
+      }
+    }
+    if card == null {
+      Text { text: d == null ? "…" : "no cards yet: Sun's decks are on the tailnet"; style: muted }
+    } else {
+      Text { text: card.prompt; style: title; maxLines: 3 }
+      if flipped {
+        Text { text: card.answer; style: body; maxLines: 9 }
+      } else {
+        Text { text: "tap to flip"; style: muted }
+      }
+    }
+    Spacer { weight: 1 }
+    Row {
+      gap: 8
+      Text { text: len(cards) > 0 ? "${pick % len(cards) + 1} / ${len(cards)}" : ""; style: small; color: muted }
+      Spacer { weight: 1 }
+      Button { text: "next"; onTap: { pick = pick + 1; flipped = false } }
+      Button { text: "open trainer"; color: muted; onTap: androidApp("solutions.ormus.trainer") }
+    }
+  }
+}
