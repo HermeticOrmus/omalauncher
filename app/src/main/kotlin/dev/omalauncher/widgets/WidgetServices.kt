@@ -418,6 +418,8 @@ class WidgetServices(
                 "locale" to Str(java.util.Locale.getDefault().toLanguageTag()),
                 "timezone" to Str(java.util.TimeZone.getDefault().id),
                 "launcher" to Str(BuildConfig.VERSION_NAME),
+                // The drawer and android.apps leave the launcher out, so its own versionCode is here.
+                "launcherCode" to num(BuildConfig.VERSION_CODE.toLong()),
                 "theme" to (runtime.themes.current?.title?.let(::Str) ?: Null),
                 "apps" to num(runtime.androidApps.apps.size.toLong()),
             ),
@@ -425,10 +427,11 @@ class WidgetServices(
     }
 
     /**
-     * Launchable Android apps for `source a = android.apps`, updated as apps come and go and are opened, each `{key, name, package, component, profile, system, icon, score, last}`.
+     * Launchable Android apps for `source a = android.apps`, updated as apps come and go and are opened, each `{key, name, package, component, profile, system, icon, score, last, version, versionCode}`.
      * `key` is [dev.omalauncher.AndroidApp.key], unique across profiles, for `androidApp(a.key)`; `profile` is `work` or
      * `clone` as on notifications, else null; `icon` is the `app:` src for that copy. `score` and `last` are what the
-     * search ranks by ([dev.omalauncher.AppUsage]), so a widget can rank apps the same way.
+     * search ranks by ([dev.omalauncher.AppUsage]), so a widget can rank apps the same way. `version` and `versionCode` are
+     * the installed package's ([versionFields]), so a widget can tell an app is out of date.
      */
     private fun apps(): Value =
         Lst(
@@ -446,7 +449,7 @@ class WidgetServices(
                         "icon" to Str("app:${app.component.packageName}${kind?.let { "@$it" } ?: ""}"),
                         "score" to Num(Math.round(runtime.usage.score(usage) * 10.0) / 10.0),
                         "last" to (runtime.usage.last(usage)?.let { Num((it / 1000).toDouble()) } ?: Null),
-                    ),
+                    ) + versionFields(app.versionName, app.versionCode),
                 )
             },
         )
@@ -985,3 +988,12 @@ private class BytesSource(
 
     override fun close() {}
 }
+
+/**
+ * An app's installed version as `android.apps` shows it: `version` the versionName, `versionCode` the number Android
+ * compares on an update, both null when the launcher can't read them (another profile).
+ */
+internal fun versionFields(
+    name: String?,
+    code: Long?,
+): Map<String, Value> = mapOf("version" to (name?.let(::Str) ?: Null), "versionCode" to (code?.let { Num(it.toDouble()) } ?: Null))
