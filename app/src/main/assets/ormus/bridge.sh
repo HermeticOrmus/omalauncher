@@ -1,6 +1,6 @@
 #!/bin/sh
 # Omalauncher Ormus: lets Sun reach this Linux over SSH on port 2223 with the
-# keys in $1, and gives it ssh and mosh to Sun as "sun". Run by OrmusBridge,
+# keys in $1, and gives it ssh and mosh to Sun as "sun" and to sg as "sg". Run by OrmusBridge,
 # which restarts it if sshd exits.
 set -u
 if ! command -v sshd >/dev/null || ! command -v mosh >/dev/null; then
@@ -14,5 +14,7 @@ while read -r key; do
 done < "$1"
 [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C 'root@saturn-omalauncher-ormus' -f ~/.ssh/id_ed25519
 grep -q '^Host sun$' ~/.ssh/config 2>/dev/null || printf 'Host sun\n    HostName 100.92.213.61\n    User ormus\n' >> ~/.ssh/config
+# sg runs Ormus's herdr agents; the mercurio widget reads them.
+grep -q '^Host sg$' ~/.ssh/config 2>/dev/null || printf 'Host sg\n    HostName 100.66.108.108\n    User ormus\n' >> ~/.ssh/config
 ssh-keygen -A
 exec /usr/bin/sshd -D -e -p 2223 -o PasswordAuthentication=no -o PermitRootLogin=prohibit-password
