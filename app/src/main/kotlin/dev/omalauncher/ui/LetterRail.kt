@@ -33,18 +33,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import java.text.Normalizer
-import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /** The drawer's end edge the letters take; the grid leaves it free while the full list shows. */
 internal val RailWidth = 24.dp
 
-/** How far the letter under the finger leans out of the rail. */
-private val WaveLean = 36.dp
+/** How far the letter under the finger leans out of the rail; Niagara's, measured on a 1080 px wide phone. */
+private val WaveLean = 88.dp
 
-/** How many letters either side of the finger the bulge reaches. */
-private const val WaveReach = 3f
+/** The wave's width in letters (a Gaussian's sigma): four away still lean 70%, eight away 20%, as in Niagara. */
+private const val WaveSpread = 4.6f
 
 private val BubbleSize = 56.dp
 private val BubbleGap = 12.dp
@@ -72,7 +72,7 @@ internal fun letterRows(
 /**
  * Niagara's alphabet down the drawer's end edge, over a list that scrolls. Touching or dragging along it scrolls
  * [listState] so the row of the letter under the finger is at the top, with a tick each time the letter changes. The
- * letters next to the finger grow and lean out, and the one under it shows large beside the rail. [itemOf] turns a
+ * whole alphabet curves out toward the finger, and the letter under it shows large beside the rail. [itemOf] turns a
  * letter's row into the list's item index. Fills [modifier]'s size without taking touches outside the rail.
  */
 @Composable
@@ -136,11 +136,8 @@ internal fun LetterRail(
                             // Read here, not in composition, so a drag only redraws the letters.
                             val slot = height.toFloat() / shown.size
                             val center = slot * (i + 0.5f)
-                            val near = if (touch.isNaN()) 0f else (1f - abs(touch - center) / (slot * WaveReach)).coerceAtLeast(0f)
-                            val bulge = near * near * wave
-                            scaleX = 1f + bulge
-                            scaleY = 1f + bulge
-                            translationX = -WaveLean.toPx() * bulge
+                            val d = if (touch.isNaN()) Float.POSITIVE_INFINITY else (touch - center) / (slot * WaveSpread)
+                            translationX = -WaveLean.toPx() * exp(-d * d / 2f) * wave
                         },
                         style =
                             Mono.copy(
