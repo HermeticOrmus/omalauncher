@@ -17,8 +17,8 @@ android {
         applicationId = "dev.omalauncher.ormus"
         minSdk = 29
         targetSdk = 37
-        versionCode = 15
-        versionName = "0.7.2-ormus.15"
+        versionCode = 16
+        versionName = "0.7.2-ormus.16"
         ndk { abiFilters += "arm64-v8a" }
     }
 
