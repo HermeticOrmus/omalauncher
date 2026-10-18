@@ -1,0 +1,47 @@
+widget "today" {
+  page: 1
+  order: 1
+  size: 6x3
+  minSize: 3x2
+
+  meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // Built on Sun (ormus-feeds) from his calendar and the Alqvimia API.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  // Ended meetings drop out between feed runs.
+  let events = data != null ? data.events.filter(e => now == null || e.start_unix > now - 3600) : []
+  let room = max(1, floor(((tileHeight ?? 204) - 74) / 25))
+
+  component Meeting(e) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: fmtTime(e.start_unix, "EEE HH:mm"); style: small; width: 76; color: muted }
+      Text { text: e.title; style: body; maxLines: 1; weight: 1 }
+      Text { text: now == null ? "" : e.start_unix <= now ? "now" : e.start_unix - now < 3600 ? "in ${floor((e.start_unix - now) / 60)}m" : e.start_unix - now < 86400 ? "in ${floor((e.start_unix - now) / 3600)}h" : ""; style: small; width: 52; align: end; color: now != null && e.start_unix - now < 900 ? yellow : muted }
+    }
+  }
+
+  Column {
+    gap: 6
+    Text { text: data == null ? (f == null ? "today …" : "today · Sun doesn't answer") : "today · ${len(events)} ahead"; style: muted }
+    if data != null && len(events) == 0 {
+      Text { text: "no meetings through tomorrow"; style: body; color: green }
+    }
+    for e in events.take(room) key "${e.start_unix}:${e.title}" {
+      // Handlers take one action, not a choice, so a meeting with no link is its own node.
+      if e.join_url != null {
+        Box { onTap: url(e.join_url); Meeting { e: e } }
+      } else {
+        Meeting { e: e }
+      }
+    }
+    Spacer { weight: 1 }
+    if data != null && data.practice != null {
+      Text { text: "practice · ${data.practice.title}"; style: small; color: accent; maxLines: 1 }
+    }
+  }
+}
