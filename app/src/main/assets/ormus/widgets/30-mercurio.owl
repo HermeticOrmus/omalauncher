@@ -4,18 +4,34 @@ widget "mercurio" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 8; description: "Ormus's herdr agents on sg: who waits on him, who works, who finished, then the latest idle ones, each with its workspace. Tap to open Mercurio."; version: "1.2"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "Ormus's herdr agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with workspace, machine and how long ago. Tap to open Mercurio."; version: "2.0"; license: "MIT"; category: "productivity" }
 
-  // Both herdr lists in one call, joined here by jq: every agent with its workspace's label, newest change first.
-  // BatchMode, so a key sg doesn't know yet shows as an error, not a password prompt.
-  source h = cmd("""ssh -o BatchMode=yes -o ConnectTimeout=6 sg 'herdr workspace list; herdr agent list' | jq -cs 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map({status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), seq: .state_change_seq, pane: .pane_id}) | sort_by(-.seq)'""") every 60s json timeout 20s status
+  // Every machine at once, each through jq into one list. herdr's sort_key is the agent's last activity in minutes
+  // since 1970 on every machine, so the lists merge by real time; per-machine counters don't compare. A machine
+  // that doesn't answer comes back as null and is named in "down" instead of silently shrinking the list.
+  source h = cmd("""
+    now=$(( $(date +%s) / 60 ))
+    # A folder per run: the launcher and an owl-check preview may run this at once.
+    D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
+    for m in sun sg mars; do
+      # ~/.local/bin first: a non-interactive login otherwise finds an older system herdr (Sun has pacman's 0.8.2,
+      # which the running 0.9 server turns away with protocol_mismatch).
+      ( ssh -o BatchMode=yes -o ConnectTimeout=5 "$m" 'PATH="$HOME/.local/bin:$PATH"; herdr workspace list; herdr agent list' 2>/dev/null \
+        | jq -cs --arg m "$m" --argjson now "$now" 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map(((.tokens.sort_key // "0") | tonumber) as $k | {host: $m, status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), k: $k, pane: ($m + ":" + .pane_id), ago: (if $k == 0 then "" else ($now - $k) as $d | if $d < 60 then "\($d)m" elif $d < 1440 then "\($d / 60 | floor)h" else "\($d / 1440 | floor)d" end end)})' > "$D/$m.json" \
+        || echo null > "$D/$m.json" ) &
+    done
+    wait
+    jq -cs '{down: [["sun", "sg", "mars"][] as $m | $m], got: .} | {down: [range(0; 3) as $i | select(.got[$i] == null) | .down[$i]], agents: (.got | map(. // []) | add | sort_by(-.k))}' "$D/sun.json" "$D/sg.json" "$D/mars.json"
+  """) every 60s json timeout 25s status
 
-  let all = h != null && h.ok ? h.out : []
+  let all = h != null && h.ok && h.out != null ? h.out.agents : []
+  let down = h != null && h.ok && h.out != null ? h.out.down : []
   let waiting = count(all, a => a.status == "blocked")
   let working = count(all, a => a.status == "working")
   let done = count(all, a => a.status == "done")
-  // Whoever waits on Ormus first, then the ones at work, then the finished ones; idle ones fill what room is left.
-  let busy = all.filter(a => a.status != "idle").sortBy(a => a.status == "blocked" ? 0 : a.status == "working" ? 1 : 2)
+  // Whoever waits on Ormus first, then the ones at work, then the finished ones, newest first in each; idle ones
+  // fill what room is left, most recently active first.
+  let busy = all.filter(a => a.status != "idle").sortBy(a => (a.status == "blocked" ? 0 : a.status == "working" ? 1 : 2) * 100000000 - a.k)
   let idle = all.filter(a => a.status == "idle")
   // As many lines as the tile holds: about 25 dp each, after the padding and the header.
   let room = max(2, floor(((tileHeight ?? 136) - 50) / 25))
@@ -31,19 +47,23 @@ widget "mercurio" {
     Row {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
-      Text { text: "mercurio"; style: muted; weight: 1 }
-      Text { text: h == null ? "…" : len(busy) == 0 ? "${len(all)} agents, all idle" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted; weight: 2; align: end; maxLines: 1 }
+      Text { text: "mercurio · ${len(all)}"; style: muted; weight: 1; maxLines: 1 }
+      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted; weight: 2; align: end; maxLines: 1 }
+    }
+    if len(down) > 0 {
+      Text { text: "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red; maxLines: 1 }
     }
     if h != null && !h.ok {
-      Text { text: "sg doesn't answer: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
+      Text { text: "couldn't read herdr: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
     }
     for a in shown key a.pane {
       Row {
         gap: 8
         align: center
-        Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 64; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
+        Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
         Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
-        Text { text: lower(a.ws); style: small; color: muted; width: 56; align: end; maxLines: 1 }
+        Text { text: "${lower(a.ws)}·${a.host}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
+        Text { text: a.ago; style: small; color: muted; width: 28; align: end; maxLines: 1 }
       }
     }
   }
