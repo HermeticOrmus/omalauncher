@@ -3,6 +3,7 @@ package dev.omalauncher.widgets
 import dev.omalauncher.system.copyText
 import dev.omalauncher.system.registerNotExported
 import dev.omalauncher.system.shareText
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -656,6 +657,7 @@ class WidgetServices(
             "notification" -> notifications.control(arg, args.getOrNull(1).textOrNull(), args.getOrNull(2))
             "settings" -> panels.open(arg, media.playingPackage())
             "androidApp" -> openAndroidApp(arg)
+            "androidIntent" -> openAndroidIntent(args[0] as? Obj)
             "copy" -> copy(arg)
             "notify" -> notify(arg, args.getOrNull(1).textOrNull())
             "torch" -> modes.torch(args[0])
@@ -1020,6 +1022,26 @@ class WidgetServices(
         val agent = bin?.let { b -> agents.installed.firstOrNull { it.bin == b } } ?: agents.default
         if (agent == null) return launcherAction?.invoke("agents") ?: runtime.openSettings(SettingsPage.Agents)
         runtime.terminal("${agentInvocation(agent.bin, p)}; exec bash", agent.name, agent)
+    }
+
+    /**
+     * Opens an activity of the named package with an action, data and string extras, the way an app's own
+     * notification opens a place inside it (a chat, a terminal pane). Only activities, and only in that package.
+     */
+    private fun openAndroidIntent(spec: Obj?) {
+        val f = spec?.fields ?: return
+        val pkg = f["package"]?.takeIf { it != Null }?.toString()?.takeIf { it.isNotBlank() } ?: return
+        val intent = Intent(f["action"]?.takeIf { it != Null }?.toString()?.takeIf { it.isNotBlank() } ?: Intent.ACTION_MAIN).setPackage(pkg)
+        f["component"]?.takeIf { it != Null }?.toString()?.takeIf { it.isNotBlank() }?.let { intent.setClassName(pkg, it) }
+        f["data"]?.takeIf { it != Null }?.toString()?.takeIf { it.isNotBlank() }?.let { intent.data = android.net.Uri.parse(it) }
+        (f["extras"] as? Obj)?.fields?.forEach { (key, value) -> if (value != Null) intent.putExtra(key, value.toString()) }
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "$pkg doesn't open that", Toast.LENGTH_SHORT).show()
+        } catch (e: SecurityException) {
+            Toast.makeText(context, "$pkg doesn't let other apps open that", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun copy(text: String) {
