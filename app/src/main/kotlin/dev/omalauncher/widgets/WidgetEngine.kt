@@ -335,7 +335,10 @@ class WidgetEngine(
             if (item.isFace && item.page <= FACE_PAGE) {
                 newFacePage()
             } else {
-                pages.firstOrNull { it > item.page && layout.claim(item, itemsOn(it)) } ?: ((pages.maxOrNull() ?: 1) + 1)
+                // Omalauncher Ormus: within its own space.
+                val space = dev.omalauncher.Ormus.spaceOf(item.page)
+                val ours = pages.filter { dev.omalauncher.Ormus.spaceOf(it) == space }
+                ours.firstOrNull { it > item.page && layout.claim(item, itemsOn(it)) } ?: ((ours.maxOrNull() ?: item.page) + 1)
             }
         moveToPage(item, page)
         return page

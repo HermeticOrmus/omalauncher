@@ -202,8 +202,8 @@ class Style(
         val SWIPE_UP =
             Setting.Text(
                 "gestures.swipe-up",
-                "drawer.owl",
-                "The app drawer, which swiping up opens: a panel's file name in ~/.config/omalauncher/widgets, by default drawer.owl; \"none\" leaves only tapping the bar to open drawer.owl. One that's gone or doesn't compile falls back to drawer.owl, then to .stock-drawer.owl, the drawer as it ships.",
+                dev.omalauncher.Ormus.SWIPE_UP,
+                "The app drawer, which swiping up opens: a panel's file name in ~/.config/omalauncher/widgets, or drawer.owl; \"none\" leaves only tapping the bar to open drawer.owl. One that's gone or doesn't compile falls back to drawer.owl, then to .stock-drawer.owl, the drawer as it ships. \"spaces\", the default here, swipes up and down through home's spaces, and the bar opens drawer.owl.",
             )
         val SWIPE_DOWN =
             Setting.Text(

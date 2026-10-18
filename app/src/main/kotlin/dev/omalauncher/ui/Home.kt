@@ -103,9 +103,14 @@ fun HomeScreen(
     // the leftmost, page 0 at first, then -1, -2, ... as they fill.
     // Unfolded, tile pages show in pairs and a face across both halves: the pager counts slots (see slotsOf).
     val per = if (showsTwoPages(windowSize())) 2 else 1
+    // Omalauncher Ormus: only the pages of the space showing, each space starting at its own first page; faces, left of
+    // page 1, are now's.
+    val space = state.space
     val pageNumbers =
         engine.pages
-            .let { listOf(minOf(it.first(), FACE_PAGE + 1) - 1) + it }
+            .filter { dev.omalauncher.Ormus.spaceOf(it) == space }
+            .ifEmpty { listOf(dev.omalauncher.Ormus.firstPage(space)) }
+            .let { if (space == 0) listOf(minOf(it.first(), FACE_PAGE + 1) - 1) + it else it }
             .let { if (engine.itemsOn(it.last()).isEmpty()) it else it + (it.last() + 1) }
     // Only faces on screen, or the empty one waiting left of them: they get it whole, the bar's room too (see
     // LauncherState.faceShowing), and the status bar's while all of them say statusBar: false.
@@ -117,7 +122,8 @@ fun HomeScreen(
     fun slotOf(page: Int) = slots.indexOfFirst { page in it }
     // Home opens on page 1, not left of it; on the first tile page, if a layout from before faces has none numbered 1.
     // Made again once the widgets have loaded, so it starts on that page among all of them.
-    val pager = key(engine.loaded) { rememberPagerState(initialPage = slotOf(pageNumbers.firstOrNull { it >= 1 } ?: 1).coerceAtLeast(0)) { slots.size } }
+    // A new space starts at its first page.
+    val pager = key(engine.loaded, space) { rememberPagerState(initialPage = slotOf(pageNumbers.firstOrNull { it >= 1 } ?: 1).coerceAtLeast(0)) { slots.size } }
     // A tile dropped on another page: show that page once the page list has caught up, by the list as it is then. The
     // list the request was made with could be one from before (a store add spilling onto page 2 showed a face). A swipe
     // meanwhile wins, and the request goes with it rather than firing later.
@@ -224,7 +230,8 @@ fun HomeScreen(
     val typing = terminals.active != null
     LaunchedEffect(typing) { if (!typing) terminals.keyboard?.hide() }
     DisposableEffect(state) {
-        state.onHomeAgain = { if (arrange.folder != null) arrange.folder = null else state.requestedPage = 1 }
+        // Omalauncher Ormus: from another space, back to now's first page.
+        state.onHomeAgain = { if (arrange.folder != null) arrange.folder = null else if (state.space != 0) state.space = 0 else state.requestedPage = 1 }
         onDispose { state.onHomeAgain = {} }
     }
     LaunchedEffect(state.requestedPage) {
@@ -281,6 +288,7 @@ fun HomeScreen(
     val sideRoom = sideWidth()
     val barRoom = with(density) { state.barHeight.takeIf { it > 0 }?.toDp() ?: (PromptBarHeight + HomeGap + EdgeGap) }
     LaunchedEffect(extraKeys) { if (!extraKeys) terminals.extraKeys = null }
+    val arrival = spaceArrival(space)
     Box(
         modifier
             .onGloballyPositioned { origin = it.positionInWindow() }
@@ -387,7 +395,12 @@ fun HomeScreen(
                         },
                     )
                     .focusRequester(state.homeEntry)
-                    .focusGroup(),
+                    .focusGroup()
+                    // Omalauncher Ormus: a space arrives from the way the swipe went.
+                    .graphicsLayer {
+                        alpha = arrival
+                        translationY = state.spaceStep * (1f - arrival) * 48.dp.toPx()
+                    },
             selected = state.editing,
             onSelect = { state.editing = it },
             actions = { item ->
@@ -461,6 +474,7 @@ fun HomeScreen(
     if (side == null && state.editing == null && terminals.active == null && shown.none(::full)) {
         HomeLetterRail(runtime, Modifier.fillMaxWidth().homeRailBounds(engine.layout, barRoom))
     }
+    SpaceFlash(space)
 
     if (extraKeys) {
         ExtraKeys(

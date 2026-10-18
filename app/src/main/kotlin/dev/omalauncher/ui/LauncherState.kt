@@ -88,6 +88,18 @@ class LauncherState {
     val fullScreen: Boolean
         get() = statusBarAway && drawer.value < 0.01f && !homeMenuOpen && shared == null && sharing == null
 
+    /** Omalauncher Ormus: the space home shows, an index into Ormus.SPACES. */
+    var space by mutableIntStateOf(0)
+
+    /** The way home last moved between spaces: 1 to the next, -1 back. */
+    var spaceStep by mutableIntStateOf(1)
+
+    /** The next space for 1, the one before for -1, wrapping round. */
+    fun moveSpace(step: Int) {
+        spaceStep = step
+        space = (space + step).mod(dev.omalauncher.Ormus.SPACES.size)
+    }
+
     /** Home page currently showing (1-based); the drawer pins apps there. */
     var currentPage by mutableStateOf(1)
 
