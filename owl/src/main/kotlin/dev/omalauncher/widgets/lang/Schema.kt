@@ -100,8 +100,9 @@ internal val SINCE =
         listOf("Input.focus", "sh", "corners").associateWith { 6 } +
         // owl 7: more of the phone, without new permissions.
         listOf("android.alarm", "android.modes", "torch", "share", "haptic").associateWith { 7 } +
-        // owl 8: apps, files that aren't tiles; the phone's apps as a list; images and sounds from the web; values in URLs.
-        listOf("app \"…\" { }", "android.apps", WEB_IMAGE, "sound", "enc", "post", "screenInset").associateWith { 8 } +
+        // owl 8: apps, files that aren't tiles; the phone's apps as a list; images and sounds from the web; values in URLs;
+        // an app opened at a place inside it.
+        listOf("app \"…\" { }", "android.apps", WEB_IMAGE, "sound", "enc", "post", "screenInset", "androidIntent").associateWith { 8 } +
         // owl 9: dates and numbers as text and back; chance.
         listOf("parseTime", "fmtAgo", "fmtNum", FMT_TIME_ZONE, "random", "shuffle", "hash").associateWith { 9 } +
         // owl 9: lists and maps changed in place of rebuilding them; a trigger for a first value.
