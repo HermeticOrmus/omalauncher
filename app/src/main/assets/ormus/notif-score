@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Score the phone's notifications for Ormus's attention with the local model on Mars.
+
+Called by the smart notifications widget with one argument: one notification per line, fields separated by tabs
+(key, app, package, title, text). Prints {"scores": {key: {"score": 0-100, "reason": str}}, "error": str|null}.
+Each notification is scored once: results are cached by its content, so only new ones reach the model. The text
+goes to Mars over the tailnet and nowhere else. Who and what matters lives in ~/.config/notif-score/context.md,
+which Ormus (or an agent) can edit; it is written with defaults the first time.
+"""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import re
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+MODEL_URL = "http://100.107.202.72:11434/api/chat"
+MODEL = "ornith-15-35b"
+CACHE = Path.home() / ".cache/notif-score/cache.json"
+CONTEXT = Path.home() / ".config/notif-score/context.md"
+KEEP_SECS = 3 * 86400
+
+DEFAULT_CONTEXT = """Diego (Ormus): founder of Ormus Solutions, engineering lead at Raven Cargo (freight, Chicago), in Panama.
+
+Matters most, score high:
+- Money: payments, invoices, wires, clients paying or asking about money, banks flagging something.
+- People waiting on him: clients and partners (Guy Bodart is his father and runs Altum Wealth; Fouzan leads EuroLuxe;
+  Cynthia DeBriey, Floralia; Kate Edelstein, Serprana; Stefano; Jatnna, Carpeta Panda; Tomas, embry0 partner;
+  David Swift, Second 50), Raven people (James Loewen, Kevin, Hubert, Scott Urban) and JTEKT (Ricky Bruce).
+- Production down or failing for many users, security alerts on his accounts.
+- Decisions only he can make, deadlines today.
+
+Matters little, score low:
+- Promotions, fundraising reminders, app system prompts, "finished" notices, routine status he can see elsewhere.
+"""
+
+PROMPT = (
+    "You triage phone notifications for the person described below. Score each 0-100 for how much it deserves "
+    "his attention right now, with a reason of at most 8 words. Reply only with JSON "
+    '{"scores": [{"id": str, "score": int, "reason": str}]}.\n\n'
+)
+
+
+def load_cache() -> dict:
+    try:
+        return json.loads(CACHE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def ask(context: str, batch: list[dict]) -> dict[str, dict]:
+    body = {
+        "model": MODEL,
+        "stream": False,
+        "format": "json",
+        "think": False,
+        "options": {"temperature": 0},
+        "messages": [
+            {"role": "system", "content": PROMPT + context},
+            {"role": "user", "content": json.dumps([{k: n[k] for k in ("id", "app", "title", "text")} for n in batch])},
+        ],
+    }
+    req = urllib.request.Request(MODEL_URL, json.dumps(body).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=45) as r:
+        content = json.loads(r.read())["message"]["content"].strip()
+    content = re.sub(r"^```(?:json)?|```$", "", content).strip()
+    out = {}
+    for s in json.loads(content).get("scores", []):
+        out[str(s.get("id"))] = {"score": max(0, min(100, int(s.get("score", 50)))), "reason": str(s.get("reason", ""))[:80]}
+    return out
+
+
+def main() -> None:
+    lines = [l for l in (sys.argv[1] if len(sys.argv) > 1 else "").split("\n") if l.strip()]
+    notes = []
+    for line in lines:
+        f = (line.split("\t") + [""] * 5)[:5]
+        digest = hashlib.sha1("\t".join(f[1:]).encode()).hexdigest()[:16]
+        notes.append({"key": f[0], "id": digest, "app": f[1], "title": f[3], "text": f[4][:300]})
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    if not CONTEXT.exists():
+        CONTEXT.parent.mkdir(parents=True, exist_ok=True)
+        CONTEXT.write_text(DEFAULT_CONTEXT)
+    error = None
+    # One model call at a time: the widget's refresh and a preview can run this together.
+    with open(CACHE.with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        cache = load_cache()
+        new = [n for n in notes if n["id"] not in cache]
+        if new:
+            try:
+                scored = ask(CONTEXT.read_text(), new[:25])
+                now = int(time.time())
+                for n in new[:25]:
+                    if n["id"] in scored:
+                        cache[n["id"]] = scored[n["id"]] | {"at": now}
+            except Exception as e:  # noqa: BLE001 - Mars off or a bad reply: the widget falls back to time order
+                error = f"mars: {e}"[:120]
+        cutoff = time.time() - KEEP_SECS
+        cache = {k: v for k, v in cache.items() if v.get("at", 0) > cutoff}
+        tmp = CACHE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cache))
+        tmp.replace(CACHE)
+    scores = {n["key"]: {"score": cache[n["id"]]["score"], "reason": cache[n["id"]]["reason"]} for n in notes if n["id"] in cache}
+    print(json.dumps({"scores": scores, "error": error}))
+
+
+if __name__ == "__main__":
+    main()
