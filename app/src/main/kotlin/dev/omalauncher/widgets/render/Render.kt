@@ -554,8 +554,10 @@ private fun Element(
             } else {
                 val hug = columnHugs(inst.program.level, sized, parent is RowScope, parent is ColumnScope && LocalHug.current)
                 HoldingPopups(el, mod, env, inst) { m, children ->
+                    val scroll = if (p.observe("scroll")?.truthy == true) rememberScrollState() else null
                     Column(
-                        m.then(if (p.observe("scroll")?.truthy == true) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                        // Takes drags only while its content overflows: one that fits lets a swipe through to home's pages.
+                        m.then(if (scroll != null) Modifier.verticalScroll(scroll, enabled = scroll.maxValue > 0) else Modifier),
                         verticalArrangement = arrangement,
                         horizontalAlignment = alignment,
                     ) { CompositionLocalProvider(LocalHug provides hug) { Nodes(children, env, inst, this) } }
