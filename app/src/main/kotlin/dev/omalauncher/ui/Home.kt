@@ -348,7 +348,8 @@ fun HomeScreen(
                 GridPad(
                     left = bars.getLeft(density, direction) + if (side == HomeSide.Left) sideRoom.roundToPx() else 0,
                     top = bars.getTop(density),
-                    right = bars.getRight(density, direction) + if (side == HomeSide.Right) sideRoom.roundToPx() else 0,
+                    // Omalauncher Ormus: in portrait the right strip is HomeLetterRail's.
+                    right = bars.getRight(density, direction) + if (side == HomeSide.Right) sideRoom.roundToPx() else if (side == null) HomeRailWidth.roundToPx() else 0,
                     bottom = bars.getBottom(density) + if (side != null) 0 else barRoom.roundToPx(),
                 )
             }
@@ -454,6 +455,11 @@ fun HomeScreen(
             onRenameFolder = { folder, name -> engine.shortcuts.rename(folder.key, name) },
         )
     }
+    }
+
+    // Omalauncher Ormus: Niagara's alphabet down home's right edge, in portrait, beside the tiles' rows; not over a face.
+    if (side == null && state.editing == null && terminals.active == null && shown.none(::full)) {
+        HomeLetterRail(runtime, Modifier.fillMaxWidth().homeRailBounds(engine.layout, barRoom))
     }
 
     if (extraKeys) {
