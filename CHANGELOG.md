@@ -6,6 +6,8 @@ Dates are when the build was uploaded to Play.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
+- Owl apps and widgets can open a place inside an Android app, as its own notifications
+  do: `androidIntent({package, component, action, data, extras})` (owl 8).
 - A store update no longer throws away changes made to a widget, app or face:
   settings' update leaves an edited one out and lists it as edited, and its store
   page says updating replaces the changes, as "update anyway" (a Play review).
