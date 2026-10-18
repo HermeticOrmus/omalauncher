@@ -138,11 +138,18 @@ fun HomeScreen(
     // Not the left one: adding a page before the one on screen would shift the pager under the finger.
     // Unfolded, tile pages show in pairs and a face across both halves: the pager counts slots (see slotsOf).
     val per = if (showsTwoPages(windowSize())) 2 else 1
+    // Omalauncher Ormus: only the pages of the space showing, each space starting at its own first page; faces, left of
+    // page 1, are now's.
+    val space = state.space
+    val spacePages = engine.pages
+        .filter { dev.omalauncher.Ormus.spaceOf(it) == space }
+        .ifEmpty { listOf(dev.omalauncher.Ormus.firstPage(space)) }
     val pageNumbers =
         pagerPages(
-            engine.pages,
-            lastEmpty = engine.itemsOn(engine.pages.last()).isEmpty(),
-            emptyPageLeft = LauncherStyle.emptyPageLeft,
+            spacePages,
+            lastEmpty = engine.itemsOn(spacePages.last()).isEmpty(),
+            // Omalauncher Ormus: the face page waiting on the left belongs to now.
+            emptyPageLeft = space == 0 && LauncherStyle.emptyPageLeft,
             emptyPageRight = LauncherStyle.emptyPageRight || arrange.carry != null,
         )
     // Only faces on screen, or the empty one waiting left of them: they get it whole, the bar's room too (see
@@ -153,11 +160,13 @@ fun HomeScreen(
     // shift as the widgets' pages joined, with home turning to page 1 among them.
     val slots = if (engine.loaded) slotsOf(pageNumbers, per, ::full) else emptyList()
     fun slotOf(page: Int) = slots.indexOfFirst { page in it }
-    fun homePage() = homePageIn(engine.pages, LauncherStyle.homePage)
+    // Omalauncher Ormus: in another space, its first page; now keeps home.home-page.
+    fun homePage() = if (space == 0) homePageIn(spacePages, LauncherStyle.homePage) else spacePages.first()
     // Home opens on home.home-page, page 1 unless set, or the first page after it if none is numbered so. Among the pages
     // that hold something: the empty ones waiting at either end aren't home.
     // Made again once the widgets have loaded, so it starts on that page among all of them.
-    val pager = key(engine.loaded) { rememberPagerState(initialPage = slotOf(homePage()).coerceAtLeast(0)) { slots.size } }
+    // A new space starts at its first page.
+    val pager = key(engine.loaded, space) { rememberPagerState(initialPage = slotOf(homePage()).coerceAtLeast(0)) { slots.size } }
     // A tile dropped on another page: show that page once the page list has caught up, by the list as it is then. The
     // list the request was made with could be one from before (a store add spilling onto page 2 showed a face). A swipe
     // meanwhile wins, and the request goes with it rather than firing later.
@@ -308,7 +317,8 @@ fun HomeScreen(
     val typing = terminals.active != null
     LaunchedEffect(typing) { if (!typing) terminals.keyboard?.hide() }
     DisposableEffect(state) {
-        state.onHomeAgain = { if (arrange.folder != null) arrange.folder = null else state.requestedPage = homePage() }
+        // Omalauncher Ormus: from another space, back to now's first page.
+        state.onHomeAgain = { if (arrange.folder != null) arrange.folder = null else if (state.space != 0) state.space = 0 else state.requestedPage = homePage() }
         onDispose { state.onHomeAgain = {} }
     }
     LaunchedEffect(state.requestedPage) {
@@ -365,6 +375,7 @@ fun HomeScreen(
     val sideRoom = sideWidth()
     val barRoom = with(density) { state.barHeight.takeIf { it > 0 }?.toDp() ?: (PromptBarHeight + HomeGap + EdgeGap) }
     LaunchedEffect(extraKeys) { if (!extraKeys) terminals.extraKeys = null }
+    val arrival = spaceArrival(space)
     Box(
         modifier
             .onGloballyPositioned { origin = it.positionInWindow() }
@@ -472,7 +483,12 @@ fun HomeScreen(
                         },
                     )
                     .focusRequester(state.homeEntry)
-                    .focusGroup(),
+                    .focusGroup()
+                    // Omalauncher Ormus: a space arrives from the way the swipe went.
+                    .graphicsLayer {
+                        alpha = arrival
+                        translationY = state.spaceStep * (1f - arrival) * 48.dp.toPx()
+                    },
             selected = state.editing,
             locked = terminals.locked,
             onSelect = { state.editing = it },
@@ -577,6 +593,7 @@ fun HomeScreen(
     if (side == null && state.editing == null && terminals.active == null && shown.none(::full)) {
         HomeLetterRail(runtime, Modifier.fillMaxWidth().homeRailBounds(engine.layout, barRoom))
     }
+    SpaceFlash(space)
 
     if (extraKeys) {
         ExtraKeys(

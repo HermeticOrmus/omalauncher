@@ -145,7 +145,8 @@ private class DragTrack {
 /**
  * Swiping on home (the pages, the recent apps strip, the bar) does what's picked in gesture settings: up for the
  * drawer or a panel in its place, down for a panel from the top. With the drawer open, the swipe drags it whatever
- * the setting, so it can still be pulled closed.
+ * the setting, so it can still be pulled closed. Omalauncher Ormus: with spaces picked for swiping up, swiping up goes
+ * to the next space and down to the one before, as if scrolling through them, whatever swiping down is set to.
  */
 @Composable
 internal fun Modifier.homeSwipe(
@@ -157,7 +158,8 @@ internal fun Modifier.homeSwipe(
     val drawerShown by remember(state) { derivedStateOf { state.drawer.value > 0f } }
     // Whether the drawer shows is only read when it matters: read here, it would recompose all of home (its Box is
     // inline) each time the drawer opens or closes.
-    val drags = gestures.swipeUp != Gestures.NONE || gestures.swipeDown != Gestures.NONE || drawerShown
+    val spaces = gestures.swipeUp == dev.omalauncher.Ormus.SWIPE_UP
+    val drags = (!spaces && (gestures.swipeUp != Gestures.NONE || gestures.swipeDown != Gestures.NONE)) || drawerShown
     val screenHeight = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     val drag = remember { DragTrack() }
     // One drag handler, only turned on or off: a new one mid-swipe (as the drawer starts to show) would drop the drag.
@@ -194,7 +196,7 @@ internal fun Modifier.homeSwipe(
             }
             drag.kind = HomeDrag.Undecided
         },
-    )
+    ).swipeVertical(enabled && spaces && !drags, up = { state.moveSpace(1) }, down = { state.moveSpace(-1) })
 }
 
 /**
@@ -259,7 +261,7 @@ fun GesturesScreen(
     val panels = runtime.widgets.panels().map { it.file.name to if (it.program == null) stringResource(R.string.gestures_has_errors, it.name) else it.name }
     val nothing = Gestures.NONE to stringResource(R.string.gestures_nothing)
     OverlayPanel(stringResource(R.string.gestures_title), onDismiss, contentWidth = ReadingWidth) {
-        GestureRow(stringResource(R.string.gestures_swipe_up), panels + listOf(nothing), gestures.swipeUp) { gestures.swipeUp = it }
+        GestureRow(stringResource(R.string.gestures_swipe_up), listOf(dev.omalauncher.Ormus.SWIPE_UP to "spaces") + panels + listOf(nothing), gestures.swipeUp) { gestures.swipeUp = it }
         EditPanel(runtime, gestures.swipeUp, onAgent)
         Spacer(Modifier.height(8.dp))
         GestureRow(stringResource(R.string.gestures_swipe_down), listOf(nothing) + panels, gestures.swipeDown) { gestures.swipeDown = it }

@@ -18,6 +18,24 @@ object Ormus {
     /** The agent setup picks first, which becomes the bar's default. */
     const val AGENT = "grok"
 
+    /**
+     * Swiping up on home until the gesture settings say otherwise (style.toml's gestures.swipe-up): the letter rail
+     * opens apps, so up and down move through spaces, and the drawer opens from the bar.
+     */
+    const val SWIPE_UP = "spaces"
+
+    /**
+     * Home's spaces, by area of life, in the order a swipe down steps through them (and wraps). A page number carries
+     * its space, a hundred pages each: now is pages 1-100, money 101-200 and so on, so saved layouts and layout.json
+     * need nothing new. Swiping up goes to the next, down to the one before; Home on home goes back to the first.
+     */
+    val SPACES = listOf("now", "money", "work", "mind", "world")
+    const val SPACE_PAGES = 100
+
+    fun spaceOf(page: Int) = ((page - 1) / SPACE_PAGES).coerceIn(0, SPACES.lastIndex)
+
+    fun firstPage(space: Int) = space * SPACE_PAGES + 1
+
     /** Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. */
     val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl")
 

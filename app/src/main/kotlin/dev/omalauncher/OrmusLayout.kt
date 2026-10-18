@@ -18,7 +18,7 @@ import org.json.JSONObject
 
 /**
  * Omalauncher Ormus: the home layout as files next to style.toml, so an agent on Sun can read and arrange the screens.
- * layout.json is rewritten whenever the arrangement changes. A layout.apply.json, written by anyone, is checked as a
+ * layout.json is rewritten whenever the arrangement changes; a page number carries its space (Ormus.SPACES). A layout.apply.json, written by anyone, is checked as a
  * whole (known keys, inside the grid, no overlaps, no tile under its minimum size) and applied all at once or not at
  * all; it then becomes layout.applied.json, or layout.rejected.json with the reasons in layout.errors.txt.
  */
@@ -58,6 +58,7 @@ class OrmusLayout(
                         .put("kind", kind(item))
                         .put("label", label(item))
                         .put("page", page)
+                        .put("space", Ormus.SPACES[Ormus.spaceOf(page)])
                         .put("x", c.x)
                         .put("y", c.y)
                         .put("w", c.w)
