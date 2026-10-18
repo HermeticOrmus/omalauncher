@@ -4,20 +4,27 @@ widget "mercurio" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 4; description: "Ormus's herdr agents on sg: which wait on him, which work, which finished. Tap to open Mercurio."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "Ormus's herdr agents on sg: who waits on him, who works, who finished, then the latest idle ones, each with its workspace. Tap to open Mercurio."; version: "1.2"; license: "MIT"; category: "productivity" }
 
-  // herdr prints its agent list as JSON. BatchMode, so a key sg doesn't know yet shows as an error, not a prompt.
-  source h = cmd("ssh -o BatchMode=yes -o ConnectTimeout=6 sg herdr agent list") every 60s json timeout 20s status
+  // Both herdr lists in one call, joined here by jq: every agent with its workspace's label, newest change first.
+  // BatchMode, so a key sg doesn't know yet shows as an error, not a password prompt.
+  source h = cmd("""ssh -o BatchMode=yes -o ConnectTimeout=6 sg 'herdr workspace list; herdr agent list' | jq -cs 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map({status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), seq: .state_change_seq, pane: .pane_id}) | sort_by(-.seq)'""") every 60s json timeout 20s status
 
-  let agents = h != null && h.ok ? h.out.result.agents : []
-  let waiting = count(agents, a => a.agent_status == "blocked")
-  let working = count(agents, a => a.agent_status == "working")
-  let done = count(agents, a => a.agent_status == "done")
-  // Whoever waits on Ormus first, then the ones at work, then the finished ones.
-  let busy = agents.filter(a => a.agent_status != "idle").sortBy(a => a.agent_status == "blocked" ? 0 : a.agent_status == "working" ? 1 : 2)
+  let all = h != null && h.ok ? h.out : []
+  let waiting = count(all, a => a.status == "blocked")
+  let working = count(all, a => a.status == "working")
+  let done = count(all, a => a.status == "done")
+  // Whoever waits on Ormus first, then the ones at work, then the finished ones; idle ones fill what room is left.
+  let busy = all.filter(a => a.status != "idle").sortBy(a => a.status == "blocked" ? 0 : a.status == "working" ? 1 : 2)
+  let idle = all.filter(a => a.status == "idle")
+  // As many lines as the tile holds: about 25 dp each, after the padding and the header.
+  let room = max(2, floor(((tileHeight ?? 136) - 50) / 25))
+  let shown = flatten([busy.take(room), idle.take(max(0, room - len(busy)))])
 
-  // Mercurio's applicationId kept its first name (solutions.ormus.logos), so the phone keeps its hosts and keys.
-  onTap: androidApp("solutions.ormus.logos")
+  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
+  source apps = android.apps every 10m
+  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+  onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
 
   Column {
     gap: 6
@@ -25,20 +32,18 @@ widget "mercurio" {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
       Text { text: "mercurio"; style: muted; weight: 1 }
-      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted; weight: 2; align: end; maxLines: 1 }
+      Text { text: h == null ? "…" : len(busy) == 0 ? "${len(all)} agents, all idle" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted; weight: 2; align: end; maxLines: 1 }
     }
     if h != null && !h.ok {
       Text { text: "sg doesn't answer: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
     }
-    if h != null && h.ok && len(busy) == 0 {
-      Text { text: "${len(agents)} agents, all idle"; style: body }
-    }
-    for a in busy.take(6) key a.pane_id {
+    for a in shown key a.pane {
       Row {
         gap: 8
         align: center
-        Text { text: a.agent_status == "blocked" ? "waiting" : a.agent_status; style: small; color: a.agent_status == "blocked" ? yellow : a.agent_status == "working" ? accent : green; width: 64 }
-        Text { text: a.terminal_title_stripped; style: body; maxLines: 1; weight: 1 }
+        Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 64; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
+        Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
+        Text { text: lower(a.ws); style: small; color: muted; width: 56; align: end; maxLines: 1 }
       }
     }
   }

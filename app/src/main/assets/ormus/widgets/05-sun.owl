@@ -18,7 +18,8 @@ widget "sun" {
       align: center
       gap: 10
       Text { text: ""; font: icon; fontSize: 22; width: 30; color: up == "up" ? accent : muted }
-      Text { text: up == null ? "sun …" : up == "up" ? "sun · online · tap for a shell" : "sun · offline"; style: body; weight: 1; maxLines: 1 }
+      // Narrower than the screen (beside pinned apps), the hint goes so the status fits.
+      Text { text: up == null ? "sun …" : up != "up" ? "sun · offline" : cols != null && cols < 6 ? "sun · online" : "sun · online · tap for a shell"; style: body; weight: 1; maxLines: 1 }
     }
   } else {
     Row {
