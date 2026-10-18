@@ -76,7 +76,7 @@ widget "mercurio" {
       // Handlers take one action, not a choice between two, so the choice is two nodes.
       if mercurio != null && get(links, a.host, null) != null {
         Box {
-          onTap: androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.host, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pid, "solutions.ormus.logos.extra.HERD_SESSION": "default"}})
+          onTap: androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.host, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pid, "solutions.ormus.logos.extra.HERD_SESSION": "default", "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
           AgentLine { a: a }
         }
       } else {
