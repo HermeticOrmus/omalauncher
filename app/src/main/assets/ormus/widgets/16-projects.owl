@@ -1,0 +1,50 @@
+widget "projects" {
+  page: 2
+  order: 0
+  size: 6x3
+  minSize: 3x2
+
+  meta { owl: 8; description: "Project work waiting on Ormus: pull requests that ask for his review and Linear issues in review or with an open question. Newest first, however old; tap one to open it."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // Built on Sun (ormus-feeds), where the keys live; the phone only reads the result over the tailnet.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  // Newest first; a review left open for months still waits, so nothing folds away.
+  let items = data != null ? data.items.filter(i => i.source == "github" || i.source == "linear").sortBy(i => i.age_min) : []
+  let failed = data != null ? keys(data.errors ?? {}).filter(k => k == "github" || k == "linear") : []
+  // Sun off: say how old the list is instead of passing it off as live.
+  let stale = data != null && now != null && now - data.generated > 600
+  let room = max(2, floor(((tileHeight ?? 204) - 50) / 25))
+
+  component Line(i) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: i.source == "github" ? "review" : "linear"; style: small; width: 52; color: i.source == "github" ? green : accent }
+      Text { text: i.title; style: body; maxLines: 1; weight: 1 }
+            Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : i.age_min < 86400 ? "${floor(i.age_min / 1440)}d" : "${floor(i.age_min / 43200)}mo"; style: small; color: i.age_min > 10080 ? yellow : muted; width: 32; align: end }
+    }
+  }
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "projects · ${len(items)} waiting"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : ""; style: small; color: !f.ok || stale || len(failed) > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+    }
+    if data != null && len(items) == 0 {
+      Text { text: "no review or decision waits on you"; style: body; color: green }
+    }
+    for i in items.take(room) key i.url ?? i.title {
+      // Handlers take one action, not a choice, so a row with no link is its own node.
+      if i.url != null {
+        Box { onTap: url(i.url); Line { i: i } }
+      } else {
+        Line { i: i }
+      }
+    }
+  }
+}
