@@ -11,6 +11,8 @@ Dates are when the build was uploaded to Play.
 - Widgets can read each app's installed version (`version` and `versionCode` on
   `android.apps`) and the launcher's own (`launcherCode` on `android.system`), so a
   widget can show which apps have an update waiting.
+- Widgets can open a place inside an app, with `androidIntent`: an activity, a URI and extras, as
+  the app's own notifications do (owl 8).
 
 ## 0.7.2 (versionCode 14) – 2026-10-14
 
