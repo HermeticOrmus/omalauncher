@@ -116,6 +116,10 @@ class MainActivity : ComponentActivity() {
     /** Pressing Home while already home closes the menu, like other launchers. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Omalauncher Ormus: Home pressed on home (not coming back from an app) goes back to the first space's first page.
+        if (hasWindowFocus()) {
+            if (state.space != 0) state.space = 0 else state.requestedPage = 0
+        }
         state.close()
         state.closeScreens()
         runtime.widgets.openScreen = null

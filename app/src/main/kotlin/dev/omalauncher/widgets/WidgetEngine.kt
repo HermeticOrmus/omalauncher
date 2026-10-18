@@ -219,7 +219,10 @@ class WidgetEngine(
 
     /** A widget with no room on its page moves to the next page with room at its size, or a new one after the last. Returns the page. */
     fun moveToFreePage(item: HomeItem): Int {
-        val page = pages.firstOrNull { it > item.page && layout.claim(item, itemsOn(it)) } ?: ((pages.maxOrNull() ?: 1) + 1)
+        // Omalauncher Ormus: within its own space.
+        val space = dev.omalauncher.Ormus.spaceOf(item.page)
+        val ours = pages.filter { dev.omalauncher.Ormus.spaceOf(it) == space }
+        val page = ours.firstOrNull { it > item.page && layout.claim(item, itemsOn(it)) } ?: ((ours.maxOrNull() ?: item.page) + 1)
         moveToPage(item, page)
         return page
     }

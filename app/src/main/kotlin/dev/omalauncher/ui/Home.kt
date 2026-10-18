@@ -69,11 +69,16 @@ fun HomeScreen(
     // while they hold something, so it becomes a real page once used and a new empty one follows.
     // Unfolded, pages show in pairs: the pager counts pairs, and an odd last page gets an empty partner.
     val per = if (showsTwoPages(LocalWindowInfo.current.containerSize)) 2 else 1
+    // Omalauncher Ormus: only the pages of the space showing, each space starting at its own first page.
+    val space = state.space
     val pageNumbers =
         engine.pages
+            .filter { dev.omalauncher.Ormus.spaceOf(it) == space }
+            .ifEmpty { listOf(dev.omalauncher.Ormus.firstPage(space)) }
             .let { if (engine.itemsOn(it.last()).isEmpty()) it else it + (it.last() + 1) }
             .let { if (it.size % per == 0) it else it + (it.last() + 1) }
-    val pager = rememberPagerState { pageNumbers.size / per }
+    // A new space starts at its first page.
+    val pager = androidx.compose.runtime.key(space) { rememberPagerState { pageNumbers.size / per } }
     // A tile dropped on another page: show that page once the page list has caught up.
     var showPage by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(showPage, pageNumbers) {
@@ -195,6 +200,7 @@ fun HomeScreen(
     val sideRoom = sideWidth()
     val barRoom = with(density) { state.barHeight.takeIf { it > 0 }?.toDp() ?: (PromptBarHeight + HomeGap + EdgeGap) }
     LaunchedEffect(extraKeys) { if (!extraKeys) terminals.extraKeys = null }
+    val arrival = spaceArrival(space)
     Box(
         modifier
             .onGloballyPositioned { origin = it.positionInWindow() }
@@ -261,7 +267,15 @@ fun HomeScreen(
             itemsOn = engine::itemsOn,
             layout = engine.layout,
             arrange = arrange,
-            modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { gridBounds = it.boundsInWindow() },
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .onGloballyPositioned { gridBounds = it.boundsInWindow() }
+                    .graphicsLayer {
+                        alpha = arrival
+                        translationY = state.spaceStep * (1f - arrival) * 48.dp.toPx()
+                    },
             selected = state.editing,
             onSelect = { state.editing = it },
             actions = { item ->
@@ -388,6 +402,7 @@ fun HomeScreen(
             },
         )
     }
+    SpaceFlash(space)
 
     if (extraKeys) {
         ExtraKeys(

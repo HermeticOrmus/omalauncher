@@ -44,6 +44,9 @@ enum class GestureAction(
 ) {
     Drawer("drawer", "app drawer"),
     None("none", "nothing"),
+
+    // Omalauncher Ormus: with the letter rail opening apps, swiping up and down moves through home's spaces.
+    Spaces("spaces", "spaces"),
     ;
 
     companion object {
@@ -57,7 +60,7 @@ class Gestures(
 ) {
     private val prefs = context.getSharedPreferences("launcher", Context.MODE_PRIVATE)
 
-    private var up by mutableStateOf(GestureAction.of(prefs.getString(SWIPE_UP, null)) ?: GestureAction.Drawer)
+    private var up by mutableStateOf(GestureAction.of(prefs.getString(SWIPE_UP, null)) ?: dev.omalauncher.Ormus.SWIPE_UP)
 
     /** The app drawer by default, like stock launchers. Saved as it's set. */
     var swipeUp: GestureAction
@@ -93,7 +96,8 @@ internal fun Modifier.drawerSwipe(
 
 /**
  * Swiping up on home (the pages, the recent apps strip, the bar) does what's picked in gesture settings. With
- * the drawer open, the swipe drags it whatever the setting, so it can still be pulled closed.
+ * the drawer open, the swipe drags it whatever the setting, so it can still be pulled closed. Omalauncher Ormus: with
+ * spaces picked, swiping up goes to the next space and down to the one before, as if scrolling through them.
  */
 @Composable
 internal fun Modifier.homeSwipe(
@@ -107,10 +111,11 @@ internal fun Modifier.homeSwipe(
     val drags =
         when (runtime.gestures.swipeUp) {
             GestureAction.Drawer -> true
-            GestureAction.None -> drawerShown
+            GestureAction.None, GestureAction.Spaces -> drawerShown
         }
+    val spaces = runtime.gestures.swipeUp == GestureAction.Spaces
     // One drag handler, only turned on or off: a new one mid-swipe (as the drawer starts to show) would drop the drag.
-    return drawerSwipe(state, enabled && drags)
+    return drawerSwipe(state, enabled && drags).swipeVertical(enabled && spaces && !drags, up = { state.moveSpace(1) }, down = { state.moveSpace(-1) })
 }
 
 /** Gesture settings: what swiping up on home does, picked from a dropdown. */
