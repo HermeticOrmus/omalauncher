@@ -253,6 +253,7 @@ the widget that ran it refreshes its sources; other widgets keep their own inter
 | `run("cmd")` | runs in the background (on its own shell, never retried), then refreshes this widget |
 | `x = run("cmd")` | the same, and puts the command's output into the state `x` when it finishes |
 | `androidApp("org.pkg")` | opens an Android app by package name, or by an `android.apps` key to open that copy in a work profile or clone |
+| `androidIntent({package, component, action, data, extras})` | opens a place inside an app, as its own notifications do: an activity of `package` (optionally `component`, its class), with `action` (default `android.intent.action.MAIN`), `data` (a URI) and `extras` (a map of strings). Only activities, only in that package (owl 8) |
 | `copy(text)` | copies text to the Android clipboard |
 | `notify("title", "text")` | posts an Android notification (if the launcher may post them) |
 | `url("https://...")` | opens in the Android browser. Other links open in the app that takes them: `tel:` the dialer, `geo:` maps, `mailto:` email |

@@ -110,8 +110,9 @@ class Compiler private constructor(
                 listOf("Input.focus", "sh", "corners").associateWith { 6 } +
                 // owl 7: more of the phone, without new permissions.
                 listOf("android.alarm", "android.modes", "torch", "share", "haptic").associateWith { 7 } +
-                // owl 8: apps, files that aren't tiles; the phone's apps as a list; images and sounds from the web.
-                listOf("app \"…\" { }", "android.apps", WEB_IMAGE, "sound").associateWith { 8 }
+                // owl 8: apps, files that aren't tiles; the phone's apps as a list; images and sounds from the web; an app
+                // opened at a place inside it.
+                listOf("app \"…\" { }", "android.apps", WEB_IMAGE, "sound", "androidIntent").associateWith { 8 }
 
         private const val WEB_IMAGE = "an image from the web"
 
