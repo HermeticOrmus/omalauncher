@@ -187,6 +187,8 @@ fun HomeScreen(
         snapshotFlow { imeTarget.getBottom(density) == 0 && terminals.keyboard?.wanted == true }.collect { terminals.keyboardLeaving = it }
     }
     var origin by remember { mutableStateOf(Offset.Zero) }
+    // Where the grid of tiles is, for HomeLetterRail: the strip of recent apps below it isn't the rail's.
+    var gridBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val extraKeys = terminals.active != null && extraKeysWanted()
     val side = homeSide()
     val turned = homeTurned()
@@ -248,7 +250,8 @@ fun HomeScreen(
             // the side portrait's bottom turned to.
             .padding(
                 start = if (side == HomeSide.Left) sideRoom else 0.dp,
-                end = if (side == HomeSide.Right) sideRoom else 0.dp,
+                // Omalauncher Ormus: in portrait the right strip is HomeLetterRail's.
+                end = if (side == HomeSide.Right) sideRoom else if (side == null) HomeRailWidth else 0.dp,
                 bottom = if (side != null) 0.dp else barRoom,
             ),
     ) {
@@ -258,7 +261,7 @@ fun HomeScreen(
             itemsOn = engine::itemsOn,
             layout = engine.layout,
             arrange = arrange,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { gridBounds = it.boundsInWindow() },
             selected = state.editing,
             onSelect = { state.editing = it },
             actions = { item ->
@@ -366,6 +369,23 @@ fun HomeScreen(
             onGroup = { app, target -> engine.shortcuts.group(app, target) },
             onReorder = { app, before -> engine.shortcuts.moveBefore(app.key, before) },
             onRenameFolder = { folder, name -> engine.shortcuts.rename(folder.key, name) },
+        )
+    }
+
+    // Omalauncher Ormus: Niagara's alphabet down home's right edge, in portrait; the grid above leaves it free.
+    if (side == null && state.editing == null && terminals.active == null) {
+        val grid = gridBounds
+        HomeLetterRail(
+            runtime,
+            if (grid == null) {
+                Modifier.fillMaxSize().padding(top = with(density) { statusBar.getTop(density).toDp() } + EdgeGap, bottom = barRoom)
+            } else {
+                // The tiles' rows, not the grid's bounds: the strip of recent apps is drawn over the grid's bottom.
+                val rows = engine.layout.gridSize()?.second
+                val cell = engine.layout.geometry?.second
+                val tall = if (rows != null && cell != null) rows * cell else grid.height
+                with(density) { Modifier.fillMaxWidth().padding(top = (grid.top - origin.y).toDp()).height(tall.toDp()) }
+            },
         )
     }
 
