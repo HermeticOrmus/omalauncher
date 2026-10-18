@@ -1,0 +1,54 @@
+widget "pipeline" {
+  page: 102
+  order: 1
+  size: 6x5
+  minSize: 3x2
+
+  meta { owl: 8; description: "Ormus Solutions' sales pipeline from its leads table: leads by stage, and the follow-ups that are due, the furthest along first. Tap one for its proposal."; version: "1.0"; license: "MIT"; category: "finance" }
+
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let pipe = data != null ? data.pipeline : null
+  // Nobody has touched a lead in two weeks: say so, the pipeline has gone cold.
+  let cold = pipe != null && now != null && pipe.as_of != null && now - pipe.as_of > 1209600
+  let stale = data != null && now != null && now - data.generated > 900
+  let room = max(1, floor(((tileHeight ?? 340) - 96) / 25))
+
+  component Line(d) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: d.business; style: body; maxLines: 1; weight: 1 }
+      Text { text: d.stage; style: small; color: d.stage == "new" ? muted : green; width: 70; maxLines: 1 }
+      Text { text: d.owner ?? ""; style: small; color: muted; width: 56; maxLines: 1 }
+      Text { text: d.days_over == 0 ? "today" : "${d.days_over}d over"; style: small; width: 56; align: end; color: d.days_over > 7 ? yellow : muted }
+    }
+  }
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: pipe != null ? "pipeline · ${pipe.count} leads" : "pipeline"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.pipeline != null ? "leads unreadable" : cold ? "untouched ${floor((now - pipe.as_of) / 86400)}d" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+    }
+    if pipe != null {
+      Flow {
+        gap: 6
+        for s in pipe.stages key s.stage {
+          Button { text: "${s.stage} ${s.n}"; color: s.stage == "new" ? muted : green }
+        }
+      }
+      Text { text: pipe.follow_ups_total > 0 ? "follow-ups due · ${pipe.follow_ups_total}" : "no follow-up due"; style: small; color: muted }
+      for d in pipe.follow_ups.take(room) key d.business {
+        if d.url != null {
+          Box { onTap: url(d.url); Line { d: d } }
+        } else {
+          Line { d: d }
+        }
+      }
+    }
+  }
+}
