@@ -270,8 +270,10 @@ private fun Element(
         "Column" -> {
             val gap = (p.observe("gap")?.num() ?: 4.0).dp
             val align = p.observe("align")?.toString()
+            val scroll = if (p.observe("scroll")?.truthy == true) rememberScrollState() else null
             Column(
-                mod.then(if (p.observe("scroll")?.truthy == true) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                // Takes drags only while its content overflows: one that fits lets a swipe through to home's pages.
+                mod.then(if (scroll != null) Modifier.verticalScroll(scroll, enabled = scroll.maxValue > 0) else Modifier),
                 verticalArrangement = vertical(p.observe("justify")?.toString(), gap),
                 horizontalAlignment =
                     when (align) {

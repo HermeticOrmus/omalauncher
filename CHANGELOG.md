@@ -13,6 +13,8 @@ Dates are when the build was uploaded to Play.
   widget can show which apps have an update waiting.
 - Widgets can open a place inside an app, with `androidIntent`: an activity, a URI and extras, as
   the app's own notifications do (owl 8).
+- A widget's scrolling column only takes swipes while its content overflows, so swiping on home
+  over one whose content fits still opens the drawer.
 
 ## 0.7.2 (versionCode 14) – 2026-10-14
 
