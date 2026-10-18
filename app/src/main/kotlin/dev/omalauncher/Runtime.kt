@@ -203,6 +203,7 @@ class Runtime(
     fun start() {
         if (started) return
         started = true
+        OrmusLayout(widgets, LauncherData.styleDir(context), scope).start()
         scope.launch {
             withContext(Dispatchers.IO) {
                 launcherFiles.sync()

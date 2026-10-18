@@ -156,6 +156,9 @@ class WidgetLayout(
         return face.takeIf { items.none { !it.isFace && cells[it.key] != null } }
     }
 
+    /** Columns and rows of [grid], for OrmusLayout; null until home has been laid out. */
+    fun gridSize() = grid
+
     /**
      * Gives widgets that have no cell yet one at their declared size, in the
      * first free spot. Saved cells are never rewritten here: a temporarily
