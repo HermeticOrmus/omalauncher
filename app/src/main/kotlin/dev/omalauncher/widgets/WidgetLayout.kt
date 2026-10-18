@@ -109,6 +109,9 @@ class WidgetLayout(
     /** The grid last laid out on screen; every page shares it. */
     private var grid: Pair<Int, Int>? = null
 
+    /** Columns and rows of [grid], for OrmusLayout; null until home has been laid out. */
+    fun gridSize() = grid
+
     /**
      * Gives widgets that have no cell yet one at their declared size, in the
      * first free spot. Saved cells are never rewritten here: a temporarily

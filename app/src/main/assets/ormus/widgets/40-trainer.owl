@@ -4,7 +4,7 @@ widget "trainer" {
   size: 6x5
   minSize: 3x3
 
-  meta { owl: 4; description: "A card from Ormus Trainer's decks: tap to flip, next for the following one. The Trainer app keeps the real review schedule."; version: "1.0"; license: "MIT"; category: "learning" }
+  meta { owl: 4; description: "A card from Ormus Trainer's decks: tap to flip, next for the following one. The Trainer app keeps the real review schedule."; version: "1.1"; license: "MIT"; category: "learning" }
 
   state deck = "ai-terms" persist
   state pick = 0 persist
@@ -34,16 +34,21 @@ widget "trainer" {
       }
     }
     if card == null {
-      Text { text: d == null ? "…" : "no cards yet: Sun's decks are on the tailnet"; style: muted }
+      Text { text: d == null ? "…" : "no cards yet: Sun's decks are on the tailnet"; style: muted; weight: 1 }
     } else {
-      Text { text: card.prompt; style: title; maxLines: 3 }
-      if flipped {
-        Text { text: card.answer; style: body; maxLines: 9 }
-      } else {
-        Text { text: "tap to flip"; style: muted }
+      // The card takes the tile: a big prompt alone, then a smaller one above the whole answer once flipped.
+      Column {
+        weight: 1
+        justify: center
+        gap: 12
+        Text { text: card.prompt; fontSize: flipped ? 20 : 26; bold: true; maxLines: 3 }
+        if flipped {
+          Text { text: card.answer; style: body; maxLines: 14 }
+        } else {
+          Text { text: "tap to flip"; style: muted }
+        }
       }
     }
-    Spacer { weight: 1 }
     Row {
       gap: 8
       align: center
