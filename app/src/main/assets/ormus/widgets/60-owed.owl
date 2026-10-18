@@ -1,0 +1,53 @@
+widget "owed" {
+  page: 101
+  order: 0
+  size: 6x4
+  minSize: 3x2
+
+  meta { owl: 8; description: "Money owed to Ormus: invoices sent and not paid, from the invoicer on Sun, the latest due first. Tap one to message the client."; version: "1.0"; license: "MIT"; category: "finance" }
+
+  // Built on Sun (ormus-feeds money); paid status is only as fresh as the invoicer, so its date shows.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let owed = data != null ? data.owed : null
+  let items = owed != null ? owed.items.sortBy(i => -i.days_late) : []
+  let stale = data != null && now != null && now - data.generated > 900
+  let room = max(1, floor(((tileHeight ?? 272) - 92) / 25))
+
+  component Line(i) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: i.client; style: body; maxLines: 1; weight: 1 }
+      Text { text: i.number; style: small; color: muted; width: 96; maxLines: 1 }
+      Text { text: i.total_text; style: body; width: 64; align: end }
+      Text { text: i.days_late > 0 ? "${i.days_late}d late" : i.days_late == 0 ? "due today" : "in ${-i.days_late}d"; style: small; width: 62; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? yellow : muted }
+    }
+  }
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "owed to you"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.owed != null ? "invoicer unreadable" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+    }
+    if owed != null {
+      Text { text: owed.total_text; fontSize: 30; bold: true; color: accent }
+      if len(items) == 0 {
+        Text { text: "nothing owed"; style: body; color: green }
+      }
+      for i in items.take(room) key i.number {
+        // Handlers take one action, not a choice, so a row with no chat is its own node.
+        if i.url != null {
+          Box { onTap: url(i.url); Line { i: i } }
+        } else {
+          Line { i: i }
+        }
+      }
+      Text { text: "paid status as of the invoicer, ${owed.as_of_text}"; style: small; color: muted; maxLines: 1 }
+    }
+  }
+}

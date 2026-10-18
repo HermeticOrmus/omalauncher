@@ -1,0 +1,53 @@
+widget "raven" {
+  page: 202
+  order: 0
+  size: 6x6
+  minSize: 3x3
+
+  meta { owl: 8; description: "Ormus's Raven Cargo work: his RAV issues in progress and in review, the latest touched first, and whether the JTEKT portal answers and which deploy it runs. Tap an issue to open it in Linear."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // Built on Sun (ormus-feeds raven) from Linear, the portal itself and Vercel.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/raven.json") every 3m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let lin = data != null ? data.linear : null
+  let portal = data != null ? data.portal : null
+  let deploy = data != null ? data.deploy : null
+  let stale = data != null && now != null && now - data.generated > 600
+  let room = max(2, floor(((tileHeight ?? 408) - 104) / 25))
+
+  component Line(i) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: i.id; style: small; color: i.state == "In Review" ? green : muted; width: 72 }
+      Text { text: i.title; style: body; maxLines: 1; weight: 1 }
+      Text { text: i.state == "In Review" ? "review" : "doing"; style: small; color: muted; width: 44; align: end }
+      Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : "${floor(i.age_min / 1440)}d"; style: small; color: muted; width: 30; align: end }
+    }
+  }
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: lin != null ? "raven · ${lin.in_progress} doing · ${lin.in_review} review" : "raven"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || stale || data.errors.linear != null ? yellow : muted; width: 120; align: end; maxLines: 1 }
+    }
+    Row {
+      gap: 8
+      align: center
+      Text { text: portal == null ? "portal down" : "portal ${portal.status} · ${fixed(portal.ms / 1000, 1)}s · ${portal.sha}"; style: small; color: portal == null || portal.status != 200 ? red : portal.ms > 3000 ? yellow : green; weight: 1; maxLines: 1 }
+      Text { text: deploy == null ? "deploy unknown" : "deploy ${lower(deploy.state)} ${deploy.age_min < 60 ? "${deploy.age_min}m" : deploy.age_min < 1440 ? "${floor(deploy.age_min / 60)}h" : "${floor(deploy.age_min / 1440)}d"} ago"; style: small; color: deploy == null || deploy.state != "READY" ? yellow : muted; width: 150; align: end; maxLines: 1 }
+    }
+    if deploy != null && portal != null && deploy.sha != "" && deploy.sha != portal.sha {
+      Text { text: "live ${portal.sha} differs from the last deploy ${deploy.sha}"; style: small; color: yellow; maxLines: 1 }
+    }
+    if lin != null {
+      for i in lin.recent.take(room) key i.id {
+        Box { onTap: url(i.url); Line { i: i } }
+      }
+    }
+  }
+}
