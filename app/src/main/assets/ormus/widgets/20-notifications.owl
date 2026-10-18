@@ -4,12 +4,26 @@ widget "notifications" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 4; description: "The phone's notifications: tap one to open it, x to clear it."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "The phone's notifications ranked by how much they matter to Ormus right now, scored by the local model on Mars with a one-line reason; the quieter ones fold away. Tap to open, x to clear."; version: "2.0"; license: "MIT"; category: "productivity" }
 
-  // Android's notification shade, updated as notifications come and go. No shell involved.
+  // Android's notification shade, updated as notifications come and go.
   source n = android.notifications
+  // Mercurio's agent notices are already the mercurio widget's whole job.
+  let items = n != null && n.available ? n.items.filter(i => !startsWith(i.package ?? "", "solutions.ormus.logos")) : []
+  // One per line, tab-separated, for notif-score (in ~/.local/bin, installed by the Ormus bridge).
+  let payload = join(items.map(i => "${i.key}\t${i.app}\t${i.package ?? ""}\t${replace(replace(i.title ?? "", "\t", " "), "\n", " ")}\t${replace(replace(i.text ?? "", "\t", " "), "\n", " ")}"), "\n")
+  // Only new notifications reach the model; known ones come back from its cache at once.
+  source s = cmd("notif-score ${sh(payload)}") every 1m json timeout 60s status
+  state showAll = false
 
-  if !n.available {
+  let scores = s != null && s.ok ? s.out.scores : {}
+  let failed = s != null && (!s.ok || s.out.error != null)
+  let ranked = items.map(i => {i: i, sc: get(scores, i.key, null)}).sortBy(x => x.sc == null ? -50 - x.i.time / 10000000000 : -x.sc.score)
+  let important = ranked.filter(x => x.sc == null || x.sc.score >= 60)
+  let quiet = len(ranked) - len(important)
+  let shown = showAll ? ranked : important
+
+  if n != null && !n.available {
     Column {
       justify: center
       fill: true
@@ -23,32 +37,44 @@ widget "notifications" {
       gap: 6
       fill: true
       Row {
-        Text { text: "notifications"; style: muted; weight: 1 }
-        Text { text: n.count; style: muted; width: 40; align: end }
+        align: center
+        Text { text: showAll ? "all notifications · ${len(ranked)}" : "important · ${len(important)}"; style: muted; weight: 1 }
+        if failed {
+          Text { text: "mars off · by time"; style: small; color: yellow; width: 130; align: end }
+        }
+        if quiet > 0 {
+          Button { text: showAll ? "important only" : "${quiet} quieter"; color: muted; onTap: showAll = !showAll }
+        }
       }
-      if n.count == 0 {
-        Text { text: "all clear"; style: small }
+      if len(shown) == 0 {
+        Text { text: len(ranked) == 0 ? "all clear" : "nothing important · ${quiet} quieter"; style: small; color: green }
       }
       Column {
         gap: 8
         weight: 1
         scroll: true
-        for item in n.items key item.key {
+        for x in shown key x.i.key {
           Row {
             gap: 8
             align: top
             Column {
               gap: 0
               weight: 1
-              onTap: notification("open", item.key)
-              Text { text: "${item.app} · ${fmtTime(item.time, "HH:mm")}"; style: label; maxLines: 1 }
-              Text { text: item.title; bold: true; maxLines: 1 }
-              if item.text != "" {
-                Text { text: item.text; style: small; maxLines: 2 }
+              onTap: notification("open", x.i.key)
+              Row {
+                Text { text: "${x.i.app} · ${fmtTime(x.i.time, "HH:mm")}"; style: label; maxLines: 1; weight: 1 }
+                Text { text: x.sc == null ? "…" : "${x.sc.score}"; style: label; width: 28; align: end; color: x.sc == null ? muted : x.sc.score >= 80 ? yellow : x.sc.score >= 60 ? accent : muted }
+              }
+              Text { text: x.i.title; bold: true; maxLines: 1 }
+              if x.i.text != "" {
+                Text { text: x.i.text; style: small; maxLines: 2 }
+              }
+              if x.sc != null && x.sc.reason != "" {
+                Text { text: x.sc.reason; style: small; italic: true; color: muted; maxLines: 1 }
               }
             }
-            if item.clearable {
-              Button { text: "x"; color: muted; onTap: notification("dismiss", item.key) }
+            if x.i.clearable {
+              Button { text: "x"; color: muted; onTap: notification("dismiss", x.i.key) }
             }
           }
         }

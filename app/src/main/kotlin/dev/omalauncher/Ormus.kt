@@ -70,7 +70,7 @@ class OrmusBridge(
         while (true) {
             val code =
                 runCatching {
-                    for (name in listOf("bridge.sh", "authorized_keys")) {
+                    for (name in listOf("bridge.sh", "authorized_keys", "notif-score")) {
                         proot.hostFile("/tmp/ormus-$name").writeBytes(context.assets.open("ormus/$name").use { it.readBytes() })
                     }
                     proot.run("exec sh /tmp/ormus-bridge.sh /tmp/ormus-authorized_keys") { Log.i(TAG, it) }

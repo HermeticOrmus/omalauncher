@@ -1,0 +1,70 @@
+widget "markets" {
+  page: 2
+  order: 0
+  size: 6x4
+  minSize: 3x3
+
+  meta { owl: 8; description: "Ormus's markets desk: Salamander P&L since start and today, its open positions, and his top Kalshi edges. Read-only."; version: "1.0"; license: "MIT"; category: "finance" }
+
+  // Built on Sun (ormus-feeds) from Salamander's state and the Kalshi co-pilot; nothing here can trade.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/markets.json") every 2m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let sal = data != null ? data.salamander : null
+  let kalshi = data != null ? data.kalshi : null
+  // The board only counts markets with both his probability and a price; settled ones drop out.
+  let edges = kalshi != null ? kalshi.edges.filter(e => e.edge != null) : []
+  let positions = kalshi != null ? kalshi.positions ?? [] : []
+  let stale = data != null && now != null && now - data.generated > 600
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "markets"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end }
+    }
+    if sal != null {
+      Row {
+        align: center
+        gap: 10
+        Text { text: "${sal.pnl_total >= 0 ? "+" : "-"}$${fixed(abs(sal.pnl_total), 0)}"; fontSize: 30; bold: true; width: 150; color: sal.pnl_total >= 0 ? green : red }
+        Column {
+          weight: 1
+          Text { text: "salamander since ${sal.since}"; style: small; color: muted; maxLines: 1 }
+          Text { text: sal.pnl_today == null ? "" : "today ${sal.pnl_today >= 0 ? "+" : "-"}$${fixed(abs(sal.pnl_today), 0)}"; style: small; color: sal.pnl_today == null || sal.pnl_today >= 0 ? green : red }
+        }
+      }
+      for p in sal.open.take(3) key p.name {
+        Row {
+          gap: 8
+          Text { text: p.name; style: body; weight: 1; maxLines: 1 }
+          Text { text: p.size; style: small; color: muted; width: 140; align: end; maxLines: 1 }
+          Text { text: p.pnl == null ? "" : "${p.pnl >= 0 ? "+" : "-"}$${fixed(abs(p.pnl), 0)}"; style: small; width: 56; align: end; color: p.pnl == null || p.pnl >= 0 ? green : red }
+        }
+      }
+    }
+    if len(edges) == 0 && len(positions) > 0 {
+      Text { text: "kalshi · ${kalshi.total != null ? "$${fixed(kalshi.total, 2)}" : ""} · no live edges, refresh the watchlist"; style: small; color: muted; maxLines: 1 }
+      for p in positions.take(3) key p.market {
+        Row {
+          gap: 8
+          Text { text: p.market; style: body; weight: 1; maxLines: 1 }
+          Text { text: p.side; style: small; color: muted; width: 36; align: end }
+          Text { text: p.pnl == null ? "" : "${p.pnl >= 0 ? "+" : "-"}$${fixed(abs(p.pnl), 2)}"; style: small; width: 64; align: end; color: p.pnl == null || p.pnl >= 0 ? green : red }
+        }
+      }
+    }
+    if len(edges) > 0 {
+      Text { text: "kalshi edges"; style: small; color: muted }
+      for e in edges.take(3) key e.market {
+        Row {
+          gap: 8
+          Text { text: e.market; style: body; weight: 1; maxLines: 1 }
+          Text { text: e.edge == null ? "" : "${e.edge >= 0 ? "+" : ""}${round(e.edge * 100)}pt"; style: small; width: 56; align: end; color: e.edge != null && e.edge > 0 ? accent : muted }
+        }
+      }
+    }
+  }
+}

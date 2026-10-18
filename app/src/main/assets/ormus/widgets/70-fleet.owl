@@ -1,0 +1,44 @@
+widget "fleet" {
+  page: 1
+  order: 7
+  size: 6x2
+  minSize: 3x2
+
+  meta { owl: 8; description: "Ormus's machines up or down, and any loop or service that failed on Sun; tap a machine for a shell."; version: "1.0"; license: "MIT"; category: "system" }
+
+  // Built on Sun (ormus-feeds) from tailscale status, the loops' state and failed systemd units.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/fleet.json") every 1m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let machines = data != null ? data.machines.filter(m => !m.retired) : []
+  let down = machines.filter(m => !m.online)
+  let failing = data != null ? data.loops.filter(l => !l.ok).map(l => "${l.name}@${l.machine}") : []
+  let units = data != null ? len(data.failed_units ?? []) : 0
+  // The phone has keys and ssh aliases for these only; sg has no mosh-server.
+  let reach = ["sun", "sg", "mars"]
+  let stale = data != null && now != null && now - data.generated > 300
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "fleet · ${len(machines) - len(down)}/${len(machines)} up"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || stale || len(failing) > 0 ? yellow : green; weight: 1; align: end }
+    }
+    Flow {
+      gap: 6
+      for m in machines key m.name {
+        // Handlers take one action, not a choice, so a machine the phone can't reach is its own node.
+        if m.ssh != null && m.online && any(reach, r => r == m.ssh) {
+          Button { text: m.name; color: accent; onTap: terminal(m.ssh == "sun" ? "mosh sun" : "ssh -t ${m.ssh}", m.name) }
+        } else {
+          Button { text: m.name; color: m.online ? muted : red }
+        }
+      }
+    }
+    if len(failing) > 0 {
+      Text { text: join(failing, " · "); style: small; color: yellow; maxLines: 2 }
+    }
+  }
+}

@@ -18,5 +18,7 @@ grep -q '^Host sun$' ~/.ssh/config 2>/dev/null || printf 'Host sun\n    HostName
 grep -q '^Host sg$' ~/.ssh/config 2>/dev/null || printf 'Host sg\n    HostName 100.66.108.108\n    User ormus\n' >> ~/.ssh/config
 # Mars runs Ormus's Hermes agents in herdr too.
 grep -q '^Host mars$' ~/.ssh/config 2>/dev/null || printf 'Host mars\n    HostName 100.107.202.72\n    User aiadmin\n' >> ~/.ssh/config
+# The smart notifications widget's scorer (asks the local model on Mars).
+mkdir -p ~/.local/bin && install -m 755 /tmp/ormus-notif-score ~/.local/bin/notif-score
 ssh-keygen -A
 exec /usr/bin/sshd -D -e -p 2223 -o PasswordAuthentication=no -o PermitRootLogin=prohibit-password
