@@ -4,7 +4,7 @@ widget "mercurio" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 8; description: "Ormus's herdr agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with workspace, machine and how long ago. Tap to open Mercurio."; version: "2.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "Ormus's herdr agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with workspace, machine and how long ago. Tap one to land in its pane."; version: "2.1"; license: "MIT"; category: "productivity" }
 
   // Every machine at once, each through jq into one list. herdr's sort_key is the agent's last activity in minutes
   // since 1970 on every machine, so the lists merge by real time; per-machine counters don't compare. A machine
@@ -17,7 +17,7 @@ widget "mercurio" {
       # ~/.local/bin first: a non-interactive login otherwise finds an older system herdr (Sun has pacman's 0.8.2,
       # which the running 0.9 server turns away with protocol_mismatch).
       ( ssh -o BatchMode=yes -o ConnectTimeout=5 "$m" 'PATH="$HOME/.local/bin:$PATH"; herdr workspace list; herdr agent list' 2>/dev/null \
-        | jq -cs --arg m "$m" --argjson now "$now" 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map(((.tokens.sort_key // "0") | tonumber) as $k | {host: $m, status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), k: $k, pane: ($m + ":" + .pane_id), ago: (if $k == 0 then "" else ($now - $k) as $d | if $d < 60 then "\($d)m" elif $d < 1440 then "\($d / 60 | floor)h" else "\($d / 1440 | floor)d" end end)})' > "$D/$m.json" \
+        | jq -cs --arg m "$m" --argjson now "$now" 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map(((.tokens.sort_key // "0") | tonumber) as $k | {host: $m, status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), k: $k, pane: ($m + ":" + .pane_id), pid: .pane_id, ago: (if $k == 0 then "" else ($now - $k) as $d | if $d < 60 then "\($d)m" elif $d < 1440 then "\($d / 60 | floor)h" else "\($d / 1440 | floor)d" end end)})' > "$D/$m.json" \
         || echo null > "$D/$m.json" ) &
     done
     wait
@@ -42,6 +42,22 @@ widget "mercurio" {
   let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
   onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
 
+  // Hosts saved in Mercurio, as its links name them (ssh://user@host:port#nickname). An agent on one of them opens
+  // in Mercurio at its pane, the way Mercurio's own notification does; sg has no host there yet, so its agents open
+  // in a terminal here, attached with herdr (sg has no mosh-server).
+  let links = {sun: "ssh://ormus@100.92.213.61:22#Sun", mars: "ssh://aiadmin@100.107.202.72:22#mars"}
+
+  component AgentLine(a) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
+      Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
+      Text { text: "${lower(a.ws)}·${a.host}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
+      Text { text: a.ago; style: small; color: muted; width: 28; align: end; maxLines: 1 }
+    }
+  }
+
   Column {
     gap: 6
     Row {
@@ -57,13 +73,17 @@ widget "mercurio" {
       Text { text: "couldn't read herdr: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
     }
     for a in shown key a.pane {
-      Row {
-        gap: 8
-        align: center
-        Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
-        Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
-        Text { text: "${lower(a.ws)}·${a.host}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
-        Text { text: a.ago; style: small; color: muted; width: 28; align: end; maxLines: 1 }
+      // Handlers take one action, not a choice between two, so the choice is two nodes.
+      if mercurio != null && get(links, a.host, null) != null {
+        Box {
+          onTap: androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.host, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pid, "solutions.ormus.logos.extra.HERD_SESSION": "default"}})
+          AgentLine { a: a }
+        }
+      } else {
+        Box {
+          onTap: terminal("ssh -t ${a.host} 'PATH=$HOME/.local/bin:$PATH exec herdr agent attach ${a.pid}'", a.title)
+          AgentLine { a: a }
+        }
       }
     }
   }
