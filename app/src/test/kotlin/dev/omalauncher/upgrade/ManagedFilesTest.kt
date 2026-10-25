@@ -55,6 +55,22 @@ class ManagedFilesTest {
         assertEquals("theirs", read("a.conf"))
     }
 
+    @Test fun adoptsAFileThatAlreadyHoldsExactlyWhatItShips() {
+        // Put there first (by an agent previewing it, say) with the very bytes the launcher ships: it's no edit.
+        File(base, "a.conf").writeText("v1")
+        files.sync(listOf(seeded("a.conf", "v1")))
+        files.sync(listOf(seeded("a.conf", "v2")))
+        assertEquals("v2", read("a.conf"))
+    }
+
+    @Test fun adoptsAnEditThatMatchesTheNewVersion() {
+        files.sync(listOf(seeded("a.conf", "v1")))
+        File(base, "a.conf").writeText("v2")
+        files.sync(listOf(seeded("a.conf", "v2")))
+        files.sync(listOf(seeded("a.conf", "v3")))
+        assertEquals("v3", read("a.conf"))
+    }
+
     @Test fun doesNotBringBackDeletedDefaults() {
         files.sync(listOf(seeded("a.conf", "v1")))
         File(base, "a.conf").delete()

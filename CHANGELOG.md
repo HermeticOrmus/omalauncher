@@ -25,6 +25,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   `android.apps`; `launcherCode` on `android.system`), and `androidIntent(...)` opens
   a place inside an app.
 - A scrolling Column that fits its tile lets home's swipes through.
+- A shipped widget or config that already holds exactly what this version ships is
+  the launcher's again, so later versions update it: one an agent previewed before
+  it shipped stayed stuck on that copy.
 - Ormus widgets: sun, now playing, smart notifications, communications, projects,
   mercurio, trainer, the pass, owed, people, pipeline, fleet, raven (the reviews
   waiting longest first), today, markets; and money's face, left of money's first page.
