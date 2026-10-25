@@ -25,15 +25,19 @@ data class FolderTile(
     override val cell: Cell? = null,
 ) : Tile
 
-/** A home page in layout.toml: a face, filling it, or tiles. */
-sealed interface PageEntry
+/** A home page in layout.toml: a face, filling it, or tiles. Omalauncher Ormus: in [space], an index into Ormus.SPACES. */
+sealed interface PageEntry {
+    val space: Int
+}
 
 data class FacePage(
     val file: String,
+    override val space: Int = 0,
 ) : PageEntry
 
 data class TilePage(
     val tiles: List<Tile>,
+    override val space: Int = 0,
 ) : PageEntry
 
 /** Home as layout.toml says: its pages left to right, and the columns their cells are on. */
@@ -54,6 +58,7 @@ object HomeFile {
     private const val VERSION_KEY = "version"
     private const val COLUMNS = "columns"
     private const val PAGE = "page"
+    private const val SPACE = "space"
 
     /** The file's keys for [screen]'s columns and pages: at the top for the main screen, in its section for another. */
     private fun columnsKey(screen: Screen) = if (screen == Screen.MAIN) COLUMNS else "${screen.key}.$COLUMNS"
@@ -78,7 +83,8 @@ object HomeFile {
         |# A foldable's cover screen has pages of its own under [cover], as [[cover.page]]; without them it
         |# starts from the pages above. With home.unfolded-layout, a Fold's inner screen has its own under
         |# [unfolded] (its columns home.unfolded-columns), starting from the pages above side by side.
-        |# What couldn't be read is in errors.txt next to this file.
+        |# What couldn't be read is in errors.txt next to this file. Omalauncher Ormus: space = "money" puts a
+        |# page in that space (now, money, work, mind, world); a page without one is in the space of the one before it.
         |
         """.trimMargin()
 
@@ -94,10 +100,7 @@ object HomeFile {
      * Page numbers for [pages] in order, as [WidgetEngine.arrangePages] numbers them: the first page of tiles is
      * page 1, where home opens, the ones before it 0, -1, ... and the rest 2, 3, ....
      */
-    fun numbers(pages: List<PageEntry>): List<Int> {
-        val first = pages.indexOfFirst { it is TilePage }.let { if (it < 0) pages.size else it }
-        return pages.indices.map { it - first + 1 }
-    }
+    fun numbers(pages: List<PageEntry>): List<Int> = dev.omalauncher.Ormus.pageNumbers(pages.map { it.space }, pages.map { it is TilePage })
 
     fun encode(
         table: Map<String, Any>,
@@ -121,8 +124,8 @@ object HomeFile {
     private fun encodePages(layout: HomeLayout) =
         layout.pages.map { page ->
             when (page) {
-                is FacePage -> linkedMapOf<String, Any>("face" to page.file)
-                is TilePage -> linkedMapOf<String, Any>("tiles" to page.tiles.map(::encodeTile))
+                is FacePage -> linkedMapOf<String, Any>(SPACE to dev.omalauncher.Ormus.SPACES[page.space], "face" to page.file)
+                is TilePage -> linkedMapOf<String, Any>(SPACE to dev.omalauncher.Ormus.SPACES[page.space], "tiles" to page.tiles.map(::encodeTile))
             }
         }
 
@@ -181,16 +184,22 @@ object HomeFile {
                 else -> emptyList<Any>().also { problems += "$pageKey: write each page as [[$pageKey]]" }
             }
         val pages = ArrayList<PageEntry>()
+        // Omalauncher Ormus: the space a page without its own is in, the previous page's.
+        var space = 0
         raw.forEachIndexed { i, p ->
             val where = "$prefix${PAGE} ${i + 1}"
             if (p !is Map<*, *>) {
                 problems += "$where: write each page as [[$pageKey]]"
                 return@forEachIndexed
             }
-            for (k in p.keys) if (k != "face" && k != "tiles") problems += "$where: $k isn't a page's; a page has a face or tiles"
+            for (k in p.keys) if (k != "face" && k != "tiles" && k != SPACE) problems += "$where: $k isn't a page's; a page has a face or tiles"
+            p[SPACE]?.let { named ->
+                val index = dev.omalauncher.Ormus.SPACES.indexOf(named)
+                if (index >= 0) space = index else problems += "$where: space takes one of ${dev.omalauncher.Ormus.SPACES.joinToString { "\"$it\"" }}; it stays in ${dev.omalauncher.Ormus.SPACES[space]}"
+            }
             val face = p["face"]
             if (face != null) {
-                if (face is String && face.isNotBlank()) pages += FacePage(face) else problems += "$where: face takes a widget file name in quotes"
+                if (face is String && face.isNotBlank()) pages += FacePage(face, space) else problems += "$where: face takes a widget file name in quotes"
             }
             val tiles = p["tiles"]
             if (tiles != null) {
@@ -200,7 +209,7 @@ object HomeFile {
                     problems += "$where: tiles takes a list, [ { widget = \"…\" }, … ]"
                 } else {
                     val decoded = tiles.mapIndexedNotNull { j, t -> tile(t, "$where, tile ${j + 1}", problems) }
-                    if (decoded.isNotEmpty()) pages += TilePage(decoded)
+                    if (decoded.isNotEmpty()) pages += TilePage(decoded, space)
                 }
             }
         }

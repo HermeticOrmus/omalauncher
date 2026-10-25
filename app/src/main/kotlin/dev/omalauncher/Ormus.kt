@@ -26,15 +26,43 @@ object Ormus {
 
     /**
      * Home's spaces, by area of life, in the order a swipe down steps through them (and wraps). A page number carries
-     * its space, a hundred pages each: now is pages 1-100, money 101-200 and so on, so saved layouts and layout.json
-     * need nothing new. Swiping up goes to the next, down to the one before; Home on home goes back to the first.
+     * its space, a hundred each: a space's tile pages count up from its first page (now 1, money 101, work 201, ...),
+     * and its faces' pages count down from just left of it (now's 0, -1, ... as upstream; money's 100 down to 51), so
+     * saved layouts need nothing new. Swiping up goes to the next space, down to the one before; Home on home goes
+     * back to now.
      */
     val SPACES = listOf("now", "money", "work", "mind", "world")
     const val SPACE_PAGES = 100
 
-    fun spaceOf(page: Int) = ((page - 1) / SPACE_PAGES).coerceIn(0, SPACES.lastIndex)
+    /** Page numbers a space keeps left of its first page, for its faces. */
+    const val FACE_PAGES = 50
+
+    fun spaceOf(page: Int) = Math.floorDiv(page - 1 + FACE_PAGES, SPACE_PAGES).coerceIn(0, SPACES.lastIndex)
 
     fun firstPage(space: Int) = space * SPACE_PAGES + 1
+
+    /** Left of its space's first page: a face's place, never a tile's (upstream's pages left of page 1, in each space). */
+    fun isFacePage(page: Int) = page < firstPage(spaceOf(page))
+
+    /**
+     * Page numbers for pages in order, in [spaces] and with [tiles] saying which hold tiles. Each space is numbered on
+     * its own, as upstream numbers home: its first page of tiles is the space's first page, the ones before it count down
+     * from just left of it and the rest count up.
+     */
+    fun pageNumbers(
+        spaces: List<Int>,
+        tiles: List<Boolean>,
+    ): List<Int> {
+        val within = IntArray(spaces.size)
+        val count = HashMap<Int, Int>()
+        val first = HashMap<Int, Int>()
+        spaces.forEachIndexed { i, space ->
+            within[i] = count.getOrDefault(space, 0)
+            count[space] = within[i] + 1
+            if (tiles[i] && space !in first) first[space] = within[i]
+        }
+        return spaces.indices.map { i -> firstPage(spaces[i]) + within[i] - (first[spaces[i]] ?: count.getValue(spaces[i])) }
+    }
 
     /** Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. */
     val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl")

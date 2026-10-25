@@ -124,7 +124,7 @@ class HomeStore(
         for (page in byPage.keys.sorted()) {
             val items = byPage.getValue(page)
             // A face sharing its page with tiles is on its way to a page of its own; it goes before them.
-            for (item in items) if (item is WidgetItem && item.isFace) pages += FacePage(item.key)
+            for (item in items) if (item is WidgetItem && item.isFace) pages += FacePage(item.key, dev.omalauncher.Ormus.spaceOf(page))
             val tiles =
                 items
                     .filterNot { it.isFace }
@@ -137,7 +137,7 @@ class HomeStore(
                             is Folder -> FolderTile(item.name, item.apps.map { fileKey(it.key) }, cell)
                         }
                     }
-            if (tiles.isNotEmpty()) pages += TilePage(tiles)
+            if (tiles.isNotEmpty()) pages += TilePage(tiles, dev.omalauncher.Ormus.spaceOf(page))
         }
         return HomeLayout(layout.columnsOf(screen), pages)
     }

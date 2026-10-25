@@ -138,8 +138,8 @@ fun HomeScreen(
     // Not the left one: adding a page before the one on screen would shift the pager under the finger.
     // Unfolded, tile pages show in pairs and a face across both halves: the pager counts slots (see slotsOf).
     val per = if (showsTwoPages(windowSize())) 2 else 1
-    // Omalauncher Ormus: only the pages of the space showing, each space starting at its own first page; faces, left of
-    // page 1, are now's.
+    // Omalauncher Ormus: only the pages of the space showing, each space starting at its own first page, with its faces
+    // and the empty one waiting for a face left of it.
     val space = state.space
     val spacePages = engine.pages
         .filter { dev.omalauncher.Ormus.spaceOf(it) == space }
@@ -148,9 +148,10 @@ fun HomeScreen(
         pagerPages(
             spacePages,
             lastEmpty = engine.itemsOn(spacePages.last()).isEmpty(),
-            // Omalauncher Ormus: the face page waiting on the left belongs to now.
-            emptyPageLeft = space == 0 && LauncherStyle.emptyPageLeft,
+            emptyPageLeft = LauncherStyle.emptyPageLeft,
             emptyPageRight = LauncherStyle.emptyPageRight || arrange.carry != null,
+            // Omalauncher Ormus: each space waits for a face left of its own first page.
+            firstPage = dev.omalauncher.Ormus.firstPage(space),
         )
     // Only faces on screen, or the empty one waiting left of them: they get it whole, the bar's room too (see
     // LauncherState.faceShowing), and the status bar's while all of them say statusBar: false.
@@ -160,8 +161,8 @@ fun HomeScreen(
     // shift as the widgets' pages joined, with home turning to page 1 among them.
     val slots = if (engine.loaded) slotsOf(pageNumbers, per, ::full) else emptyList()
     fun slotOf(page: Int) = slots.indexOfFirst { page in it }
-    // Omalauncher Ormus: in another space, its first page; now keeps home.home-page.
-    fun homePage() = if (space == 0) homePageIn(spacePages, LauncherStyle.homePage) else spacePages.first()
+    // Omalauncher Ormus: in another space, its first page of tiles; now keeps home.home-page.
+    fun homePage() = if (space == 0) homePageIn(spacePages, LauncherStyle.homePage) else spacePages.firstOrNull { !isFacePage(it) } ?: dev.omalauncher.Ormus.firstPage(space)
     // Home opens on home.home-page, page 1 unless set, or the first page after it if none is numbered so. Among the pages
     // that hold something: the empty ones waiting at either end aren't home.
     // Made again once the widgets have loaded, so it starts on that page among all of them.
@@ -266,7 +267,7 @@ fun HomeScreen(
         }
         engine.activePage = slots.getOrNull(pager.currentPage)?.first() ?: 1
         if (engine.layout.screen == shownScreen && showPage == null) lastPage[shownScreen] = engine.activePage
-        state.currentPage = engine.activePage.takeIf { it >= 1 && !full(it) } ?: 1
+        state.currentPage = engine.activePage.takeIf { it >= 1 && !full(it) } ?: dev.omalauncher.Ormus.firstPage(space)
     }
     val shown = slots.getOrElse(pager.currentPage) { listOf(1) }
     // A face showing has the keyboard, for one of its fields, terminals or pages: it isn't lifted, it makes room itself.
@@ -653,15 +654,16 @@ internal fun createWithLabel(agent: String?): String =
 /**
  * Home's page numbers as the pager has them: [pages], with the empty page waiting left of the leftmost for a new face
  * when [emptyPageLeft], and one after the last when [emptyPageRight], for tiles, unless that one is empty already
- * ([lastEmpty]). Neither (both settings off, no tile carried) leaves only [pages], so home ends at its own pages.
+ * ([lastEmpty]). [firstPage] is the first page of tiles of the space shown (Omalauncher Ormus; page 1 for upstream). Neither (both settings off, no tile carried) leaves only [pages], so home ends at its own pages.
  */
 internal fun pagerPages(
     pages: List<Int>,
     lastEmpty: Boolean,
     emptyPageLeft: Boolean,
     emptyPageRight: Boolean,
+    firstPage: Int = FACE_PAGE + 1,
 ): List<Int> {
-    val withFace = if (emptyPageLeft) listOf(minOf(pages.first(), FACE_PAGE + 1) - 1) + pages else pages
+    val withFace = if (emptyPageLeft) listOf(minOf(pages.first(), firstPage) - 1) + pages else pages
     return if (!emptyPageRight || lastEmpty) withFace else withFace + (withFace.last() + 1)
 }
 
