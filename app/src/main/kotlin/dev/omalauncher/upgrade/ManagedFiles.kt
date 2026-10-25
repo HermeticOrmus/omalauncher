@@ -13,7 +13,8 @@ enum class Policy {
     /**
      * A default the user may edit or delete: updated only while it's unchanged
      * since we wrote it, never brought back once deleted. A file that was
-     * already there before we first wrote it is the user's.
+     * already there before we first wrote it is the user's, unless it holds
+     * exactly what we ship.
      */
     Seeded,
 }
@@ -58,8 +59,10 @@ class ManagedFiles(
             val write =
                 when (m.policy) {
                     Policy.Owned -> true
-                    // Missing but recorded: the user deleted it.
-                    Policy.Seeded -> if (current == null) before == null else current == before
+                    // Missing but recorded: the user deleted it. One that already holds exactly what this version ships
+                    // is no edit (put there first, as an agent previewing it does, or edited to this very version): ours
+                    // again, so later versions update it.
+                    Policy.Seeded -> if (current == null) before == null else current == before || runCatching { current == sha256Hex(m.content()) }.getOrDefault(false)
                 }
             if (!write) {
                 // Edited or deleted defaults keep what we last wrote on record, so they stay the user's, removal included.
