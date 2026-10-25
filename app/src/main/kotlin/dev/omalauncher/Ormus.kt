@@ -25,6 +25,13 @@ object Ormus {
     const val SWIPE_UP = "spaces"
 
     /**
+     * Apps the recent strip starts with on every page of every space, whatever was opened last: Ormus said "I want to be
+     * able to open mercurio from anywhere", and Mercurio and WhatsApp are most of his phone. By package, the first of
+     * each line that's installed (Mercurio's release build before its debug one).
+     */
+    val STRIP_FIRST = listOf(listOf("solutions.ormus.logos", "solutions.ormus.logos.debug"), listOf("com.whatsapp"))
+
+    /**
      * Home's spaces, by area of life, in the order a swipe down steps through them (and wraps). A page number carries
      * its space, a hundred each: a space's tile pages count up from its first page (now 1, money 101, work 201, ...),
      * and its faces' pages count down from just left of it (now's 0, -1, ... as upstream; money's 100 down to 51), so

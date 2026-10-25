@@ -261,7 +261,8 @@ internal fun RecentStrip(
     side: HomeSide? = null,
 ) {
     // Not before every kind of app is listed: the ones missing would push in as their kind arrived.
-    val apps = if (runtime.appsListed) recentApps(runtime, 20) else emptyList()
+    // Omalauncher Ormus: Ormus.STRIP_FIRST lead, then the rest as opened.
+    val apps = if (runtime.appsListed) (stripFirst(runtime) + recentApps(runtime, 20)).distinctBy { it.key }.take(20) else emptyList()
     // Nothing opened yet: no strip, but its room stays, so home doesn't shift when the first app shows up.
     if (apps.isEmpty()) {
         Spacer(if (vertical) modifier.width(RecentStripHeight) else modifier.height(RecentStripHeight))
@@ -352,6 +353,12 @@ internal fun familiarApps(
     runtime: Runtime,
     limit: Int,
 ): List<AppHit> = (recentApps(runtime, limit) + allApps(runtime)).distinctBy { it.key }.take(limit)
+
+/** Omalauncher Ormus: the apps the recent strip always starts with, in the owner's profile, as installed. */
+internal fun stripFirst(runtime: Runtime): List<AppHit> =
+    dev.omalauncher.Ormus.STRIP_FIRST.mapNotNull { packages ->
+        packages.firstNotNullOfOrNull { pkg -> runtime.androidApps.apps.firstOrNull { it.component.packageName == pkg && it.profile == null } }?.let(AppHit::Android)
+    }
 
 /** The apps opened lately, last opened first; ones not installed (or not loaded yet) are skipped. */
 internal fun recentApps(
