@@ -1,0 +1,189 @@
+face "money" {
+  // Money's face: left of money's first page (101), where a swipe right from it lands.
+  page: 100
+
+  meta { owl: 13; description: "Money in one place: what's owed to you, the pipeline's follow-ups that are due, the people to be in touch with and the markets. Tap a row to open it."; version: "1.0"; license: "MIT"; category: "finance" }
+
+  // Built on Sun (ormus-feeds money and markets): the invoicer, the leads table, WhatsApp, Salamander.
+  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source mk = http("https://sun.tailb43a3a.ts.net/feeds/markets.json") every 5m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok ? f.out : null
+  let owed = data != null ? data.owed : null
+  let pipe = data != null ? data.pipeline : null
+  let people = data != null ? data.people.filter(p => p.due >= 0.8) : []
+  let sal = mk != null && mk.ok ? mk.out.salamander : null
+  let bets = mk != null && mk.ok && mk.out.kalshi != null ? mk.out.kalshi.positions ?? [] : []
+  // One gold number: what's owed while anything is, else the follow-ups that bring the next money in.
+  let owing = owed != null && owed.total > 0
+  let stale = data != null && now != null && now - data.generated > 900
+  let short = (tileHeight ?? 918) < 820
+
+  background: linear(0, 0, 0, 1, [alpha(background, 0.85), alpha(background, 0.45), alpha(background, 0.85)])
+  padding: 0
+
+  component Heading(label, note = "") {
+    Row {
+      align: center
+      Text { text: label; style: label; color: muted; weight: 1 }
+      Text { text: note; style: small; color: muted; maxLines: 1; weight: 2; align: end }
+    }
+  }
+
+  component Owed(i) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: i.client; style: body; maxLines: 1; weight: 1 }
+      Text { text: i.total_text; style: body; width: 72; align: end }
+      Text { text: i.days_late > 0 ? "${i.days_late}d late" : "in ${-i.days_late}d"; style: small; width: 64; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? yellow : muted }
+    }
+  }
+
+  component FollowUp(u) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: u.business; style: body; maxLines: 1; weight: 1 }
+      Text { text: u.stage; style: small; color: u.stage == "new" || u.stage == "contacted" ? muted : green; width: 76; maxLines: 1 }
+      Text { text: u.owner ?? ""; style: small; color: muted; width: 60; maxLines: 1 }
+      Text { text: "${u.days_over}d"; style: small; color: u.days_over > 14 ? yellow : muted; width: 36; align: end }
+    }
+  }
+
+  component Person(p) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: p.name; style: body; maxLines: 1; width: 120 }
+      Text { text: p.owes_text != null ? "owes ${p.owes_text}" : p.why; style: small; color: p.owes_text != null ? yellow : muted; maxLines: 1; weight: 1 }
+      Text { text: p.last_min == null ? "never" : p.last_min < 1440 ? "${floor(p.last_min / 60)}h" : "${floor(p.last_min / 1440)}d"; style: small; color: p.due > 1.5 ? yellow : muted; width: 36; align: end }
+      Text { text: p.from_me ? "you" : "them"; style: small; color: p.from_me ? muted : green; width: 40; align: end }
+    }
+  }
+
+  component Position(o) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: o.name; style: body; width: 72; maxLines: 1 }
+      Text { text: o.size; style: small; color: muted; weight: 1; maxLines: 1 }
+      Text { text: "${o.pnl >= 0 ? "+" : "-"}$${fmtNum(abs(o.pnl))}"; style: small; color: o.pnl >= 0 ? green : red; width: 64; align: end }
+    }
+  }
+
+  Column {
+    gap: 10
+    padding: [12, 16]
+    Row {
+      align: center
+      Text { text: "money"; style: title; weight: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+    }
+
+    // What's owed: the invoicer's sent invoices, paid status as fresh as its last change.
+    Column {
+      gap: 6
+      padding: 12
+      background: alpha(background, tileOpacity)
+      frost: tileFrost
+      border: 1
+      borderColor: border
+      radius: 8 * corners
+      Heading { label: "owed to you"; note: owed != null ? "as of the invoicer, ${owed.as_of_text}" : "" }
+      if owing {
+        Text { text: owed.total_text; fontSize: 40; bold: true; color: accent }
+        for i in owed.items.sortBy(i => -i.days_late).take(3) key i.number {
+          if i.url != null {
+            Box { onTap: url(i.url); Owed { i: i } }
+          } else {
+            Owed { i: i }
+          }
+        }
+      } else {
+        Text { text: owed != null ? "nothing owed" : "…"; style: body; color: owed != null ? green : muted }
+      }
+    }
+
+    // Where the next money comes from: leads, and the follow-ups that are due, furthest along first.
+    if pipe != null {
+      Column {
+        gap: 6
+        padding: 12
+        background: alpha(background, tileOpacity)
+        frost: tileFrost
+        border: 1
+        borderColor: border
+        radius: 8 * corners
+        Heading { label: "pipeline"; note: "${pipe.count} leads · untouched ${fmtAgo(pipe.as_of, now)}" }
+        Text { text: join(pipe.stages.map(s => "${s.n} ${s.stage}"), " · "); style: small; color: muted; maxLines: 1 }
+        Text { text: "${pipe.follow_ups_total} follow-ups due"; fontSize: owing ? 18 : 30; bold: true; color: owing ? yellow : accent }
+        for u in pipe.follow_ups.take(short ? 4 : 8) key u.business {
+          if u.url != null {
+            Box { onTap: url(u.url); FollowUp { u: u } }
+          } else {
+            FollowUp { u: u }
+          }
+        }
+      }
+    }
+
+    // The people past the rhythm Ormus wants with them (people.json on Sun), most overdue first.
+    if len(people) > 0 {
+      Column {
+        gap: 6
+        padding: 12
+        background: alpha(background, tileOpacity)
+        frost: tileFrost
+        border: 1
+        borderColor: border
+        radius: 8 * corners
+        Heading { label: "people"; note: "due to hear from you" }
+        for p in people.take(short ? 2 : 3) key p.name {
+          if p.url != null {
+            Box { onTap: url(p.url); Person { p: p } }
+          } else {
+            Person { p: p }
+          }
+        }
+      }
+    }
+
+    // Salamander's paper portfolio: how it stands since it started, and the biggest positions.
+    if sal != null {
+      Column {
+        gap: 6
+        padding: 12
+        background: alpha(background, tileOpacity)
+        frost: tileFrost
+        border: 1
+        borderColor: border
+        radius: 8 * corners
+        Heading { label: "markets"; note: "salamander since ${sal.since} · kalshi" }
+        Row {
+          gap: 12
+          align: center
+          Text { text: "${sal.pnl_total >= 0 ? "+" : "-"}$${fmtNum(abs(sal.pnl_total))}"; fontSize: 22; bold: true; color: sal.pnl_total >= 0 ? green : red }
+          Text { text: "today ${sal.pnl_today >= 0 ? "+" : "-"}$${fmtNum(abs(sal.pnl_today), 2)}"; style: small; color: muted; weight: 1 }
+        }
+        for o in sal.open.take(short ? 3 : 5) key o.name {
+          Position { o: o }
+        }
+        // Kalshi is real money: shown here, never traded from here.
+        for b in bets.take(short ? 1 : 3) key b.ticker {
+          Row {
+            gap: 8
+            align: center
+            Text { text: b.market; style: small; maxLines: 1; weight: 1 }
+            Text { text: b.side; style: small; color: muted; width: 32 }
+            Text { text: "${b.pnl >= 0 ? "+" : "-"}$${fmtNum(abs(b.pnl), 2)}"; style: small; color: b.pnl >= 0 ? green : red; width: 64; align: end }
+          }
+        }
+      }
+    }
+
+    Spacer { weight: 1 }
+    Spacer { height: screenInset }
+  }
+}

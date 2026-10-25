@@ -14,7 +14,8 @@ What this fork adds to the release below it; none of it is in the Play build.
   down to the one before; left and right turn a space's pages. Home on home goes
   back to now. `gestures.swipe-up = "spaces"` is the default. Every space has faces
   left of its first page, as upstream's now does, and layout.toml says each page's
-  `space`, so editing it keeps the spaces apart.
+  `space`, so editing it keeps the spaces apart. Five dots at the top of the letter
+  rail say which space this is; a long press on them lists the spaces to go to one.
 - Niagara's alphabet down home's right edge: slide along it to a letter, then to an
   app, and let go to open it.
 - The home layout as a file: layout.json, and layout.apply.json to rearrange.
@@ -23,7 +24,8 @@ What this fork adds to the release below it; none of it is in the Play build.
   a place inside an app.
 - A scrolling Column that fits its tile lets home's swipes through.
 - Ormus widgets: sun, now playing, smart notifications, communications, projects,
-  mercurio, trainer, the pass, owed, people, pipeline, fleet, raven, today, markets.
+  mercurio, trainer, the pass, owed, people, pipeline, fleet, raven (the reviews
+  waiting longest first), today, markets; and money's face, left of money's first page.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 

@@ -100,6 +100,16 @@ class LauncherState {
         space = (space + step).mod(dev.omalauncher.Ormus.SPACES.size)
     }
 
+    /** Whether the list of spaces is open, from a long press on the space dots. */
+    var pickingSpace by mutableStateOf(false)
+
+    /** Straight to space [to], arriving from the side it's on. */
+    fun goToSpace(to: Int) {
+        if (to == space) return
+        spaceStep = if (to > space) 1 else -1
+        space = to
+    }
+
     /** Home page currently showing (1-based); the drawer pins apps there. */
     var currentPage by mutableStateOf(1)
 

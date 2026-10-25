@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.systemBars
 import dev.omalauncher.theme.Style
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -469,11 +470,16 @@ fun HomeScreen(
     }
     }
 
-    // Omalauncher Ormus: Niagara's alphabet down home's right edge, in portrait, beside the tiles' rows; not over a face.
+    // Omalauncher Ormus: Niagara's alphabet down home's right edge, in portrait, beside the tiles' rows, under the dots
+    // that say which space this is; not over a face.
     if (side == null && state.editing == null && terminals.active == null && shown.none(::full)) {
-        HomeLetterRail(runtime, Modifier.fillMaxWidth().homeRailBounds(engine.layout, barRoom))
+        Column(Modifier.fillMaxWidth().homeRailBounds(engine.layout, barRoom)) {
+            SpaceDots(state, Modifier.align(Alignment.End).width(HomeRailWidth))
+            HomeLetterRail(runtime, Modifier.fillMaxWidth().weight(1f))
+        }
     }
     SpaceFlash(space)
+    SpacePicker(state)
 
     if (extraKeys) {
         ExtraKeys(
