@@ -29,6 +29,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.omalauncher.Ormus
 import kotlinx.coroutines.delay
+import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 
 /**
  * Omalauncher Ormus: runs [up] or [down] once for a vertical swipe of 72 dp or a quick fling, for gestures that do
@@ -124,6 +135,80 @@ internal fun SpaceFlash(
                             Mono.copy(color = Palette.muted, fontSize = TextSize.Item)
                         },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Which space home shows: five dots down the top of the rail's strip, in the order a swipe goes through them, the
+ * current one brightest. A long press opens [SpacePicker], to go straight to any of them.
+ */
+@Composable
+internal fun SpaceDots(
+    state: LauncherState,
+    modifier: Modifier = Modifier,
+) {
+    val view = LocalView.current
+    Column(
+        modifier
+            .padding(vertical = 8.dp)
+            .pointerInput(state) {
+                detectTapGestures(onLongPress = {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    state.pickingSpace = true
+                })
+            },
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Ormus.SPACES.indices.forEach { i ->
+            val here = i == state.space
+            Box(Modifier.size(if (here) 7.dp else 5.dp).background(if (here) Palette.foreground else Palette.muted, CircleShape))
+        }
+    }
+}
+
+/** The spaces by name, as [SpaceFlash] shows them, to tap one and go there; a tap anywhere else or Back closes it. */
+@Composable
+internal fun SpacePicker(
+    state: LauncherState,
+    modifier: Modifier = Modifier,
+) {
+    if (!state.pickingSpace) return
+    BackHandler { state.pickingSpace = false }
+    Box(
+        modifier.fillMaxSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.pickingSpace = false },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .width(200.dp)
+                .background(Palette.surface, LauncherStyle.shape(12.dp))
+                .border(1.dp, Palette.border, LauncherStyle.shape(12.dp))
+                .padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Ormus.SPACES.forEachIndexed { i, name ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            state.goToSpace(i)
+                            state.pickingSpace = false
+                        }.padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(
+                        name,
+                        style =
+                            if (i == state.space) {
+                                Mono.copy(color = Palette.accent, fontSize = TextSize.Title * 1.6f)
+                            } else {
+                                Mono.copy(color = Palette.foreground, fontSize = TextSize.Item)
+                            },
+                    )
+                }
             }
         }
     }

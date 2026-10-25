@@ -4,7 +4,7 @@ widget "raven" {
   size: 6x6
   minSize: 3x3
 
-  meta { owl: 8; description: "Ormus's Raven Cargo work: his RAV issues in progress and in review, the latest touched first, and whether the JTEKT portal answers and which deploy it runs. Tap an issue to open it in Linear."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "Ormus's Raven Cargo work: how many RAV issues are in progress and in review, the ones waiting longest in review first, and whether the JTEKT portal answers and which deploy it runs. Tap an issue to open it in Linear."; version: "1.1"; license: "MIT"; category: "productivity" }
 
   // Built on Sun (ormus-feeds raven) from Linear, the portal itself and Vercel.
   source f = http("https://sun.tailb43a3a.ts.net/feeds/raven.json") every 3m json timeout 20s status
@@ -12,19 +12,20 @@ widget "raven" {
 
   let data = f != null && f.ok ? f.out : null
   let lin = data != null ? data.linear : null
+  let reviews = data != null && data.reviews != null ? data.reviews : []
   let portal = data != null ? data.portal : null
   let deploy = data != null ? data.deploy : null
   let stale = data != null && now != null && now - data.generated > 600
-  let room = max(2, floor(((tileHeight ?? 408) - 104) / 25))
+  let room = max(2, floor(((tileHeight ?? 408) - 124) / 25))
 
+  // Review is the bottleneck: the ones waiting longest there lead, with how long.
   component Line(i) {
     Row {
       gap: 8
       align: center
-      Text { text: i.id; style: small; color: i.state == "In Review" ? green : muted; width: 72 }
+      Text { text: i.id; style: small; color: green; width: 72 }
       Text { text: i.title; style: body; maxLines: 1; weight: 1 }
-      Text { text: i.state == "In Review" ? "review" : "doing"; style: small; color: muted; width: 44; align: end }
-      Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : "${floor(i.age_min / 1440)}d"; style: small; color: muted; width: 30; align: end }
+      Text { text: i.wait_min < 1440 ? "${floor(i.wait_min / 60)}h" : "${floor(i.wait_min / 1440)}d"; style: small; color: i.wait_min > 90 * 1440 ? yellow : muted; width: 40; align: end }
     }
   }
 
@@ -33,7 +34,7 @@ widget "raven" {
     Row {
       align: center
       Text { text: lin != null ? "raven · ${lin.in_progress} doing · ${lin.in_review} review" : "raven"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || stale || data.errors.linear != null ? yellow : muted; width: 120; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null || data.errors.reviews != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || stale || data.errors.linear != null || data.errors.reviews != null ? yellow : muted; width: 120; align: end; maxLines: 1 }
     }
     Row {
       gap: 8
@@ -44,8 +45,9 @@ widget "raven" {
     if deploy != null && portal != null && deploy.sha != "" && deploy.sha != portal.sha {
       Text { text: "live ${portal.sha} differs from the last deploy ${deploy.sha}"; style: small; color: yellow; maxLines: 1 }
     }
-    if lin != null {
-      for i in lin.recent.take(room) key i.id {
+    if len(reviews) > 0 {
+      Text { text: "waiting longest in review"; style: small; color: muted }
+      for i in reviews.take(room) key i.id {
         Box { onTap: url(i.url); Line { i: i } }
       }
     }
