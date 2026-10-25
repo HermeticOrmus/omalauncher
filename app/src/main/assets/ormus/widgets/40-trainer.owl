@@ -4,7 +4,7 @@ widget "trainer" {
   size: 6x5
   minSize: 3x3
 
-  meta { owl: 4; description: "A card from Ormus Trainer's decks: tap to flip, next for the following one. The Trainer app keeps the real review schedule."; version: "1.1"; license: "MIT"; category: "learning" }
+  meta { owl: 8; description: "A card from Ormus Trainer's decks: tap to flip, next for the following one. The Trainer app keeps the real review schedule."; version: "1.2"; license: "MIT"; category: "learning" }
 
   state deck = "ai-terms" persist
   state pick = 0 persist
@@ -14,7 +14,7 @@ widget "trainer" {
 
   // Published by the trainer-decks loop on Sun, reachable only on the tailnet. After a tap the widget refreshes its
   // sources, so picking another deck fetches it right away.
-  source d = http("https://sun.tailb43a3a.ts.net/trainer-decks/${deck}.json") every 6h json timeout 20s status
+  source d = http("https://sun.tailb43a3a.ts.net/trainer-decks/${enc(deck)}.json") every 6h json timeout 20s status
   let fresh = d != null && d.ok && d.out.deck == deck ? d.out.cards : null
   // Shown straight from the fetch: `on` skips a source's first value, so the copy only covers Sun being off.
   let shown = fresh ?? cards

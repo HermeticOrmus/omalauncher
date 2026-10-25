@@ -4,6 +4,25 @@ The most important changes in each release. The Play Store notes for a release
 are in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 Dates are when the build was uploaded to Play.
 
+## Omalauncher Ormus (the ormus branch, on top of upstream)
+
+What this fork adds to the release below it; none of it is in the Play build.
+
+- Installs beside the Play build as dev.omalauncher.ormus, "Omalauncher Ormus", with
+  the Aurum theme, Grok and the Sun bridge preloaded.
+- Home has spaces: swiping up goes to the next (now, money, work, mind, world) and
+  down to the one before; left and right turn a space's pages. Home on home goes
+  back to now. `gestures.swipe-up = "spaces"` is the default.
+- Niagara's alphabet down home's right edge: slide along it to a letter, then to an
+  app, and let go to open it.
+- The home layout as a file: layout.json, and layout.apply.json to rearrange.
+- Widgets read each app's installed version (`version`, `versionCode` on
+  `android.apps`; `launcherCode` on `android.system`), and `androidIntent(...)` opens
+  a place inside an app.
+- A scrolling Column that fits its tile lets home's swipes through.
+- Ormus widgets: sun, now playing, smart notifications, communications, projects,
+  mercurio, trainer, the pass, owed, people, pipeline, fleet, raven, today, markets.
+
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
 - A store update no longer throws away changes made to a widget, app or face:
