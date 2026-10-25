@@ -332,8 +332,8 @@ class WidgetEngine(
      */
     fun moveToFreePage(item: HomeItem): Int {
         val page =
-            if (item.isFace && item.page <= FACE_PAGE) {
-                newFacePage()
+            if (item.isFace && isFacePage(item.page)) {
+                newFacePage(dev.omalauncher.Ormus.spaceOf(item.page))
             } else {
                 // Omalauncher Ormus: within its own space.
                 val space = dev.omalauncher.Ormus.spaceOf(item.page)
@@ -344,8 +344,11 @@ class WidgetEngine(
         return page
     }
 
-    /** The empty page waiting left of the leftmost, where a new face goes. */
-    fun newFacePage() = minOf(pages.minOrNull() ?: 1, FACE_PAGE + 1) - 1
+    /** The empty page waiting left of the leftmost, where a new face goes. Omalauncher Ormus: [space]'s, the one showing by default. */
+    fun newFacePage(space: Int = dev.omalauncher.Ormus.spaceOf(activePage)): Int {
+        val first = dev.omalauncher.Ormus.firstPage(space)
+        return minOf(pages.filter { dev.omalauncher.Ormus.spaceOf(it) == space }.minOrNull() ?: first, first) - 1
+    }
 
     /**
      * Puts home's pages in [order] (page numbers, as [pages] lists them) and numbers them again: the first one with tiles
@@ -356,8 +359,9 @@ class WidgetEngine(
         // Before the first load the pages are only partly known, and an order made from an older list (pages came or went
         // since) names pages that aren't these: moving by either would mix them up.
         if (!loaded || order.sorted() != pages) return
-        val first = order.indexOfFirst { p -> itemsOn(p).any { !it.isFace } }.let { if (it < 0) order.size else it }
-        val moves = order.mapIndexed { i, p -> itemsOn(p) to i - first + 1 }
+        // Omalauncher Ormus: each space numbered on its own, from its first page (see Ormus.pageNumbers).
+        val numbers = dev.omalauncher.Ormus.pageNumbers(order.map(dev.omalauncher.Ormus::spaceOf), order.map { p -> itemsOn(p).any { !it.isFace } })
+        val moves = order.mapIndexed { i, p -> itemsOn(p) to numbers[i] }
         for ((items, to) in moves) for (item in items) if (item.page != to) moveToPage(item, to)
     }
 

@@ -12,7 +12,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   the Aurum theme, Grok and the Sun bridge preloaded.
 - Home has spaces: swiping up goes to the next (now, money, work, mind, world) and
   down to the one before; left and right turn a space's pages. Home on home goes
-  back to now. `gestures.swipe-up = "spaces"` is the default.
+  back to now. `gestures.swipe-up = "spaces"` is the default. Every space has faces
+  left of its first page, as upstream's now does, and layout.toml says each page's
+  `space`, so editing it keeps the spaces apart.
 - Niagara's alphabet down home's right edge: slide along it to a letter, then to an
   app, and let go to open it.
 - The home layout as a file: layout.json, and layout.apply.json to rearrange.

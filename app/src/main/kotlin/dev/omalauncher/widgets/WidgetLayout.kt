@@ -43,8 +43,8 @@ data class Cell(
  */
 const val FACE_PAGE = 0
 
-/** Left of page 1: a face's place, never a tile's. */
-fun isFacePage(page: Int) = page <= FACE_PAGE
+/** Left of page 1: a face's place, never a tile's. Omalauncher Ormus: left of each space's first page. */
+fun isFacePage(page: Int) = dev.omalauncher.Ormus.isFacePage(page)
 
 /** The home grid's columns before they could be set: a saved layout that doesn't say has this many. */
 const val CLASSIC_COLUMNS = 6
