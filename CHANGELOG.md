@@ -16,6 +16,8 @@ What this fork adds to the release below it; none of it is in the Play build.
   left of its first page, as upstream's now does, and layout.toml says each page's
   `space`, so editing it keeps the spaces apart. Five dots at the top of the letter
   rail say which space this is; a long press on them lists the spaces to go to one.
+- The recent apps strip starts with Mercurio and WhatsApp on every page, then the
+  apps opened last.
 - Niagara's alphabet down home's right edge: slide along it to a letter, then to an
   app, and let go to open it.
 - The home layout as a file: layout.json, and layout.apply.json to rearrange.
