@@ -102,6 +102,18 @@ class OrmusWorkboardsTest {
         assertEquals(emptyList<String>(), plan.removed)
     }
 
+    @Test fun facesKeepTheirOrderAndAFaceOfASpaceThatIsGoneGoesLeftOfMore() {
+        val plan = OrmusWorkboards.plan(listOf(Item("near.owl", 0, null, face = true), Item("far.owl", -1, null, face = true), Item("old-money-face.owl", 100, null, face = true)))
+        assertEquals(setOf(Move("near.owl", 0, null), Move("far.owl", -1, null), Move("old-money-face.owl", 600, null)), plan.moves.toSet())
+    }
+
+    @Test fun aGroupThatDoesNotFitUnderThePageTakesTheNextAndATileTallerThanTheRowsStandsAlone() {
+        val plan = OrmusWorkboards.plan(listOf(tile("45-kiosk.owl", 1, 0, 6, 6, 4), tile("40-trainer.owl", 301, 0, 0, 6, 6)), rows = 8)
+        assertEquals(setOf(Move("45-kiosk.owl", 501, Cell(0, 0, 6, 4)), Move("40-trainer.owl", 502, Cell(0, 0, 6, 6))), plan.moves.toSet())
+        val tall = OrmusWorkboards.plan(listOf(tile("45-kiosk.owl", 1, 0, 0, 6, 12), tile("40-trainer.owl", 301, 0, 0, 6, 6)))
+        assertEquals(setOf(Move("45-kiosk.owl", 501, Cell(0, 0, 6, 12)), Move("40-trainer.owl", 502, Cell(0, 0, 6, 6))), tall.moves.toSet())
+    }
+
     @Test fun anEmptyHomeMovesNothingAndTheBoardsStillHaveTheirPages() {
         assertEquals(OrmusWorkboards.Plan(emptyList(), emptyList()), OrmusWorkboards.plan(emptyList()))
         assertEquals(listOf(101, 201, 301, 401), OrmusWorkboards.BOARDS.keys.map { Ormus.firstPage(Ormus.SPACES.indexOf(it)) })

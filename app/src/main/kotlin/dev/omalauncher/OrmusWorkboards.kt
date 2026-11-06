@@ -16,7 +16,11 @@ object OrmusWorkboards {
     /** The spaces of the builds before, in their old order, each a hundred pages from its first (as today). */
     val OLD_SPACES = listOf("now", "money", "work", "mind", "world")
 
-    /** Rows of his home grid, where a page's tiles are stacked; the engine moves a tile that does not fit anyway. */
+    /**
+     * Rows of his home grid, when the engine does not know the grid yet: a page's tiles are stacked within them. A tile
+     * with a cell is never moved by the engine, so on a grid with fewer rows a stacked tile could sit past the bottom;
+     * his layout reaches row 10.
+     */
     const val ROWS = 10
 
     /** The board tile each workboard space holds on its first page, from the top. */
@@ -93,7 +97,8 @@ object OrmusWorkboards {
             if (items.any { it.widget && it.key == file }) moves += Move(file, first, Cell(0, 0, columns, BOARD_HEIGHT))
         }
         val kept = items.filter { home(it) != null && it.key !in BOARDS.values }
-        for (face in kept.filter { it.face }) {
+        // Faces keep their order: the one nearest its space's first page stays nearest.
+        for (face in kept.filter { it.face }.sortedByDescending { it.page }) {
             val space = home(face)!!
             val n = faces.getOrDefault(space, 0)
             faces[space] = n + 1

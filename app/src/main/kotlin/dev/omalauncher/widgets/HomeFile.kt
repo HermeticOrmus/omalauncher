@@ -84,7 +84,7 @@ object HomeFile {
         |# starts from the pages above. With home.unfolded-layout, a Fold's inner screen has its own under
         |# [unfolded] (its columns home.unfolded-columns), starting from the pages above side by side.
         |# What couldn't be read is in errors.txt next to this file. Omalauncher Ormus: space = "raven" puts a
-        |# page in that space (now, money, work, mind, world); a page without one is in the space of the one before it.
+        |# page in that space (${dev.omalauncher.Ormus.SPACES.joinToString(", ")}); a page without one is in the space of the one before it.
         |
         """.trimMargin()
 

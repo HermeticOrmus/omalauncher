@@ -10,6 +10,11 @@ class OrmusPagesTest {
         assertEquals(listOf(0, 0, 1, 1, 2, 4), listOf(1, 2, 101, 102, 201, 402).map(Ormus::spaceOf))
     }
 
+    @Test fun theLastSpacesTakeTheirPagesAndEverythingPastThem() {
+        assertEquals(listOf(5, 5, 6, 6, 6, 6, 6), listOf(501, 550, 551, 600, 601, 651, 1000).map(Ormus::spaceOf))
+        assertEquals(listOf("now", "raven", "ormus", "alqvimia", "clients", "mercury", "more"), Ormus.SPACES)
+    }
+
     @Test fun theFiftyPagesLeftOfASpacesFirstAreItsFaces() {
         assertEquals(listOf(0, 0, 1, 1, 2), listOf(0, -7, 100, 51, 200).map(Ormus::spaceOf))
         assertTrue(listOf(0, -7, 100, 51, 151, 400).all(Ormus::isFacePage))
