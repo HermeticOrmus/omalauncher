@@ -1,0 +1,105 @@
+widget "kiosk" {
+  page: 301
+  order: 5
+  size: 6x4
+  minSize: 4x3
+
+  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, each with why it matters and the one move to take. Swipe for the next, tap to open it, tap the header for the whole list."; version: "1.1"; license: "MIT"; category: "news" }
+
+  // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
+  // the Mercury board show the same picks; this tile calls no model.
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/kiosk.json") every 5m json timeout 20s status
+  source now = clock every 1m
+  state at = 0 persist
+  state pull = 0
+
+  let data = f != null && f.ok && f.out != null && f.out.news != null ? f.out : null
+  let picks = data != null ? flatten([data.news.items.map(i => merge(i, {kind: "news"})), data.craft.items.map(i => merge(i, {kind: "craft"}))]) : []
+  let n = len(picks)
+  let i = n > 0 ? picks[at % n] : null
+  let picked = data != null ? (data.news.picked ?? data.craft.picked) : null
+  // The loops stopped or sg is away: say how old the picks are instead of passing them off as fresh.
+  let stale = picked != null && now != null && now - picked > 4 * 3600
+  let failed = data != null ? keys(data.errors ?? {}) : []
+
+  // One pick. `lines` is the room for its texts. `gold` marks the one pick of a view whose move is the gold line:
+  // one gold element a view, for the thing to do first.
+  component Pick(i, lines, gold) {
+    Column {
+      gap: 6
+      Text { text: i.title; style: body; bold: true; maxLines: 3 }
+      if (i.gold ?? i.try ?? "") != "" {
+        Text { text: i.kind == "news" ? "✦ ${i.gold}" : "try: ${i.try}"; style: small; color: gold ? accent : foreground; bold: !gold; maxLines: 3 }
+      }
+      if (i.why ?? "") != "" {
+        Text { text: i.why; style: small; color: foreground; maxLines: lines }
+      }
+      // What happened, when the tile has room left for it under the why.
+      if (i.summary ?? "") != "" && ((i.why ?? "") == "" || lines > 4) {
+        Text { text: i.summary; style: small; color: muted; maxLines: (i.why ?? "") == "" ? lines : lines - 3 }
+      }
+      Text { text: "${i.kind == "news" ? "news" : "how others code"} · ${i.who != null ? "${i.who} · " : ""}${i.source ?? ""}${i.at != null && now != null ? " · ${fmtAgo(i.at, now)}" : ""}"; style: small; color: muted; maxLines: 1 }
+    }
+  }
+
+  Column {
+    gap: 8
+    Box {
+      onTap: screen()
+      Row {
+        align: center
+        Text { text: "mercury"; style: muted; weight: 1 }
+        Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+      }
+    }
+    if data != null && n == 0 {
+      Text { text: "nothing picked yet"; style: body; color: muted }
+    }
+    if i != null {
+      // A swipe moves to the next or the one before; a tap opens the link.
+      Box {
+        drag: horizontal
+        onDrag: pull = pull + dx
+        onDragEnd: {
+          if pull < -40 || vx < -400 {
+            at = (at + 1) % n
+          } else if pull > 40 || vx > 400 {
+            at = (at % n - 1 + n) % n
+          }
+          pull = 0
+        }
+        onTap: url(i.url)
+        offset: [pull, 0]
+        animate offset: spring()
+        Pick { i: i; lines: max(2, floor(((tileHeight ?? 270) - 170) / 16)); gold: true }
+      }
+    }
+  }
+
+  screen {
+    title: "mercury"
+    Column {
+      scroll: true
+      gap: 14
+      padding: [4, 8]
+      if data == null {
+        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else {
+        if stale {
+          Text { text: "picked ${fmtAgo(picked, now)} ago"; style: small; color: red }
+        }
+        Text { text: "NEWS FOR YOU"; style: label }
+        for p, k in data.news.items key p.url {
+          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "news"}); lines: 4; gold: k == 0 } }
+        }
+        Text { text: "HOW OTHERS CODE"; style: label }
+        for p, k in data.craft.items key p.url {
+          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "craft"}); lines: 4; gold: k == 0 && len(data.news.items) == 0 } }
+        }
+        for k in failed {
+          Text { text: "${k}: ${data.errors[k]}"; style: small; color: red }
+        }
+      }
+    }
+  }
+}
