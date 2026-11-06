@@ -249,17 +249,21 @@ widget "sessions" {
       Text { text: only == "" ? "sessions" : only; style: muted; weight: 1 }
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(down) > 0 ? "${join(down, ", ")} didn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; style: small; color: data == null || len(down) > 0 || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
-    if data != null {
+    if data != null && only != "" && len(boards) == 0 {
+      Text { text: "no ${only} board in the feed"; style: body; color: red }
+    } else if data != null {
       Summary {}
       Score {}
       if len(asks) > 0 {
         AskCard { a: asks[0]; lines: 3; wide: floor(((tileWidth ?? 360) - 48) / 8) }
       }
-      Row {
-        gap: 12
-        // Per workboard: agents that need him plus chats that wait; white when an agent is among them.
-        for b in live.filter(b => b.agents.blocked + (b.waiting ?? 0) > 0).take(5) key b.name {
-          Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: b.agents.blocked > 0 ? foreground : green, bold: true}]; style: small; color: muted; maxLines: 1 }
+      if only == "" {
+        Row {
+          gap: 12
+          // Per workboard: agents that need him plus chats that wait; white when an agent is among them.
+          for b in live.filter(b => b.agents.blocked + (b.waiting ?? 0) > 0).take(5) key b.name {
+            Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: b.agents.blocked > 0 ? foreground : green, bold: true}]; style: small; color: muted; maxLines: 1 }
+          }
         }
       }
       for i in rows.take(room) key "${i.row}:${i.board}:${i.project}:${i.machine ?? ""}:${i.session ?? ""}:${i.pane ?? i.k ?? i.name}" {
@@ -279,6 +283,8 @@ widget "sessions" {
       padding: [4, 8]
       if data == null {
         Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else if only != "" && len(boards) == 0 {
+        Text { text: "no ${only} board in the feed"; style: body; color: red }
       } else {
         Summary {}
         Score {}
