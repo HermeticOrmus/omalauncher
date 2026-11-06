@@ -56,12 +56,18 @@ class HomeStore(
     /** Called once the widgets have loaded: takes in the file, or writes it from what the launcher had saved before it. */
     fun loaded() {
         if (ready) return
-        // Omalauncher Ormus: the file as it was before this start moved home by workboard stays beside it.
-        if (engine.workboardsMoved) keepBeforeWorkboards()
         val text = synced.open()
         ready = true
         when {
             text == null -> synced.create()
+            // Omalauncher Ormus: this start moved home by workboard. The file as it was stays beside it, and whatever
+            // it says (the old spaces, or only now pages) it is written again from home as the launcher moved it.
+            engine.workboardsMoved -> {
+                keepBeforeWorkboards()
+                table = runCatching { Toml.parse(text) }.getOrDefault(emptyMap())
+                synced.setProblems(listOf("$FILE: home was moved by workboard at this start and this file is written from it; the one you had is $BEFORE_WORKBOARDS"))
+                synced.save()
+            }
             // Just as the launcher last wrote it: no one edited it, so it says nothing the saved layout doesn't, which
             // may be newer (the app stopped before a save went out, or a launcher before this file ran in between).
             // The saved layout stays, and the file follows it.
@@ -102,7 +108,9 @@ class HomeStore(
         // workboard: it is kept as a backup and written again from home as it is.
         if (HomeFile.namesOldSpaces(parsed)) {
             keepBeforeWorkboards()
-            synced.setProblems(listOf("$FILE names the spaces of an older build (money, work, mind, world); home stays as the launcher moved it by workboard and this file is written from it; the one you had is $BEFORE_WORKBOARDS"))
+            val kept = runCatching { File(dir, REJECTED).writeText(text) }.isSuccess
+            synced.setProblems(listOf("$FILE names the spaces of an older build (money, work, mind, world); nothing in it was applied and it is written again from home" +
+                (if (kept) "; what you wrote is $REJECTED" else "") + (if (File(dir, BEFORE_WORKBOARDS).isFile) "; the file from before the move is $BEFORE_WORKBOARDS" else "")))
             synced.save()
             return
         }
@@ -319,6 +327,7 @@ class HomeStore(
         const val FILE = "layout.toml"
         const val ERRORS = "errors.txt"
         const val BEFORE_WORKBOARDS = "layout.toml.before-workboards"
+        const val REJECTED = "layout.toml.rejected"
 
         /** Where Linux sees [FILE], relative to the guest home. */
         const val GUEST_DIR = ".config/omalauncher/home"

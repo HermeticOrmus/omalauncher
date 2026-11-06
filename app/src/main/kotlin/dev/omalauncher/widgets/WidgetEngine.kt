@@ -382,14 +382,23 @@ class WidgetEngine(
         val done = File(dir, dev.omalauncher.OrmusWorkboards.DONE)
         if (done.exists()) return
         val items = pages.flatMap(::itemsOn)
+        // The first listing can be empty or partial (guarded above for the layout): without a widget on home there
+        // is nothing to move yet, and the marker waits for a start that sees them.
+        if (items.none { it is WidgetItem }) return
+        // The marker goes first: a move that ran twice would read the new page numbers as the old spaces. A marker
+        // that cannot be written means no move at all, not one on every start.
+        if (!runCatching { done.createNewFile() }.getOrElse { Log.w("ormus", "workboards marker", it); false }) return
         if (items.any { placedOnPhone(it) }) {
-            val plan = dev.omalauncher.OrmusWorkboards.plan(items.map { dev.omalauncher.OrmusWorkboards.Item(it.key, it.page, layout.cell(it.key), it is WidgetItem, it.isFace) }, columns = layout.columns)
+            val rows = layout.gridSize()?.second ?: dev.omalauncher.OrmusWorkboards.ROWS
+            val plan = dev.omalauncher.OrmusWorkboards.plan(items.map { dev.omalauncher.OrmusWorkboards.Item(it.key, it.page, layout.cell(it.key), it is WidgetItem, it.isFace) }, rows, layout.columns)
             val byKey = items.associateBy { it.key }
             for (move in plan.moves) {
                 val item = byKey[move.key] ?: continue
                 move.cell?.let { layout.set(item.key, it) }
                 moveToPage(item, move.page)
             }
+            // The cells of apps and folders moved last are saved with the pages here; a widget's move saved on its own.
+            layout.save()
             for (key in plan.removed) specs.firstOrNull { it.file.name == key }?.let(::removeWidget)
             workboardsMoved = true
             Log.i("ormus", "home moved by workboard: ${plan.moves.size} tiles moved, ${plan.removed.size} left")
