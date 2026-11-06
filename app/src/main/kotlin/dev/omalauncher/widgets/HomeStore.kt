@@ -1,6 +1,7 @@
 package dev.omalauncher.widgets
 
 import android.content.Context
+import android.util.Log
 import dev.omalauncher.LauncherData
 import dev.omalauncher.Runtime
 import dev.omalauncher.sha256Hex
@@ -55,6 +56,8 @@ class HomeStore(
     /** Called once the widgets have loaded: takes in the file, or writes it from what the launcher had saved before it. */
     fun loaded() {
         if (ready) return
+        // Omalauncher Ormus: the file as it was before this start moved home by workboard stays beside it.
+        if (engine.workboardsMoved) keepBeforeWorkboards()
         val text = synced.open()
         ready = true
         when {
@@ -95,6 +98,14 @@ class HomeStore(
             }
         synced.readable = true
         table = parsed
+        // Omalauncher Ormus: a file from a build with the old spaces says nothing of home as the launcher moved it by
+        // workboard: it is kept as a backup and written again from home as it is.
+        if (HomeFile.namesOldSpaces(parsed)) {
+            keepBeforeWorkboards()
+            synced.setProblems(listOf("$FILE names the spaces of an older build (money, work, mind, world); home stays as the launcher moved it by workboard and this file is written from it; the one you had is $BEFORE_WORKBOARDS"))
+            synced.save()
+            return
+        }
         // Says nothing about pages, as a file of only `version`: nothing to move, and apps left out mustn't all come off.
         if ("page" !in parsed) {
             synced.setProblems(listOf("$FILE: no [[page]]; home stays as it is"))
@@ -296,9 +307,18 @@ class HomeStore(
             else -> null
         }
 
+    /** Omalauncher Ormus: the layout file as it was before the move to the workboards, once; see OrmusWorkboards. */
+    private fun keepBeforeWorkboards() {
+        val file = File(dir, FILE)
+        val before = File(dir, BEFORE_WORKBOARDS)
+        if (file.isFile && !before.exists()) runCatching { file.copyTo(before) }.onFailure { Log.w(TAG, "layout backup", it) }
+    }
+
     companion object {
+        private const val TAG = "home"
         const val FILE = "layout.toml"
         const val ERRORS = "errors.txt"
+        const val BEFORE_WORKBOARDS = "layout.toml.before-workboards"
 
         /** Where Linux sees [FILE], relative to the guest home. */
         const val GUEST_DIR = ".config/omalauncher/home"

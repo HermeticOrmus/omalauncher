@@ -1,6 +1,6 @@
 face "money" {
   // Money's face: left of money's first page (101), where a swipe right from it lands.
-  page: 100
+  page: 600
 
   meta { owl: 13; description: "Money in one place: what's owed to you, the pipeline's follow-ups that are due, the people to be in touch with and the markets. Tap a row to open it."; version: "1.0"; license: "MIT"; category: "finance" }
 

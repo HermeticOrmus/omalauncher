@@ -365,6 +365,38 @@ class WidgetEngine(
         for ((items, to) in moves) for (item in items) if (item.page != to) moveToPage(item, to)
     }
 
+    /**
+     * Omalauncher Ormus: whether this start moved home from the old spaces to the workboards (the home store then keeps
+     * the layout file as it was, as a backup, before writing it again).
+     */
+    var workboardsMoved = false
+        private set
+
+    /**
+     * Omalauncher Ormus: once, at the first start of a build whose spaces are the workboards, every tile laid out under
+     * the old spaces goes where [dev.omalauncher.OrmusWorkboards] says; the widgets that leave go to .removed/. A marker
+     * file in widgets/ says it is done, so a home arranged since is never moved again. A home with no tile placed on the
+     * phone (a first install) has nothing to move: the shipped files' own pages are already the workboards'.
+     */
+    private fun migrateWorkboards() {
+        val done = File(dir, dev.omalauncher.OrmusWorkboards.DONE)
+        if (done.exists()) return
+        val items = pages.flatMap(::itemsOn)
+        if (items.any { placedOnPhone(it) }) {
+            val plan = dev.omalauncher.OrmusWorkboards.plan(items.map { dev.omalauncher.OrmusWorkboards.Item(it.key, it.page, layout.cell(it.key), it is WidgetItem, it.isFace) }, columns = layout.columns)
+            val byKey = items.associateBy { it.key }
+            for (move in plan.moves) {
+                val item = byKey[move.key] ?: continue
+                move.cell?.let { layout.set(item.key, it) }
+                moveToPage(item, move.page)
+            }
+            for (key in plan.removed) specs.firstOrNull { it.file.name == key }?.let(::removeWidget)
+            workboardsMoved = true
+            Log.i("ormus", "home moved by workboard: ${plan.moves.size} tiles moved, ${plan.removed.size} left")
+        }
+        runCatching { done.writeText(dev.omalauncher.Ormus.SPACES.joinToString(" ") + "\n") }.onFailure { Log.w("ormus", "workboards marker", it) }
+    }
+
     /** Takes [page] off home: its widgets and faces go to .removed/, its apps and folders come off home (they stay installed). */
     fun removePage(page: Int) {
         if (!loaded) return
@@ -649,6 +681,7 @@ class WidgetEngine(
         if (loaded) changed.forEach(::requestPreview)
         if (!loaded) {
             runtime.drawOwlIcons(parsed.filter { it.kind == OwlKind.App })
+            migrateWorkboards()
             loaded = true
             // Before faces, page 1 could be emptied by moving its last tile away, and home opens on page 1: the first page
             // of tiles becomes it again.

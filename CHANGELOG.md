@@ -10,12 +10,19 @@ What this fork adds to the release below it; none of it is in the Play build.
 
 - Installs beside the Play build as dev.omalauncher.ormus, "Omalauncher Ormus", with
   the Aurum theme, Grok and the Sun bridge preloaded.
-- Home has spaces: swiping up goes to the next (now, money, work, mind, world) and
-  down to the one before; left and right turn a space's pages. Home on home goes
-  back to now. `gestures.swipe-up = "spaces"` is the default. Every space has faces
-  left of its first page, as upstream's now does, and layout.toml says each page's
-  `space`, so editing it keeps the spaces apart. Five dots at the top of the letter
-  rail say which space this is; a long press on them lists the spaces to go to one.
+- Home has spaces, by workboard: swiping up goes to the next (now, raven, ormus,
+  alqvimia, clients, mercury, more) and down to the one before; left and right turn
+  a space's pages. Home on home goes back to now. `gestures.swipe-up = "spaces"` is
+  the default. Every space has faces left of its first page, as upstream's now does,
+  and layout.toml says each page's `space`, so editing it keeps the spaces apart.
+  Seven dots at the top of the letter rail say which space this is; a long press on
+  them lists the spaces to go to one. A home laid out under the spaces before (now,
+  money, work, mind, world) is moved over once at the first start: each workboard
+  space opens on its board tile, mercury takes the kiosk, the trainer and AI stars,
+  more takes the pass, the fleet, today and the sun; owed, people, pipeline, markets,
+  money's face, GitHub trending and the world's tiles leave the home (their files
+  stay in widgets/.removed); the layout file as it was stays beside the new one as
+  `layout.toml.before-workboards`.
 - The recent apps strip starts with Mercurio and WhatsApp on every page, then the
   apps opened last.
 - Niagara's alphabet down home's right edge: slide along it to a letter, then to an
