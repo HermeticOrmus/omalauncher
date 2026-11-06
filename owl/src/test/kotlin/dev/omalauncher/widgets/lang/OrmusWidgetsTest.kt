@@ -25,7 +25,9 @@ class OrmusWidgetsTest {
     @Test fun boardTilesAreTheSessionsTileWithThreeLinesChanged() {
         val dir = java.io.File("../app/src/main/assets/ormus/widgets")
         val lines = java.io.File(dir, "10-sessions.owl").readText().split("\n")
-        for ((board, page) in listOf("raven" to 101, "ormus" to 201, "alqvimia" to 301, "clients" to 401)) {
+        val boards = listOf("raven" to 101, "ormus" to 201, "alqvimia" to 301, "clients" to 401)
+        assertEquals("every board tile is one the script writes", boards.map { "11-board-${it.first}.owl" }.toSet(), dir.listFiles().orEmpty().map { it.name }.filter { it.startsWith("11-board-") }.toSet())
+        for ((board, page) in boards) {
             val swaps = mapOf("widget \"sessions\" {" to "widget \"board-$board\" {", "  page: 1" to "  page: $page", "  let only = \"\"" to "  let only = \"$board\"")
             for (from in swaps.keys) assertEquals("$from once in 10-sessions.owl", 1, lines.count { it == from })
             val expected = lines.joinToString("\n") { swaps[it] ?: it }

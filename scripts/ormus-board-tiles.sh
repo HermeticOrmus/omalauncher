@@ -5,7 +5,9 @@
 #   scripts/ormus-board-tiles.sh
 set -euo pipefail
 dir="${1:-app/src/main/assets/ormus/widgets}"
-# Each workboard space (Ormus.SPACES) holds its board tile on its first page: raven 101, ormus 201, ...
+# Each workboard space (Ormus.SPACES of the build with the workboards) holds its board tile on its first page:
+# raven 101, ormus 201, alqvimia 301, clients 401. Under the five older spaces those pages belong to money, work,
+# mind and world: the tiles ship only with the build that has the workboards.
 boards=(raven:101 ormus:201 alqvimia:301 clients:401)
 for entry in "${boards[@]}"; do
   board="${entry%%:*}"
