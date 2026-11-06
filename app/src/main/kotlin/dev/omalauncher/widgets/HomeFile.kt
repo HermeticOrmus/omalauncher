@@ -71,7 +71,7 @@ object HomeFile {
         |# an app left out comes off home. An app is a package, "pkg/activity" (with "@profile" for a work
         |# profile's), "linux:<desktop id>" or "owl:<file>".
         |# What couldn't be read is in errors.txt next to this file. Omalauncher Ormus: space = "raven" puts a
-        |# page in that space (now, money, work, mind, world); a page without one is in the space of the one before it.
+        |# page in that space (${dev.omalauncher.Ormus.SPACES.joinToString(", ")}); a page without one is in the space of the one before it.
         |
         """.trimMargin()
 
