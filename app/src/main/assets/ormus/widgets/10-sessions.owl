@@ -4,7 +4,7 @@ widget "sessions" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard. An agent that asks a simple question shows it with its answers: one tap answers it."; version: "1.6"; license: "MIT"; category: "productivity" }
+  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard. An agent that asks a question with picks shows it with them: one tap answers it. A yes for a command shows too, with the whole command, once sg allows it."; version: "1.7"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace.
@@ -18,7 +18,7 @@ widget "sessions" {
   // for it. sg's answer tool checks everything again before a key goes to the agent. What comes back is wrapped as
   // {"n": a number of its own, "r": the tool's answer}, so two equal answers in a row still count as two.
   state busy = ""
-  state sent = null
+  state sent = ""
   state said = ""
   on sent {
     let got = parseJson(value ?? "")
@@ -28,7 +28,7 @@ widget "sessions" {
       haptic()
       said = "unlocked · ${reply.game.today} today"
     } else {
-      said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : "it did not go through: open the agent"
+      said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "the key may have arrived: open the agent" : "it did not go through: open the agent"
     }
     refresh()
   }
@@ -88,19 +88,19 @@ widget "sessions" {
     }
   }
 
-  component ChatLine(c, where, body) {
+  component ChatLine(c, where, withText) {
     Row {
       gap: 8
       align: center
       Text { text: c.waiting ? "chat" : c.mine ? "you" : "quiet"; style: small; width: 62; maxLines: 1; color: c.waiting ? green : muted }
-      Text { text: body && c.text != "" ? "${c.name}: ${c.text}" : c.name; style: body; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
+      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; style: body; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
       Text { text: where; style: small; color: muted; width: 96; align: end; maxLines: 1 }
       Age { m: c.age_min }
     }
   }
 
   // One row that opens what it shows: an agent's chat in Mercurio, or a WhatsApp chat.
-  component Item(i, where, body) {
+  component Item(i, where, withText) {
     Box {
       onTap: {
         if i.row == "agent" {
@@ -118,7 +118,7 @@ widget "sessions" {
       if i.row == "agent" {
         AgentLine { a: i; where: where }
       } else {
-        ChatLine { c: i; where: where; body: body }
+        ChatLine { c: i; where: where; withText: withText }
       }
     }
   }
@@ -177,7 +177,7 @@ widget "sessions" {
       if a.ask.cut || (a.ask.more ?? false) {
         Text { text: a.ask.cut ? "the screen does not show all of it (${a.ask.lines} lines)" : "${a.ask.lines} lines: this is not all of it"; style: small; color: red; maxLines: 1 }
       } else if !fits {
-        Text { text: "${a.ask.lines} lines · tap to read it all"; style: small; color: muted; maxLines: 1 }
+        Text { text: "${a.ask.lines} lines: open the agent to read it all"; style: small; color: muted; maxLines: 1 }
       }
       if a.ask.why != "" {
         Text { text: a.ask.why; style: small; color: muted; maxLines: 2 }
@@ -189,7 +189,7 @@ widget "sessions" {
           Text { text: "answered from here"; style: small; color: green; weight: 1; maxLines: 1 }
           OpenAgent { a: a; label: "open" }
         }
-      } else if len(a.ask.options) == 0 {
+      } else if len(a.ask.options) == 0 || !fits {
         Row {
           gap: 8
           align: center
@@ -207,7 +207,7 @@ widget "sessions" {
                 if busy == "" {
                   busy = q
                   said = ""
-                  sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, key: o.key, term: a.term ?? ""}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 sg projects/ormus-feeds/bin/answer -; printf '}'")
+                  sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, key: o.key, term: a.term ?? ""}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -; printf '}'")
                 }
               }
             }
@@ -221,7 +221,7 @@ widget "sessions" {
     Row {
       gap: 8
       align: center
-      Text { text: said != "" ? said : game == null ? "" : "level ${game.level} · ${game.today} today${game.streak > 1 ? " · ${game.streak} days" : ""}"; style: small; color: said != "" ? green : muted; maxLines: 1 }
+      Text { text: said != "" ? said : game == null ? "" : "level ${game.level} · ${game.today} today${game.streak > 1 ? " · ${game.streak} days" : ""}"; style: small; color: said == "" ? muted : startsWith(said, "unlocked") ? green : red; maxLines: 1 }
       if game != null {
         Progress { value: game.into; max: game.need; width: 64; height: 4; color: accent }
       }
@@ -260,7 +260,7 @@ widget "sessions" {
         }
       }
       for i in rows.take(room) key "${i.row}:${i.board}:${i.project}:${i.machine ?? ""}:${i.session ?? ""}:${i.pane ?? i.k ?? i.name}" {
-        Item { i: i; where: "${lower(i.project)}"; body: false }
+        Item { i: i; where: "${lower(i.project)}"; withText: false }
       }
       if len(rows) > room {
         Text { text: "+${len(rows) - room} more · tap for every workboard"; style: small; color: muted; maxLines: 1 }
@@ -303,7 +303,7 @@ widget "sessions" {
         Row {
           gap: 8
           align: center
-          Text { text: modes != null && modes.dnd ? "quiet is on: only these alerts and your exceptions" : "quiet is off: every app can alert"; style: small; color: muted; weight: 1; maxLines: 2 }
+          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; style: small; color: muted; weight: 1; maxLines: 2 }
           Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
         }
         for b in live key b.name {
@@ -320,10 +320,10 @@ widget "sessions" {
                 padding: [0, 2]
                 Text { text: p.name; style: small; bold: true; color: muted }
                 for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
-                  Item { i: merge(a, {row: "agent", project: p.name}); where: "${a.kind} · ${a.machine}"; body: true }
+                  Item { i: merge(a, {row: "agent", project: p.name}); where: "${a.kind} · ${a.machine}"; withText: true }
                 }
                 for c in p.chats ?? [] key c.k ?? c.name {
-                  Item { i: merge(c, {row: "chat"}); where: c.slot != null ? "priority ${c.slot}" : c.group ? "group" : ""; body: true }
+                  Item { i: merge(c, {row: "chat"}); where: c.slot != null ? "priority ${c.slot}" : c.group ? "group" : ""; withText: true }
                 }
               }
             }
@@ -334,7 +334,7 @@ widget "sessions" {
             gap: 2
             Text { text: "WAITS ON YOU, NO PROJECT"; style: label }
             for c in loose key c.k ?? c.name {
-              Item { i: c; where: c.group ? "group" : ""; body: true }
+              Item { i: c; where: c.group ? "group" : ""; withText: true }
             }
           }
         }
