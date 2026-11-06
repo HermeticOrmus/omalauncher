@@ -546,20 +546,6 @@ class LangTest {
         }
     }
 
-    /** The Ormus build seeds these on home: one that does not compile would show an error tile there. */
-    @Test fun ormusWidgetsCompile() {
-        val dir = java.io.File("../app/src/main/assets/ormus/widgets")
-        val files = dir.walk().filter { it.extension == "owl" }.toList()
-        assertTrue("no widgets found in ${dir.absolutePath}", files.size > 5)
-        for (f in files) {
-            try {
-                Compiler.compile(f.readText())
-            } catch (e: CompileError) {
-                fail("${f.name}: ${Source(f.readText()).format(e)}")
-            }
-        }
-    }
-
     @Test fun needsLinux() {
         fun needs(src: String) = Compiler.compile("widget {\n$src\n}").needsLinux
         assertEquals(false, needs("source w = http(\"https://x.test\") json\nsource now = clock every 1m\nsource b = android.battery\nText { text: w.a }\nonTap: url(\"https://x.test\")"))

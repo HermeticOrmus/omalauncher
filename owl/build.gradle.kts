@@ -24,12 +24,12 @@ dependencies {
     testImplementation(libs.junit)
 }
 
-// LangTest compiles the widgets the app ships. They are no source of this module, so the test task must say that it
-// reads them: without this Gradle calls the test up to date, or takes its result from the cache, when only a
-// widget changed.
+// LangTest, ShareTest and OrmusWidgetsTest compile the widgets the app ships. They are no source of this module, so
+// the test task must say that it reads them: without this Gradle calls the test up to date, or takes its result from
+// the cache, when only a widget changed.
 tasks.test {
-    inputs.dir("../app/src/main/assets/widgets").withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir("../app/src/main/assets/ormus/widgets").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("../app/src/main/assets/widgets").withPropertyName("bundledWidgets").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir("../app/src/main/assets/ormus/widgets").withPropertyName("ormusWidgets").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 /** A single runnable jar (`java -jar owl.jar check ...`) for CI. */
