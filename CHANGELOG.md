@@ -39,6 +39,10 @@ What this fork adds to the release below it; none of it is in the Play build.
   (`owl-send ... set alert`) and it posts a notification; a quiet switch in its
   screen turns Do Not Disturb on and off. Kiosk: Mercury's picks, one at a time, a
   craft pick with the one move to take; swipe for the next, tap to open it.
+- Board tiles: one for each workboard (raven, ormus, alqvimia, clients), the sessions
+  tile for that board alone, with its own counts, chats and moves. They are the
+  sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
+  and the gate pins them to it.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 

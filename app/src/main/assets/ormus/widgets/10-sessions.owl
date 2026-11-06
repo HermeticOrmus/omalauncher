@@ -4,10 +4,12 @@ widget "sessions" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard. An agent that asks a question with picks shows it with them: one tap answers it. A yes for a command shows too, with the whole command, once sg allows it."; version: "1.7"; license: "MIT"; category: "productivity" }
+  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard, or for one workboard when `only` names it (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh). An agent that asks a question with picks shows it with them: one tap answers it. A yes for a command shows too, with the whole command, once sg allows it."; version: "1.8"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
-  // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace.
+  // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
+  // workboard, or one workboard's name: then the tile shows that board alone, with its own counts and moves.
+  let only = ""
   source f = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 60s json timeout 20s status
   source now = clock every 1m
   // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
@@ -46,7 +48,7 @@ widget "sessions" {
   source modes = android.modes
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
-  let boards = data != null ? data.boards : []
+  let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
   // Hosts as Mercurio's links name them (ssh://user@host:port#nickname), from the feed: no address is in this file.
   let links = data != null ? (data.links ?? {}) : {}
   // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
@@ -57,11 +59,12 @@ widget "sessions" {
   // Every agent and every project chat, each with where it lives.
   let agents = flatten(boards.map(b => flatten(b.projects.map(p => p.top.map(a => merge(a, {board: b.name, project: p.name, row: "agent"}))))))
   let chats = flatten(boards.map(b => flatten(b.projects.map(p => (p.chats ?? []).map(c => merge(c, {board: b.name, project: p.name, row: "chat"}))))))
-  let loose = data != null ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: "", row: "chat"})) : []
-  let needs = data != null ? data.needs : 0
-  let working = data != null ? data.agents.working : 0
-  let done = data != null ? data.agents.done : 0
-  let waiting = data != null ? (data.waiting ?? 0) : 0
+  // A chat with no project belongs to no workboard: only the tile of every workboard shows them.
+  let loose = data != null && only == "" ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: "", row: "chat"})) : []
+  let needs = data == null ? 0 : only == "" ? data.needs : sum(boards.map(b => b.agents.blocked))
+  let working = data == null ? 0 : only == "" ? data.agents.working : sum(boards.map(b => b.agents.working))
+  let done = data == null ? 0 : only == "" ? data.agents.done : sum(boards.map(b => b.agents.done))
+  let waiting = data == null ? 0 : only == "" ? (data.waiting ?? 0) : sum(boards.map(b => b.waiting ?? 0))
   // Who needs him first: blocked agents, then project chats that wait, then agents at work, then finished ones.
   // Agents whose question one tap can answer, the first one first.
   let asks = agents.filter(a => a.status == "blocked" && a.ask != null)
@@ -243,7 +246,7 @@ widget "sessions" {
     gap: 6
     Row {
       align: center
-      Text { text: "sessions"; style: muted; weight: 1 }
+      Text { text: only == "" ? "sessions" : only; style: muted; weight: 1 }
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(down) > 0 ? "${join(down, ", ")} didn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; style: small; color: data == null || len(down) > 0 || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if data != null {
@@ -263,13 +266,13 @@ widget "sessions" {
         Item { i: i; where: "${lower(i.project)}"; withText: false }
       }
       if len(rows) > room {
-        Text { text: "+${len(rows) - room} more · tap for every workboard"; style: small; color: muted; maxLines: 1 }
+        Text { text: "+${len(rows) - room} more · ${only == "" ? "tap for every workboard" : "tap for all of ${only}"}"; style: small; color: muted; maxLines: 1 }
       }
     }
   }
 
   screen {
-    title: "sessions"
+    title: only == "" ? "sessions" : only
     Column {
       scroll: true
       gap: 12
@@ -285,11 +288,12 @@ widget "sessions" {
         if stale || len(down) > 0 {
           Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red }
         }
-        if len(data.moves ?? []) > 0 {
+        let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
+        if len(moves) > 0 {
           Column {
             gap: 2
             Text { text: "MOVED LATELY"; style: label }
-            for m in reverse(data.moves).take(8) key "${m.n}" {
+            for m in reverse(moves).take(8) key "${m.n}" {
               Row {
                 gap: 8
                 align: center
