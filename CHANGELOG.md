@@ -33,11 +33,12 @@ What this fork adds to the release below it; none of it is in the Play build.
   waiting longest first), today, markets; and money's face, left of money's first page.
 - Sessions: one tile for every project he has agents in, on every machine, with the
   WhatsApp chats that belong to each, what needs him first. An agent that asks a
-  question shows it with the command a yes would run; a tap answers it when the
-  whole command fits the card, and each answer scores. sg tells the tile what moved
+  question with picks shows them: a tap answers it, and each answer scores. A yes
+  for a command shows with the whole command, and a tap answers it once sg allows
+  it, only when the whole command fits the card. sg tells the tile what moved
   (`owl-send ... set alert`) and it posts a notification; a quiet switch in its
-  screen turns Do Not Disturb on and off. Kiosk: Mercury's picks, one at a time with
-  the one move to take; swipe for the next, tap to open it.
+  screen turns Do Not Disturb on and off. Kiosk: Mercury's picks, one at a time, a
+  craft pick with the one move to take; swipe for the next, tap to open it.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
