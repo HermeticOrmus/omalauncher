@@ -83,7 +83,7 @@ object HomeFile {
         |# A foldable's cover screen has pages of its own under [cover], as [[cover.page]]; without them it
         |# starts from the pages above. With home.unfolded-layout, a Fold's inner screen has its own under
         |# [unfolded] (its columns home.unfolded-columns), starting from the pages above side by side.
-        |# What couldn't be read is in errors.txt next to this file. Omalauncher Ormus: space = "money" puts a
+        |# What couldn't be read is in errors.txt next to this file. Omalauncher Ormus: space = "raven" puts a
         |# page in that space (now, money, work, mind, world); a page without one is in the space of the one before it.
         |
         """.trimMargin()
@@ -101,6 +101,13 @@ object HomeFile {
      * page 1, where home opens, the ones before it 0, -1, ... and the rest 2, 3, ....
      */
     fun numbers(pages: List<PageEntry>): List<Int> = dev.omalauncher.Ormus.pageNumbers(pages.map { it.space }, pages.map { it is TilePage })
+
+    /** Omalauncher Ormus: whether the file names a space of the builds before the workboards (money, work, mind, world). */
+    fun namesOldSpaces(table: Map<String, Any>): Boolean =
+        (table[PAGE] as? List<*>).orEmpty().any { p ->
+            val named = (p as? Map<*, *>)?.get(SPACE)
+            named in dev.omalauncher.OrmusWorkboards.OLD_SPACES && named !in dev.omalauncher.Ormus.SPACES
+        }
 
     fun encode(
         table: Map<String, Any>,

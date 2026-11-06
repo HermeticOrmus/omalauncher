@@ -32,13 +32,15 @@ object Ormus {
     val STRIP_FIRST = listOf(listOf("solutions.ormus.logos", "solutions.ormus.logos.debug"), listOf("com.whatsapp"))
 
     /**
-     * Home's spaces, by area of life, in the order a swipe down steps through them (and wraps). A page number carries
-     * its space, a hundred each: a space's tile pages count up from its first page (now 1, money 101, work 201, ...),
-     * and its faces' pages count down from just left of it (now's 0, -1, ... as upstream; money's 100 down to 51), so
-     * saved layouts need nothing new. Swiping up goes to the next space, down to the one before; Home on home goes
-     * back to now.
+     * Home's spaces, by workboard (a Herdr session), in the order a swipe down steps through them (and wraps): now is
+     * what needs him, each workboard holds its board tile, mercury the kiosk and the trainer, more the rest. A page
+     * number carries its space, a hundred each: a space's tile pages count up from its first page (now 1, raven 101,
+     * ormus 201, ...), and its faces' pages count down from just left of it (now's 0, -1, ... as upstream; raven's 100
+     * down to 51), so saved layouts need nothing new. Swiping up goes to the next space, down to the one before; Home
+     * on home goes back to now. The spaces before were areas of life (now, money, work, mind, world): a home laid out
+     * under them is moved over once, see OrmusWorkboards.
      */
-    val SPACES = listOf("now", "money", "work", "mind", "world")
+    val SPACES = listOf("now", "raven", "ormus", "alqvimia", "clients", "mercury", "more")
     const val SPACE_PAGES = 100
 
     /** Page numbers a space keeps left of its first page, for its faces. */

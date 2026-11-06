@@ -1,5 +1,5 @@
 widget "people" {
-  page: 102
+  page: 602
   order: 0
   size: 6x5
   minSize: 3x2
