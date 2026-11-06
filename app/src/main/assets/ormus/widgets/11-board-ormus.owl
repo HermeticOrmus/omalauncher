@@ -1,0 +1,354 @@
+widget "board-ormus" {
+  page: 201
+  order: 0
+  size: 6x6
+  minSize: 4x3
+
+  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard, or for one workboard when `only` names it (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh). An agent that asks a question with picks shows it with them: one tap answers it. A yes for a command shows too, with the whole command, once sg allows it."; version: "1.8"; license: "MIT"; category: "productivity" }
+
+  // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
+  // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
+  // workboard, or one workboard's name: then the tile shows that board alone, with its own counts and moves.
+  let only = "ormus"
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 60s json timeout 20s status
+  source now = clock every 1m
+  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
+  source apps = android.apps every 10m
+  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+
+  // One-tap answers. `busy` is the question being answered, `sent` what came back for it, and `said` the line shown
+  // for it. sg's answer tool checks everything again before a key goes to the agent. What comes back is wrapped as
+  // {"n": a number of its own, "r": the tool's answer}, so two equal answers in a row still count as two.
+  state busy = ""
+  state sent = ""
+  state said = ""
+  on sent {
+    let got = parseJson(value ?? "")
+    let reply = got != null ? got.r : null
+    busy = ""
+    if reply != null && reply.ok {
+      haptic()
+      said = "unlocked · ${reply.game.today} today"
+    } else {
+      said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "the key may have arrived: open the agent" : "it did not go through: open the agent"
+    }
+    refresh()
+  }
+
+  // What moved, told while the phone sleeps. A widget's own sources run only while its page is on screen, so sg
+  // sends each move here (owl-send sets `alert`) and the tile posts it as a notification. Nothing else alerts.
+  // It starts as a move that is none: `on` does not run for a state's first value, and a null is not a value.
+  state alert = {n: 0}
+  on alert {
+    if value != null && value.title != null {
+      notify(value.title, value.text ?? "")
+    }
+  }
+  // Quiet: Do Not Disturb with his own exceptions. It is his switch; this tile never turns it on by itself.
+  source modes = android.modes
+
+  let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
+  let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
+  // Hosts as Mercurio's links name them (ssh://user@host:port#nickname), from the feed: no address is in this file.
+  let links = data != null ? (data.links ?? {}) : {}
+  // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
+  let stale = data != null && now != null && now - data.generated > 180
+  let down = data != null ? keys(data.machines ?? {}).filter(m => data.machines[m] != "ok") : []
+  let failed = data != null ? keys(data.errors ?? {}) : []
+
+  // Every agent and every project chat, each with where it lives.
+  let agents = flatten(boards.map(b => flatten(b.projects.map(p => p.top.map(a => merge(a, {board: b.name, project: p.name, row: "agent"}))))))
+  let chats = flatten(boards.map(b => flatten(b.projects.map(p => (p.chats ?? []).map(c => merge(c, {board: b.name, project: p.name, row: "chat"}))))))
+  // A chat with no project belongs to no workboard: only the tile of every workboard shows them.
+  let loose = data != null && only == "" ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: "", row: "chat"})) : []
+  let needs = data == null ? 0 : only == "" ? data.needs : sum(boards.map(b => b.agents.blocked))
+  let working = data == null ? 0 : only == "" ? data.agents.working : sum(boards.map(b => b.agents.working))
+  let done = data == null ? 0 : only == "" ? data.agents.done : sum(boards.map(b => b.agents.done))
+  let waiting = data == null ? 0 : only == "" ? (data.waiting ?? 0) : sum(boards.map(b => b.waiting ?? 0))
+  // Who needs him first: blocked agents, then project chats that wait, then agents at work, then finished ones.
+  // Agents whose question one tap can answer, the first one first.
+  let asks = agents.filter(a => a.status == "blocked" && a.ask != null)
+  let game = data != null ? data.game : null
+  let rows = flatten([agents.filter(a => a.status == "blocked"), chats.filter(c => c.waiting), agents.filter(a => a.status == "working"), agents.filter(a => a.status == "done")])
+  // As many rows as the tile holds, after the headline, the score and the answer card when one shows.
+  let room = max(1, floor(((tileHeight ?? 400) - 125 - (len(asks) > 0 ? 150 : 0)) / 21))
+  // Boards with something in them; a board with no agent and no chat stays out of the way.
+  let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0 || (b.waiting ?? 0) > 0)
+
+  component Age(m) {
+    Text { text: m == null ? "" : m < 60 ? "${m}m" : m < 1440 ? "${floor(m / 60)}h" : "${floor(m / 1440)}d"; style: small; color: muted; width: 30; align: end; maxLines: 1 }
+  }
+
+  // Mercurio's words: an agent that waits on him "needs you".
+  component AgentLine(a, where) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: a.status == "blocked" ? "needs you" : a.status; style: small; width: 62; maxLines: 1; bold: a.status == "blocked"; color: a.status == "blocked" || a.status == "working" ? foreground : a.status == "done" ? green : muted }
+      // What it needs when the priorities tool knows; else its title, or its tab when the title says nothing.
+      Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
+      Text { text: where; style: small; color: muted; width: 96; align: end; maxLines: 1 }
+    }
+  }
+
+  component ChatLine(c, where, withText) {
+    Row {
+      gap: 8
+      align: center
+      Text { text: c.waiting ? "chat" : c.mine ? "you" : "quiet"; style: small; width: 62; maxLines: 1; color: c.waiting ? green : muted }
+      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; style: body; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
+      Text { text: where; style: small; color: muted; width: 96; align: end; maxLines: 1 }
+      Age { m: c.age_min }
+    }
+  }
+
+  // One row that opens what it shows: an agent's chat in Mercurio, or a WhatsApp chat.
+  component Item(i, where, withText) {
+    Box {
+      onTap: {
+        if i.row == "agent" {
+          if mercurio != null && get(links, i.machine, null) != null {
+            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
+          } else {
+            androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+          }
+        } else if i.open.url != null {
+          androidIntent({package: "com.whatsapp", action: "android.intent.action.VIEW", data: i.open.url})
+        } else {
+          androidIntent({package: "com.whatsapp", component: "com.whatsapp.Conversation", extras: {jid: i.open.jid}})
+        }
+      }
+      if i.row == "agent" {
+        AgentLine { a: i; where: where }
+      } else {
+        ChatLine { c: i; where: where; withText: withText }
+      }
+    }
+  }
+
+  // Open an agent's chat in Mercurio, or Mercurio itself when the feed has no link for its machine.
+  component OpenAgent(a, label) {
+    Button {
+      text: label
+      color: foreground
+      onTap: {
+        if mercurio != null && get(links, a.machine, null) != null {
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pane, "solutions.ormus.logos.extra.HERD_SESSION": a.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
+        } else {
+          androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+        }
+      }
+    }
+  }
+
+  // A question of a blocked agent. The card says what a yes would run and why the agent asks. It offers the answers
+  // only when the feed gives some: a command that is cut or too long to show has none, and he opens the agent. The
+  // values go to sg's answer tool as JSON on stdin, so no shell on the way reads them as code. `term` is the
+  // terminal the question was seen in: after a Herdr restart the same pane asks at the same state number again,
+  // and a tap from before it must not answer the question after it.
+  // The answers show only under the whole command. `lines` is the room the card has for it and `wide` the
+  // characters one line of the card holds at least. A row of the command can be much wider than the card (the
+  // agent's pane is), so the room is counted in lines of the card, not in rows of the command. When the command
+  // fits, it is drawn with no limit of lines; when it does not, it is cut and the card has no answers.
+  component AskCard(a, lines, wide) {
+    Column {
+      gap: 4
+      padding: [10, 8]
+      radius: 8 * corners
+      background: alpha(foreground, 0.06)
+      let q = "${a.machine}:${a.session}:${a.pane}:${a.seq}:${a.ask.id}"
+      let shown = a.ask.run ?? a.ask.what
+      let need = sum(split(shown, "\n").map(r => max(1, ceil(len(r) / max(8, wide)))))
+      // A yes also needs the whole command from the feed (`run`): a feed from before it carried one has only the
+      // command's first line (`what`), and that is shown with no answers.
+      let fits = need <= lines && (!a.ask.approval || (a.ask.run ?? "") != "")
+      Row {
+        gap: 8
+        align: center
+        Text { text: lower(a.project); style: small; color: muted; maxLines: 1 }
+        Text { text: a.ask.question != "" ? a.ask.question : "asks you"; style: body; bold: true; weight: 1; maxLines: 2 }
+      }
+      if a.ask.about != "" {
+        Text { text: a.ask.about; style: small; color: foreground; maxLines: 2 }
+      }
+      if a.ask.tool != "" {
+        Text { text: a.ask.tool; style: small; color: muted; maxLines: 1 }
+      }
+      if shown != "" {
+        Text { text: shown; style: small; font: mono; color: foreground; maxLines: fits ? 4000 : lines }
+      }
+      if a.ask.cut || (a.ask.more ?? false) {
+        Text { text: a.ask.cut ? "the screen does not show all of it (${a.ask.lines} lines)" : "${a.ask.lines} lines: this is not all of it"; style: small; color: red; maxLines: 1 }
+      } else if !fits {
+        Text { text: "${a.ask.lines} lines: open the agent to read it all"; style: small; color: muted; maxLines: 1 }
+      }
+      if a.ask.why != "" {
+        Text { text: a.ask.why; style: small; color: muted; maxLines: 2 }
+      }
+      if a.ask.sent ?? false {
+        Row {
+          gap: 8
+          align: center
+          Text { text: "answered from here"; style: small; color: green; weight: 1; maxLines: 1 }
+          OpenAgent { a: a; label: "open" }
+        }
+      } else if len(a.ask.options) == 0 || !fits {
+        Row {
+          gap: 8
+          align: center
+          Text { text: "read it in the agent"; style: small; color: muted; weight: 1; maxLines: 1 }
+          OpenAgent { a: a; label: "open" }
+        }
+      } else if fits {
+        Flow {
+          gap: 8
+          for o in a.ask.options key o.key {
+            Button {
+              text: busy == q ? "…" : o.label
+              color: foreground
+              onTap: {
+                if busy == "" {
+                  busy = q
+                  said = ""
+                  sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, key: o.key, term: a.term ?? ""}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -; printf '}'")
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  component Score() {
+    Row {
+      gap: 8
+      align: center
+      Text { text: said != "" ? said : game == null ? "" : "level ${game.level} · ${game.today} today${game.streak > 1 ? " · ${game.streak} days" : ""}"; style: small; color: said == "" ? muted : startsWith(said, "unlocked") ? green : red; maxLines: 1 }
+      if game != null {
+        Progress { value: game.into; max: game.need; width: 64; height: 4; color: accent }
+      }
+    }
+  }
+
+  component Summary() {
+    Row {
+      gap: 10
+      align: center
+      Text { text: needs > 0 ? "${needs} need you" : "nobody needs you"; style: title; color: needs > 0 ? accent : green }
+      Text { text: "${working} working · ${done} done · ${waiting} chats"; style: small; color: muted; weight: 1; align: end; maxLines: 1 }
+    }
+  }
+
+  onTap: screen()
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: only == "" ? "sessions" : only; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(down) > 0 ? "${join(down, ", ")} didn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; style: small; color: data == null || len(down) > 0 || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+    }
+    if data != null {
+      Summary {}
+      Score {}
+      if len(asks) > 0 {
+        AskCard { a: asks[0]; lines: 3; wide: floor(((tileWidth ?? 360) - 48) / 8) }
+      }
+      Row {
+        gap: 12
+        // Per workboard: agents that need him plus chats that wait; white when an agent is among them.
+        for b in live.filter(b => b.agents.blocked + (b.waiting ?? 0) > 0).take(5) key b.name {
+          Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: b.agents.blocked > 0 ? foreground : green, bold: true}]; style: small; color: muted; maxLines: 1 }
+        }
+      }
+      for i in rows.take(room) key "${i.row}:${i.board}:${i.project}:${i.machine ?? ""}:${i.session ?? ""}:${i.pane ?? i.k ?? i.name}" {
+        Item { i: i; where: "${lower(i.project)}"; withText: false }
+      }
+      if len(rows) > room {
+        Text { text: "+${len(rows) - room} more · ${only == "" ? "tap for every workboard" : "tap for all of ${only}"}"; style: small; color: muted; maxLines: 1 }
+      }
+    }
+  }
+
+  screen {
+    title: only == "" ? "sessions" : only
+    Column {
+      scroll: true
+      gap: 12
+      padding: [4, 8]
+      if data == null {
+        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else {
+        Summary {}
+        Score {}
+        for a in asks key "${a.machine}:${a.session}:${a.pane}:${a.seq}" {
+          AskCard { a: a; lines: 4000; wide: floor(((screenWidth ?? 360) - 40) / 8) }
+        }
+        if stale || len(down) > 0 {
+          Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red }
+        }
+        let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
+        if len(moves) > 0 {
+          Column {
+            gap: 2
+            Text { text: "MOVED LATELY"; style: label }
+            for m in reverse(moves).take(8) key "${m.n}" {
+              Row {
+                gap: 8
+                align: center
+                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; style: small; width: 62; maxLines: 1; color: m.kind == "done" || m.kind == "chat" ? green : foreground }
+                Text { text: "${m.title} · ${m.text}"; style: small; weight: 1; maxLines: 1 }
+                Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
+              }
+            }
+          }
+        }
+        Row {
+          gap: 8
+          align: center
+          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; style: small; color: muted; weight: 1; maxLines: 2 }
+          Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
+        }
+        for b in live key b.name {
+          Column {
+            gap: 4
+            Row {
+              align: center
+              Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
+              Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; style: small; color: muted; align: end; maxLines: 1 }
+            }
+            for p in b.projects.filter(p => len(p.top) > 0 || len(p.chats ?? []) > 0) key p.name {
+              Column {
+                gap: 2
+                padding: [0, 2]
+                Text { text: p.name; style: small; bold: true; color: muted }
+                for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
+                  Item { i: merge(a, {row: "agent", project: p.name}); where: "${a.kind} · ${a.machine}"; withText: true }
+                }
+                for c in p.chats ?? [] key c.k ?? c.name {
+                  Item { i: merge(c, {row: "chat"}); where: c.slot != null ? "priority ${c.slot}" : c.group ? "group" : ""; withText: true }
+                }
+              }
+            }
+          }
+        }
+        if len(loose) > 0 {
+          Column {
+            gap: 2
+            Text { text: "WAITS ON YOU, NO PROJECT"; style: label }
+            for c in loose key c.k ?? c.name {
+              Item { i: c; where: c.group ? "group" : ""; withText: true }
+            }
+          }
+        }
+        for n in data.notes ?? [] {
+          Text { text: n; style: small; color: muted }
+        }
+        for k in failed {
+          Text { text: "${k}: ${data.errors[k]}"; style: small; color: red }
+        }
+      }
+    }
+  }
+}
