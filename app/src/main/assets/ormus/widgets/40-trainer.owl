@@ -1,5 +1,5 @@
 widget "trainer" {
-  page: 2
+  page: 501
   order: 2
   size: 6x5
   minSize: 3x3

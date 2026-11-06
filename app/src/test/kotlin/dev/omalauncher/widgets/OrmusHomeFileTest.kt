@@ -32,7 +32,7 @@ class OrmusHomeFileTest {
             [[page]]
             tiles = [ { widget = "80-today.owl" } ]
             [[page]]
-            space = "money"
+            space = "raven"
             tiles = [ { widget = "60-owed.owl" } ]
             [[page]]
             tiles = [ { widget = "62-people.owl" } ]
@@ -40,6 +40,20 @@ class OrmusHomeFileTest {
         val decoded = HomeFile.decode(Toml.parse(text), 6)
         assertEquals(emptyList<String>(), decoded.problems)
         assertEquals(listOf(1, 101, 102), HomeFile.numbers(decoded.layout.pages))
+    }
+
+    @Test fun aFileFromTheBuildsBeforeTheWorkboardsIsSeen() {
+        val old = """
+            [[page]]
+            tiles = [ { widget = "80-today.owl" } ]
+            [[page]]
+            space = "money"
+            tiles = [ { widget = "60-owed.owl" } ]
+            """.trimIndent()
+        assertEquals(true, HomeFile.namesOldSpaces(Toml.parse(old)))
+        val new = old.replace("money", "raven")
+        assertEquals(false, HomeFile.namesOldSpaces(Toml.parse(new)))
+        assertEquals(false, HomeFile.namesOldSpaces(Toml.parse("version = 1")))
     }
 
     @Test fun anUnknownSpaceIsSaidAndThePageStaysWhereItWas() {

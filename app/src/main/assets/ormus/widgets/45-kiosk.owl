@@ -1,5 +1,5 @@
 widget "kiosk" {
-  page: 301
+  page: 501
   order: 5
   size: 6x4
   minSize: 4x3
