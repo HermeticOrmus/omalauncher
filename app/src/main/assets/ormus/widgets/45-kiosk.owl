@@ -4,7 +4,7 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, each with why it matters and the one move to take. Swipe for the next, tap to open it, tap the header for the whole list."; version: "1.1"; license: "MIT"; category: "news" }
+  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, tap the header for the whole list."; version: "1.2"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
@@ -13,11 +13,15 @@ widget "kiosk" {
   state at = 0 persist
   state pull = 0
 
-  let data = f != null && f.ok && f.out != null && f.out.news != null ? f.out : null
-  let picks = data != null ? flatten([data.news.items.map(i => merge(i, {kind: "news"})), data.craft.items.map(i => merge(i, {kind: "craft"}))]) : []
+  // One list can be missing (its file unreadable on sg: the feed names it in `errors` and the other list still shows).
+  let data = f != null && f.ok && f.out != null && (f.out.news != null || f.out.craft != null) ? f.out : null
+  let news = data != null ? ((data.news ?? {}).items ?? []) : []
+  let craft = data != null ? ((data.craft ?? {}).items ?? []) : []
+  let picks = flatten([news.map(i => merge(i, {kind: "news"})), craft.map(i => merge(i, {kind: "craft"}))])
   let n = len(picks)
   let i = n > 0 ? picks[at % n] : null
-  let picked = data != null ? (data.news.picked ?? data.craft.picked) : null
+  // The older of the two lists: a loop that stopped shows.
+  let picked = data != null ? min((data.news ?? {}).picked ?? (now ?? 0), (data.craft ?? {}).picked ?? (now ?? 0)) : null
   // The loops stopped or sg is away: say how old the picks are instead of passing them off as fresh.
   let stale = picked != null && now != null && now - picked > 4 * 3600
   let failed = data != null ? keys(data.errors ?? {}) : []
@@ -49,7 +53,7 @@ widget "kiosk" {
       Row {
         align: center
         Text { text: "mercury"; style: muted; weight: 1 }
-        Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+        Text { text: f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
       }
     }
     if data != null && n == 0 {
@@ -89,12 +93,12 @@ widget "kiosk" {
           Text { text: "picked ${fmtAgo(picked, now)} ago"; style: small; color: red }
         }
         Text { text: "NEWS FOR YOU"; style: label }
-        for p, k in data.news.items key p.url {
+        for p, k in news key "news:${k}:${p.url}" {
           Box { onTap: url(p.url); Pick { i: merge(p, {kind: "news"}); lines: 4; gold: k == 0 } }
         }
         Text { text: "HOW OTHERS CODE"; style: label }
-        for p, k in data.craft.items key p.url {
-          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "craft"}); lines: 4; gold: k == 0 && len(data.news.items) == 0 } }
+        for p, k in craft key "craft:${k}:${p.url}" {
+          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "craft"}); lines: 4; gold: k == 0 && len(news) == 0 } }
         }
         for k in failed {
           Text { text: "${k}: ${data.errors[k]}"; style: small; color: red }
