@@ -486,7 +486,16 @@ class OrmusUsageTileTest {
         for ((width, text) in listOf(225 to "reset · 2d ago", 226 to "week reset · 2d ago", 264 to "week reset · 2d ago", 265 to "week reset · as of 2d ago")) {
             assertEquals("$width dp", "$text [yellow]", row(oldReset, width))
         }
-        for ((width, text) in listOf(231 to "unknown · 2d ago", 232 to "use unknown · 2d ago", 270 to "use unknown · 2d ago", 271 to "use unknown · as of 2d ago")) {
+        // Below "unknown · 2d ago" the cut takes the words of the short text, never the label: the age alone, not "use… · 2d ago".
+        for ((width, text) in listOf(
+            187 to "2d ago",
+            205 to "2d ago",
+            206 to "unknown · 2d ago",
+            231 to "unknown · 2d ago",
+            232 to "use unknown · 2d ago",
+            270 to "use unknown · 2d ago",
+            271 to "use unknown · as of 2d ago",
+        )) {
             assertEquals("$width dp", "$text [yellow]", row(farUnknown, width))
         }
         // A note has no short text: it keeps the whole words that fit and "…", so the age stays whole; with no room
