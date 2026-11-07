@@ -451,6 +451,90 @@ class OrmusUsageTileTest {
         assertTrue("no row with a reset time was checked", checked > 300)
     }
 
+    private val ravenStale = account("claude-1", "Claude", "Raven", """[{"label": "week Fable", "percent": 73, "resets": ${NOW + 2 * DAY}}]""", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "73")
+    private val oldReset = account("claude-7", "Claude", "Old", """[{"label": "week", "percent": null, "resets": ${NOW - 60}, "reset": true}]""", state = "stale", read = NOW - 2 * DAY, error = "\"no answer\"")
+    private val farUnknown = account("claude-9", "Claude", "Far", """[{"label": "week", "percent": null, "resets": null}]""", state = "stale", read = NOW - 2 * DAY, error = "\"no answer\"")
+    private val bareStale = account("grok-8", "Grok", "Bare", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
+    private val notedStale = account("grok-9", "Grok", "Noted", note = "\"180 credits left\"", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
+
+    /** The value text of the only account in [a] at [width] dp. */
+    private fun row(
+        a: String,
+        width: Int,
+    ) = tile(feed(a), width = width)[3]
+
+    @Test fun aStaleRowTooLongDropsTheResetTimeThenAsOfThenTheLabelThenCutsItsWords() {
+        // At 4x3 (249 dp) "week Fable 73% · as of 3h ago" next to "Claude Raven" was cut by the phone (review 3).
+        for ((width, text) in listOf(
+            249 to "73% · 3h ago",
+            264 to "73% · 3h ago",
+            265 to "week Fable 73% · 3h ago",
+            303 to "week Fable 73% · 3h ago",
+            304 to "week Fable 73% · as of 3h ago",
+            355 to "week Fable 73% · as of 3h ago",
+            356 to "week Fable 73% · in 2d · as of 3h ago",
+            400 to "week Fable 73% · in 2d · as of 3h ago",
+            401 to "week Fable 73% · resets in 2d · as of 3h ago",
+        )) {
+            assertEquals("$width dp", "$text [yellow]", row(ravenStale, width))
+        }
+        for ((width, text) in listOf(225 to "reset · 2d ago", 226 to "week reset · 2d ago", 264 to "week reset · 2d ago", 265 to "week reset · as of 2d ago")) {
+            assertEquals("$width dp", "$text [yellow]", row(oldReset, width))
+        }
+        for ((width, text) in listOf(231 to "unknown · 2d ago", 232 to "use unknown · 2d ago", 270 to "use unknown · 2d ago", 271 to "use unknown · as of 2d ago")) {
+            assertEquals("$width dp", "$text [yellow]", row(farUnknown, width))
+        }
+        // A note has no short text: its words are cut with "…" (a space before it goes: OWL trims the end of a value),
+        // so the age stays whole.
+        for ((width, text) in listOf(
+            160 to "… · 3h ago",
+            249 to "180 credits… · 3h ago",
+            256 to "180 credits l… · 3h ago",
+            264 to "180 credits le… · 3h ago",
+            265 to "180 credits left · 3h ago",
+            303 to "180 credits left · 3h ago",
+            304 to "180 credits left · as of 3h ago",
+        )) {
+            assertEquals("$width dp", "$text [yellow]", row(notedStale, width))
+        }
+        // An age alone: "as of " goes first; with no room for the age either, the renderer cuts it.
+        for ((width, text) in listOf(134 to "3h ago", 173 to "3h ago", 180 to "as of 3h ago")) {
+            assertEquals("$width dp", "$text [yellow]", row(bareStale, width))
+        }
+    }
+
+    @Test fun aRowThatIsNotStaleKeepsOnlyItsShortTextWhenItsLabelDoesNotFit() {
+        val studio = account("claude-11", "Claude", "Raven Studio", """[{"label": "week Fable", "percent": 73, "resets": ${NOW + 2 * DAY}}]""", peak = "73")
+        assertEquals("73% [foreground]", row(studio, 251))
+        assertEquals("week Fable 73% [foreground]", row(studio, 252))
+        // The feed's own words with no age stay whole in the tile's text (the renderer cuts their end; the screen shows them).
+        assertEquals("xAI gives no usage for this plan [muted]", row(noUsage, 249))
+        // An unread account says its error, never a reset time, even with a window in the feed.
+        val unread = account("claude-12", "Claude", "Dev", """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}]""", state = "unread", read = null, error = "\"token ended\"", peak = "40")
+        assertEquals("token ended [yellow]", row(unread, SIX_BY_FOUR))
+    }
+
+    @Test fun everyRowTheTileBuildsFitsFromTheSmallestSizeAtThePhonesMeasuredCharacterWidth() {
+        // Every row kind: a window with its reset time, a window reset, unknown, a note, unread, and stale ones of each.
+        val behind = account("claude-13", "Claude", "Behind", """[{"label": "week", "percent": null, "resets": ${NOW - 30}, "reset": true}]""")
+        val unread = account("claude-6", "Claude", "Dev", state = "unread", read = null, error = "\"token ended\"")
+        val staleFull = full.replace("\"state\": \"ok\"", "\"state\": \"stale\"").replace("\"read\": $NOW", "\"read\": ${NOW - 3 * 3_600}")
+        val rows = arrayOf(staleFull, half, high, credits, behind, unread, ravenStale.replace("claude-1", "claude-14"), oldReset, farUnknown, bareStale, notedStale)
+        val names = setOf("Claude Ormus", "Claude Raven", "ChatGPT Raven", "Grok Ormus", "Claude Behind", "Claude Dev", "Claude Old", "Claude Far", "Grok Bare", "Grok Noted")
+        var checked = 0
+        // 249 dp is the smallest size (4x3) on the phone.
+        for (width in 249..420) {
+            val lines = tile(feed(*rows, top = topFull), height = 2_000, width = width).drop(2).map { it.substringBeforeLast(" [") }
+            for ((name, value) in lines.zipWithNext()) {
+                if (name !in names) continue
+                val dp = (name.length + value.length) * 6.47 + 8
+                assertTrue("$width dp: \"$name\" \"$value\" needs $dp dp", dp <= width - 24)
+                checked++
+            }
+        }
+        assertEquals("rows checked", rows.size * (420 - 249 + 1), checked)
+    }
+
     @Test fun theScreensResetColumnHoldsItsLongestTimeAtThePhonesMeasuredCharacterWidth() {
         // The longest text the column takes ("EEE d HH:mm" in English), 19 characters of 6.47 dp on the phone.
         val longest = "resets Wed 30 23:59".length
@@ -496,7 +580,10 @@ class OrmusUsageTileTest {
         const val NOW = 1_800_000_000L
         const val DAY = 86_400L
 
-        /** The 6x4 tile's width on the phone in dp (a probe tile said so); a row of 53 characters fits it. */
+        /**
+         * The 6x4 tile's width on the phone in dp (a probe tile said so): rowChars 54, that is 52 characters of text and
+         * the 8 dp gap.
+         */
         const val SIX_BY_FOUR = 377
     }
 }
