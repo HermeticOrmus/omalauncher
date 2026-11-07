@@ -2,6 +2,7 @@ package dev.omalauncher.widgets.lang
 
 import dev.omalauncher.widgets.market.Review
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -12,7 +13,7 @@ import java.util.Locale
 
 class LangTest {
     /** Just enough runtime for tests: states start at their initial value, lets evaluate on read. */
-    private class TestHost(
+    internal class TestHost(
         val program: Program?,
     ) : Host {
         constructor(n: Int) : this(null) {
@@ -252,6 +253,42 @@ class LangTest {
         assertEquals(Num(2.0), host.slots[0])
         assertEquals(listOf("run echo hi"), host.actions)
         assertEquals(listOf("echo hi"), p.commands)
+    }
+
+    /** Omalauncher Ormus: install(url, sha256) reaches the host, from a touch alone, and the reviewer sees where the app comes from. */
+    @Test fun installTakesAUrlAndAHash_fromATouch_andIsSeenByTheReviewer() {
+        val h = "ab12".repeat(16)
+        val p = Compiler.compile("widget {\nonTap: install(\"https://pass.test/a.apk\", \"$h\")\nText { text: \"x\" }\n}")
+        val host = TestHost(p.globals.size)
+        p.onTap!!.run(Env.root(host), emptyList())
+        assertEquals(listOf("install https://pass.test/a.apk, $h"), host.actions)
+        assertEquals(listOf("install an app from the web: https://pass.test/a.apk"), p.commands)
+        // A URL put together from a fixed start and a value: the reviewer sees the start.
+        val built = Compiler.compile("widget {\nmeta { owl: 9 }\nlet page = \"https://pass.test/\"\nstate f = null\nstate s = null\nonTap: { if f != null { install(\"\${page}\${f}\", s) } }\nText { text: page }\n}")
+        assertEquals(listOf("install an app from the web: https://pass.test/…"), built.commands)
+        assertEquals(listOf("install an app from the web: a URL built from widget values"), Compiler.compile("widget {\nstate u = null\nonTap: install(u, u)\nText { text: u }\n}").commands)
+        // Two values, the second a SHA-256; not in a trigger; not as a value; https, or http from this phone alone.
+        for (bad in listOf("onTap: install()", "onTap: install(\"https://a/b.apk\")", "onTap: install(\"https://a/b.apk\", \"short\")")) {
+            assertThrows(bad, CompileError::class.java) { Compiler.compile("widget {\nmeta { owl: 9 }\n$bad\nText { text: \"x\" }\n}") }
+        }
+        assertThrows(CompileError::class.java) { Compiler.compile("widget {\nText { text: install(\"https://a/b.apk\", \"$h\") }\n}") }
+        // Every trigger kind, also inside an if: only a touch installs.
+        for (trig in listOf("every 1m", "state n = 1\non n", "state n = 1\nwhen n", "state t = null\nat t")) {
+            for (body in listOf("install(\"https://a/b.apk\", \"$h\")", "if 1 > 0 { install(\"https://a/b.apk\", \"$h\") }")) {
+                val e = assertThrows("$trig { $body }", CompileError::class.java) { Compiler.compile("widget {\nmeta { owl: 9 }\n$trig { $body }\nText { text: \"x\" }\n}") }
+                assertTrue(e.message, e.message!!.contains("from a touch"))
+            }
+        }
+        // After a trigger refused it, a touch still may: the flag does not stick.
+        assertThrows(CompileError::class.java) { Compiler.compile("widget {\nevery 1m { install(\"https://a/b.apk\", \"$h\") }\nText { text: \"x\" }\n}") }
+        Compiler.compile("widget {\nonTap: install(\"http://127.0.0.1:8080/lab.apk\", \"$h\")\nText { text: \"x\" }\n}")
+        Compiler.compile("widget {\nonTap: install(\"http://localhost/lab.apk\", \"$h\")\nText { text: \"x\" }\n}")
+        // http hosts that only look like this phone, and an http start with no host written out.
+        for (url in listOf("http://pass.test/a.apk", "http://127.0.0.1.evil.test/a.apk", "http://127.0.0.1@evil.test/a.apk", "http://localhost.evil.test/a.apk", "HTTP://evil.test/a.apk")) {
+            val e = assertThrows(url, CompileError::class.java) { Compiler.compile("widget {\nonTap: install(\"$url\", \"$h\")\nText { text: \"x\" }\n}") }
+            assertTrue(e.message, e.message!!.contains("https"))
+        }
+        assertThrows(CompileError::class.java) { Compiler.compile("widget {\nstate x = null\nonTap: install(\"http://127.0.0.1\${x}\", \"$h\")\nText { text: x }\n}") }
     }
 
     @Test fun runIntoStateAndNewActions() {

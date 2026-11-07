@@ -51,6 +51,12 @@ class Compiler private constructor(
         /** Where a command has an sh(...) value, as [Program.commands] lists it. */
         const val VALUE = "‹value›"
 
+        /** A SHA-256 as `install(...)` takes it: lowercase hex. */
+        val HEX64 = Regex("[0-9a-f]{64}")
+
+        /** The hosts `install(...)` may reach over plain http: this phone alone. */
+        val LOOPBACK = setOf("127.0.0.1", "localhost")
+
         /** Where a command has a number, which can't be anything but digits, a dot and a sign. */
         const val NUMBER = "‹number›"
 
@@ -94,6 +100,9 @@ class Compiler private constructor(
 
     /** True while compiling what a secret may go into: a request's headers and body, or a check that it's set. */
     private var secretOk = false
+
+    /** True while compiling a trigger's handler: what runs with no touch (Omalauncher Ormus: install() refuses to). */
+    private var inTrigger = false
 
     /** While compiling a request's URL, where a secret goes only as `enc(token)`. */
     private var inUrl = false
@@ -675,6 +684,26 @@ class Compiler private constructor(
     }
 
     /**
+     * Omalauncher Ormus: where `install(...)` gets its app, for the reviewer: the URL, or its fixed start and "…";
+     * over https, or http from this phone alone (the lab): a fixed http start must name its host whole.
+     */
+    private fun installFrom(
+        e: Expr,
+        s: Scope,
+    ) {
+        if (e is Expr.Cond) return listOf(e.a, e.b).forEach { installFrom(it, s) }
+        val whole = constText(e, s)
+        val start = whole ?: constantStart(e, s)
+        if (start.startsWith("http://", ignoreCase = true)) {
+            // A start must close its host with a `/`: "http://127.0.0.1" + a value could name another machine.
+            val host = Regex(if (whole != null) "^https?://[^/]+(?=/|$)" else "^https?://[^/]+(?=/)", RegexOption.IGNORE_CASE).find(start)?.let { runCatching { java.net.URI(it.value).host?.lowercase() }.getOrNull() }
+            if (host !in LOOPBACK) fail("install gets apps over https; http from this phone alone (127.0.0.1 or localhost, written out)", e.pos)
+        }
+        commands += "install an app from the web: " + (whole ?: if (start.isEmpty()) "a URL built from widget values" else "$start…")
+    }
+
+
+    /**
      * A `font` that isn't one of the words names a font file: an asset, a file in this system or a URL (owl 10).
      * One only known at run time, a state's or a source's, needs no level: widgets from before owl 10 pick a
      * word that way, and below 10 one that turns out to be a file draws in the launcher's font.
@@ -856,7 +885,9 @@ class Compiler private constructor(
             }
         if (d.kind != "every" && expr.const != null) fail("${d.kind} needs a value that changes, like a state or a source", d.expr.pos)
         if (d.first) since(ON_FIRST, d.pos)
-        return Trigger(TriggerKind.of(d.kind), expr, handler(Handler(d.kind, d.stmts, d.pos), root, TRIGGER_PARAMS[d.kind].orEmpty()), d.pos, d.first)
+        inTrigger = true
+        val run = try { handler(Handler(d.kind, d.stmts, d.pos), root, TRIGGER_PARAMS[d.kind].orEmpty()) } finally { inTrigger = false }
+        return Trigger(TriggerKind.of(d.kind), expr, run, d.pos, d.first)
     }
 
     private fun component(d: Decl.Component): Component {
@@ -1211,6 +1242,13 @@ class Compiler private constructor(
                     commands += "press keys in the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "keys built from widget values")
                 }
                 if (call.name == "typeText") commands += "type into the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "text built from widget values")
+                // Omalauncher Ormus: an APK from the web goes to Android's installer, which asks first. Only from a
+                // touch (a trigger could put the sheet over anything, unasked); the reviewer sees where from.
+                if (call.name == "install") {
+                    if (inTrigger) fail("install(...) runs from a touch, not in a trigger", call.pos)
+                    installFrom(call.args[0], scope)
+                    (args[1].const as? Str)?.v?.let { if (!HEX64.matches(it.trim().lowercase())) fail("install's second value is the file's SHA-256, 64 hex characters", call.args[1].pos) }
+                }
                 if (call.name == "latch") (args.getOrNull(1)?.const as? Str)?.v?.let { if (it !in KeyNames.hows) fail("latch's second value is ${KeyNames.hows.joinToString()}", call.args[1].pos) }
                 if (call.name == "screen" || call.name == "close") screenAction = screenAction ?: call.pos
                 if (call.name == "screen") openScreen = openScreen ?: call.pos

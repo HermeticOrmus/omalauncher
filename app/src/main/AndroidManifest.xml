@@ -13,6 +13,9 @@
 
     <!-- Uninstall from the app drawer's long-press menu (ACTION_DELETE). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Omalauncher Ormus: the pass tile's one-tap update, install(...). The APK goes to Android's
+         installer, which shows the app and asks before anything changes. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature
         android:name="android.software.live_wallpaper"

@@ -29,6 +29,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.core.content.FileProvider
+import java.util.concurrent.atomic.AtomicBoolean
 import dev.omalauncher.BuildConfig
 import android.os.Process
 import android.net.TrafficStats
@@ -120,9 +122,18 @@ private const val MAX_HTTP_BYTES = 1 shl 20
 /** Why a request whose response is over [MAX_HTTP_BYTES] failed; it isn't tried again any sooner than its interval. */
 internal const val HTTP_TOO_BIG = "the response is over 1 MB, more than a widget reads"
 
-private const val MAX_REDIRECTS = 5
+internal const val MAX_REDIRECTS = 5
 
-private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+/** What Android's installer takes from `install(...)`. */
+private const val APK_MIME = "application/vnd.android.package-archive"
+
+/** A downloaded APK older than this goes when the next install starts: no installer sheet still reads it. */
+private const val OLD_APK_MS = 10 * 60 * 1000L
+
+/** True while one `install(...)` downloads, for the whole process: a second tap is turned away with a toast. */
+private val installing = AtomicBoolean(false)
+
+internal val REDIRECTS = setOf(301, 302, 303, 307, 308)
 
 /**
  * How often `android.drawer` changes at most. Icons load one at a time, and each changes `hasIcon`: without this a
@@ -617,6 +628,7 @@ class WidgetServices(
             "volume" -> volume.control(args[0], args.getOrNull(1).textOrNull())
             "notification" -> notifications.control(arg, args.getOrNull(1).textOrNull(), args.getOrNull(2))
             "settings" -> panels.open(arg, media.playingPackage())
+            "install" -> install(arg, args.getOrNull(1).textOrNull())
             "androidApp" -> openAndroidApp(arg)
             "androidIntent" -> openAndroidIntent(args[0] as? Obj)
             "copy" -> copy(arg)
@@ -926,6 +938,57 @@ class WidgetServices(
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("widget", text))
         // Android 13+ confirms copies itself.
         if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, "copied", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * install(url, sha256): gets an APK from the web and hands it to Android's installer, which shows the app and asks
+     * before anything changes (the first time, it also asks to allow installs from this launcher). The hash given is
+     * checked first; a file with another is refused, and so is one with no hash. One download at a time; the work off
+     * the main thread, the toasts and the sheet on it. Nothing but Android's own sheet installs.
+     */
+    private fun install(
+        url: String,
+        sha256: String?,
+    ) {
+        if (!installing.compareAndSet(false, true)) {
+            Toast.makeText(context, "an app is already on its way", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val name = ApkDownload.apkName(url)
+        val host = runCatching { URL(url).host }.getOrNull().orEmpty()
+        val job =
+            scope.launch(Dispatchers.Main) {
+                Toast.makeText(context, "getting $name", Toast.LENGTH_SHORT).show()
+                    val dir = File(context.cacheDir, "apks")
+                    val file = File(dir, name)
+                    val got =
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                // Earlier downloads go, but not one an installer sheet may still be reading.
+                                dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > OLD_APK_MS }?.forEach { it.delete() }
+                                ApkDownload.fetch(url, file, sha256.orEmpty())
+                            }
+                        }
+                    got.onFailure {
+                        Log.w("widgets", "install $url: ${it.message ?: it.javaClass.simpleName}")
+                        Toast.makeText(context, "not installed: ${ApkDownload.whyNot(it, host)}", Toast.LENGTH_LONG).show()
+                    }
+                    got.onSuccess {
+                        try {
+                            val uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
+                            val sheet = Intent(Intent.ACTION_VIEW).setDataAndType(uri, APK_MIME).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(sheet)
+                        } catch (e: ActivityNotFoundException) {
+                            Toast.makeText(context, "no installer opens $name", Toast.LENGTH_SHORT).show()
+                        } catch (e: SecurityException) {
+                            Toast.makeText(context, "Android doesn't let the launcher open the installer", Toast.LENGTH_LONG).show()
+                        } catch (e: IllegalArgumentException) {
+                            Toast.makeText(context, "not installed: ${e.message ?: "the file could not be shared"}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+            }
+        // Also when the scope is gone before the block runs: the next tap must not be turned away for good.
+        job.invokeOnCompletion { installing.set(false) }
     }
 
     /** share(text): Android's share sheet, to send the text to any app. */
