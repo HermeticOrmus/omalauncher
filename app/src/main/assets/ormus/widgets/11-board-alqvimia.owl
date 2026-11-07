@@ -4,7 +4,7 @@ widget "board-alqvimia" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 13; description: "Every project Ormus has agents in, on every machine, with the WhatsApp chats that belong to it: who needs him first, then who works and who finished. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp, the tile for every workboard, or for one workboard when `only` names it (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh). An agent that asks a question with picks shows it with them: one tap answers it. A yes for a command shows too, with the whole command, once sg allows it."; version: "1.8"; license: "MIT"; category: "productivity" }
+  meta { owl: 13; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, with its question and the answers one tap sends; swipe for the next. Under it, the chats that wait and the agents at work; the tile's screen has every workboard, project, agent and chat. Tap an agent to land in its chat in Mercurio, a chat to open it in WhatsApp. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "2.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -22,10 +22,14 @@ widget "board-alqvimia" {
   state busy = ""
   state sent = ""
   state said = ""
+  // The question `said` is about, so the line shows on that card, or under the headline when another card shows.
+  state saidFor = ""
   on sent {
     let got = parseJson(value ?? "")
     let reply = got != null ? got.r : null
+    saidFor = busy
     busy = ""
+    dragX = 0
     if reply != null && reply.ok {
       haptic()
       said = "unlocked · ${reply.game.today} today"
@@ -49,8 +53,11 @@ widget "board-alqvimia" {
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
   let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
-  // Hosts as Mercurio's links name them (ssh://user@host:port#nickname), from the feed: no address is in this file.
+  // Hosts as Mercurio's links name them (ssh://user@host:port#nickname), and each machine's names on the tailnet,
+  // both from the feed: no address is in this file. Mercurio picks the saved host that attaches the agent's
+  // session from the names, so a tap lands in the session whatever the phone calls the host.
   let links = data != null ? (data.links ?? {}) : {}
+  let hosts = data != null ? (data.hosts ?? {}) : {}
   // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
   let stale = data != null && now != null && now - data.generated > 180
   let down = data != null ? keys(data.machines ?? {}).filter(m => data.machines[m] != "ok") : []
@@ -65,18 +72,43 @@ widget "board-alqvimia" {
   let working = data == null ? 0 : only == "" ? data.agents.working : sum(boards.map(b => b.agents.working))
   let done = data == null ? 0 : only == "" ? data.agents.done : sum(boards.map(b => b.agents.done))
   let waiting = data == null ? 0 : only == "" ? (data.waiting ?? 0) : sum(boards.map(b => b.waiting ?? 0))
-  // Who needs him first: blocked agents, then project chats that wait, then agents at work, then finished ones.
-  // Agents whose question one tap can answer, the first one first.
-  let asks = agents.filter(a => a.status == "blocked" && a.ask != null)
   let game = data != null ? data.game : null
-  let rows = flatten([agents.filter(a => a.status == "blocked"), chats.filter(c => c.waiting), agents.filter(a => a.status == "working"), agents.filter(a => a.status == "done")])
-  // As many rows as the tile holds, after the headline, the score and the answer card when one shows.
-  let room = max(1, floor(((tileHeight ?? 400) - 125 - (len(asks) > 0 ? 150 : 0)) / 21))
   // Boards with something in them; a board with no agent and no chat stays out of the way.
   let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0 || (b.waiting ?? 0) > 0)
 
+  // The cards: every agent that needs him, one at a time: first the ones one tap can answer, then the ones whose
+  // question the feed read but cannot answer from here, then the rest. `pick` is the card shown, by the agent's
+  // place, so a card keeps its place when the list changes under it; a pick that is gone shows the first. `dragX`
+  // is how far the finger has pulled the card sideways.
+  let blocked = agents.filter(a => a.status == "blocked")
+  let cards = flatten([blocked.filter(a => a.ask != null && len(a.ask.options) > 0), blocked.filter(a => a.ask != null && len(a.ask.options) == 0), blocked.filter(a => a.ask == null)])
+  let ids = cards.map(a => "${a.machine}:${a.session}:${a.pane}")
+  state pick = ""
+  state dragX = 0
+  let found = indexOf(ids, pick)
+  // A card is `pinned` while it is the one picked: only then are its keys live, so a refresh that puts another card
+  // in its place cannot take a tap meant for the one he read. The first card is pinned as the feed comes in.
+  let pinned = found != null && found >= 0
+  let at = pinned ? found : 0
+  let card = len(cards) > 0 ? cards[at] : null
+  let shownQ = card == null ? "" : "${card.machine}:${card.session}:${card.pane}:${card.seq}:${card.ask != null ? card.ask.id : ""}"
+  on f {
+    if pick == "" && len(ids) > 0 {
+      pick = ids[0]
+    }
+  }
+  // What moves besides: the chats that wait on him, then the agents at work. The finished ones are on the screen.
+  let rows = flatten([chats.filter(c => c.waiting), agents.filter(a => a.status == "working")])
+  // Characters one line of a card holds at least, and the lines of a command the card on the tile may show.
+  let wide = floor(((tileWidth ?? 360) - 64) / 7.5)
+  let cardLines = max(2, floor(((tileHeight ?? 400) - 315) / 16))
+  let cardNeed = card == null || card.ask == null ? 0 : sum(split(card.ask.run ?? card.ask.what ?? "", "\n").map(r => max(1, ceil(len(r) / max(8, wide)))))
+  // Rows the tile holds under the headline, the score and the card.
+  let cardHeight = card == null ? 0 : 225 + 16 * min(cardNeed, cardLines)
+  let room = max(0, floor(((tileHeight ?? 400) - 100 - cardHeight) / 28))
+
   component Age(m) {
-    Text { text: m == null ? "" : m < 60 ? "${m}m" : m < 1440 ? "${floor(m / 60)}h" : "${floor(m / 1440)}d"; style: small; color: muted; width: 30; align: end; maxLines: 1 }
+    Text { text: m == null ? "" : m < 60 ? "${m}m" : m < 1440 ? "${floor(m / 60)}h" : "${floor(m / 1440)}d"; fontSize: 12; color: muted; width: 30; align: end; maxLines: 1 }
   }
 
   // Mercurio's words: an agent that waits on him "needs you".
@@ -84,10 +116,11 @@ widget "board-alqvimia" {
     Row {
       gap: 8
       align: center
-      Text { text: a.status == "blocked" ? "needs you" : a.status; style: small; width: 62; maxLines: 1; bold: a.status == "blocked"; color: a.status == "blocked" || a.status == "working" ? foreground : a.status == "done" ? green : muted }
+      padding: [0, 4]
+      Text { text: a.status == "blocked" ? "needs you" : a.status; fontSize: 12; width: 66; maxLines: 1; bold: a.status == "blocked"; color: a.status == "blocked" ? accent : a.status == "working" ? foreground : a.status == "done" ? green : muted }
       // What it needs when the priorities tool knows; else its title, or its tab when the title says nothing.
-      Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
-      Text { text: where; style: small; color: muted; width: 96; align: end; maxLines: 1 }
+      Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); fontSize: 14; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
+      Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
     }
   }
 
@@ -95,9 +128,10 @@ widget "board-alqvimia" {
     Row {
       gap: 8
       align: center
-      Text { text: c.waiting ? "chat" : c.mine ? "you" : "quiet"; style: small; width: 62; maxLines: 1; color: c.waiting ? green : muted }
-      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; style: body; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
-      Text { text: where; style: small; color: muted; width: 96; align: end; maxLines: 1 }
+      padding: [0, 4]
+      Text { text: c.waiting ? "chat" : c.mine ? "you" : "quiet"; fontSize: 12; width: 66; maxLines: 1; color: c.waiting ? green : muted }
+      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; fontSize: 14; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
+      Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
       Age { m: c.age_min }
     }
   }
@@ -108,7 +142,7 @@ widget "board-alqvimia" {
       onTap: {
         if i.row == "agent" {
           if mercurio != null && get(links, i.machine, null) != null {
-            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
+            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
           } else {
             androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
           }
@@ -126,117 +160,218 @@ widget "board-alqvimia" {
     }
   }
 
+  // A key: a wide button a thumb finds. `strong` is the one answer the card leads with.
+  component Key(word, strong = false) {
+    Box {
+      fill: width
+      padding: [14, 12]
+      radius: 8 * corners
+      background: alpha(foreground, strong ? 0.16 : 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+    }
+  }
+
   // Open an agent's chat in Mercurio, or Mercurio itself when the feed has no link for its machine.
-  component OpenAgent(a, label) {
-    Button {
-      text: label
-      color: foreground
+  component OpenAgent(a, word) {
+    Box {
+      fill: width
       onTap: {
         if mercurio != null && get(links, a.machine, null) != null {
-          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pane, "solutions.ormus.logos.extra.HERD_SESSION": a.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pane, "solutions.ormus.logos.extra.HERD_SESSION": a.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
+      Key { word: word }
     }
   }
 
-  // A question of a blocked agent. The card says what a yes would run and why the agent asks. It offers the answers
-  // only when the feed gives some: a command that is cut or too long to show has none, and he opens the agent. The
-  // values go to sg's answer tool as JSON on stdin, so no shell on the way reads them as code. `term` is the
-  // terminal the question was seen in: after a Herdr restart the same pane asks at the same state number again,
-  // and a tap from before it must not answer the question after it.
-  // The answers show only under the whole command. `lines` is the room the card has for it and `wide` the
-  // characters one line of the card holds at least. A row of the command can be much wider than the card (the
-  // agent's pane is), so the room is counted in lines of the card, not in rows of the command. When the command
-  // fits, it is drawn with no limit of lines; when it does not, it is cut and the card has no answers.
-  component AskCard(a, lines, wide) {
+  // One answer: its key goes to sg's answer tool as JSON on stdin, so no shell on the way reads it as code. `term`
+  // is the terminal the question was seen in: after a Herdr restart the same pane asks at the same state number
+  // again, and a tap from before it must not answer the question after it.
+  component Answer(a, o, q, strong) {
+    Box {
+      fill: width
+      onTap: {
+        if busy == "" {
+          busy = q
+          said = ""
+          sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, key: o.key, term: a.term ?? ""}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -; printf '}'")
+        }
+      }
+      Key { word: busy == q ? "…" : o.label; strong: strong }
+    }
+  }
+
+  // One agent that needs him: what it asks, what a yes would run and why, and the answers. The answers show only
+  // under the whole command: `lines` is the room the card has for it and `wide` the characters one line holds at
+  // least; a command that does not fit is cut, and the card sends him to the screen, where it all fits. A command
+  // the screen does not show whole, or too long to carry, has no answers from the feed: he opens the agent. On the
+  // tile (`compact`: little room) the card keeps to the question, one line of what it is about, the command and
+  // up to three keys; the tool, why it asks and longer lists of answers are on the screen.
+  component NeedCard(a, lines, wide) {
     Column {
-      gap: 4
-      padding: [10, 8]
-      radius: 8 * corners
-      background: alpha(foreground, 0.06)
-      let q = "${a.machine}:${a.session}:${a.pane}:${a.seq}:${a.ask.id}"
-      let shown = a.ask.run ?? a.ask.what
-      let need = sum(split(shown, "\n").map(r => max(1, ceil(len(r) / max(8, wide)))))
+      gap: 6
+      padding: [12, 10]
+      radius: 10 * corners
+      background: alpha(foreground, 0.07)
+      let ask = a.ask
+      let compact = lines < 100
+      let q = "${a.machine}:${a.session}:${a.pane}:${a.seq}:${ask != null ? ask.id : ""}"
+      let shown = ask != null ? (ask.run ?? ask.what ?? "") : ""
+      let need = shown == "" ? 0 : sum(split(shown, "\n").map(r => max(1, ceil(len(r) / max(8, wide)))))
       // A yes also needs the whole command from the feed (`run`): a feed from before it carried one has only the
       // command's first line (`what`), and that is shown with no answers.
-      let fits = need <= lines && (!a.ask.approval || (a.ask.run ?? "") != "")
+      // A command the screen did not show whole, or too long to carry, gets no keys here either, whatever the feed says.
+      let whole = ask != null && !ask.cut && !(ask.more ?? false) && (!ask.approval || (ask.run ?? "") != "")
+      let fits = whole && need <= lines
+      let answers = ask != null && !(ask.sent ?? false) ? (ask.options ?? []) : []
+      // Keys side by side when each label fits its share of the card's width (about 9 dp a character at this size).
+      let per = max(6, floor(wide * 7.5 / max(1, len(answers)) / 9) - 3)
+      let short = len(answers) <= 3 && all(answers, o => len(o.label) <= per)
+      // On the tile only keys side by side: a stack of long ones would push the last key, usually the no, off it.
+      let roomy = !compact || short
       Row {
         gap: 8
         align: center
-        Text { text: lower(a.project); style: small; color: muted; maxLines: 1 }
-        Text { text: a.ask.question != "" ? a.ask.question : "asks you"; style: body; bold: true; weight: 1; maxLines: 2 }
+        Text { text: "${lower(a.project)} · ${a.board}"; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
+        Text { text: len(cards) > 1 ? "${at + 1} of ${len(cards)}" : ""; fontSize: 12; color: muted; maxLines: 1 }
       }
-      if a.ask.about != "" {
-        Text { text: a.ask.about; style: small; color: foreground; maxLines: 2 }
+      Text { text: ask != null && ask.question != "" ? ask.question : "needs you"; fontSize: 17; bold: true; maxLines: 2 }
+      if ask == null {
+        Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} on ${a.machine}"); fontSize: 14; maxLines: 3 }
+      } else {
+        if ask.about != "" {
+          Text { text: ask.about; fontSize: 13; maxLines: compact ? 1 : 2 }
+        }
+        if ask.tool != "" && !compact {
+          Text { text: ask.tool; fontSize: 12; color: muted; maxLines: 1 }
+        }
+        if shown != "" {
+          Text { text: shown; font: mono; fontSize: 12; maxLines: fits ? 4000 : lines }
+        }
+        if ask.cut || (ask.more ?? false) {
+          Text { text: ask.cut ? "the screen does not show all of it (${ask.lines} lines)" : "${ask.lines} lines: this is not all of it"; fontSize: 12; color: red; maxLines: 1 }
+        } else if whole && !fits {
+          Text { text: "${ask.lines} lines: read it all before a yes"; fontSize: 12; color: muted; maxLines: 1 }
+        } else if whole && !roomy {
+          Text { text: "${len(answers)} answers: pick on the screen"; fontSize: 12; color: muted; maxLines: 1 }
+        }
+        if ask.why != "" && !compact {
+          Text { text: ask.why; fontSize: 13; color: muted; maxLines: 2 }
+        }
       }
-      if a.ask.tool != "" {
-        Text { text: a.ask.tool; style: small; color: muted; maxLines: 1 }
-      }
-      if shown != "" {
-        Text { text: shown; style: small; font: mono; color: foreground; maxLines: fits ? 4000 : lines }
-      }
-      if a.ask.cut || (a.ask.more ?? false) {
-        Text { text: a.ask.cut ? "the screen does not show all of it (${a.ask.lines} lines)" : "${a.ask.lines} lines: this is not all of it"; style: small; color: red; maxLines: 1 }
-      } else if !fits {
-        Text { text: "${a.ask.lines} lines: open the agent to read it all"; style: small; color: muted; maxLines: 1 }
-      }
-      if a.ask.why != "" {
-        Text { text: a.ask.why; style: small; color: muted; maxLines: 2 }
-      }
-      if a.ask.sent ?? false {
+      if ask != null && (ask.sent ?? false) {
         Row {
           gap: 8
           align: center
-          Text { text: "answered from here"; style: small; color: green; weight: 1; maxLines: 1 }
-          OpenAgent { a: a; label: "open" }
+          Text { text: "answered from here"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
+          OpenAgent { a: a; word: "open" }
         }
-      } else if len(a.ask.options) == 0 || !fits {
+      } else if len(answers) > 0 && fits && roomy && !pinned {
+        // The card came in under the thumb, not by his hand: one tap pins it, and its keys show.
         Row {
           gap: 8
-          align: center
-          Text { text: "read it in the agent"; style: small; color: muted; weight: 1; maxLines: 1 }
-          OpenAgent { a: a; label: "open" }
+          Box {
+            onTap: pick = ids[at]
+            weight: 1
+            Key { word: "show the answers"; strong: true }
+          }
+          OpenAgent { a: a; word: "open"; weight: 1 }
         }
-      } else if fits {
-        Flow {
+      } else if len(answers) > 0 && fits && roomy && short {
+        Row {
           gap: 8
-          for o in a.ask.options key o.key {
-            Button {
-              text: busy == q ? "…" : o.label
-              color: foreground
-              onTap: {
-                if busy == "" {
-                  busy = q
-                  said = ""
-                  sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, key: o.key, term: a.term ?? ""}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -; printf '}'")
-                }
-              }
-            }
+          for o, i in answers key o.key {
+            Answer { a: a; o: o; q: q; strong: i == 0; weight: 1 }
           }
         }
+      } else if len(answers) > 0 && fits && roomy {
+        Column {
+          gap: 6
+          for o, i in answers key o.key {
+            Answer { a: a; o: o; q: q; strong: i == 0; fill: width }
+          }
+        }
+      } else if len(answers) > 0 && whole {
+        Row {
+          gap: 8
+          Box {
+            onTap: screen()
+            weight: 1
+            Key { word: fits ? "pick on the screen" : "read it all"; strong: true }
+          }
+          OpenAgent { a: a; word: "open"; weight: 1 }
+        }
+      } else {
+        OpenAgent { a: a; word: "open in Mercurio"; fill: width }
+      }
+      if said != "" && busy == "" && saidFor == q {
+        Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? green : red; maxLines: 2 }
       }
     }
   }
 
-  component Score() {
-    Row {
-      gap: 8
-      align: center
-      Text { text: said != "" ? said : game == null ? "" : "level ${game.level} · ${game.today} today${game.streak > 1 ? " · ${game.streak} days" : ""}"; style: small; color: said == "" ? muted : startsWith(said, "unlocked") ? green : red; maxLines: 1 }
-      if game != null {
-        Progress { value: game.into; max: game.need; width: 64; height: 4; color: accent }
+  // The cards, one at a time: swipe sideways for the next or the one before, or tap the arrows. The card follows
+  // the finger a little and springs back; a pull past 70 dp, or a flick, turns it.
+  component Cards(lines, wide) {
+    Column {
+      gap: 4
+      Box {
+        drag: horizontal
+        onDrag: dragX = dragX + dx
+        onDragEnd: {
+          let n = len(cards)
+          if n > 1 && (dragX < -70 || vx < -600) && at < n - 1 {
+            pick = ids[at + 1]
+            haptic()
+          } else if n > 1 && (dragX > 70 || vx > 600) && at > 0 {
+            pick = ids[at - 1]
+            haptic()
+          }
+          dragX = 0
+        }
+        offset: [dragX * 0.6, 0]
+        opacity: 1 - min(0.5, abs(dragX) / 400)
+        animate offset: spring()
+        animate opacity: tween(150ms, "out")
+        NeedCard { a: card; lines: lines; wide: wide }
+      }
+      if len(cards) > 1 {
+        // Up to seven dots (the card's header counts them all), the one shown bigger and brighter.
+        Row {
+          gap: 6
+          align: center
+          justify: center
+          Text { text: "‹"; fontSize: 20; color: at > 0 ? foreground : alpha(foreground, 0.3); padding: [18, 10]; onTap: { dragX = 0; if at > 0 { pick = ids[at - 1] } } }
+          for id, i in ids.take(7) key "${id}:${i}" {
+            Box { size: i == at ? 8 : 6; radius: 4; background: i == at ? foreground : alpha(foreground, 0.3) }
+          }
+          Text { text: "›"; fontSize: 20; color: at < len(cards) - 1 ? foreground : alpha(foreground, 0.3); padding: [18, 10]; onTap: { dragX = 0; if at < len(cards) - 1 { pick = ids[at + 1] } } }
+        }
       }
     }
   }
 
-  component Summary() {
-    Row {
-      gap: 10
-      align: center
-      Text { text: needs > 0 ? "${needs} need you" : "nobody needs you"; style: title; color: needs > 0 ? accent : green }
-      Text { text: "${working} working · ${done} done · ${waiting} chats"; style: small; color: muted; weight: 1; align: end; maxLines: 1 }
+  // The headline: who needs him is the one thing in gold, with the score of the day beside it (the level and the
+  // streak on the screen), and the other counts under it.
+  component Headline(full) {
+    Column {
+      gap: 2
+      Row {
+        gap: 8
+        align: center
+        Text { text: needs > 0 ? "${needs} need you" : "nobody needs you"; fontSize: 24; bold: true; color: needs > 0 ? accent : green; weight: 1; maxLines: 1 }
+        if game != null {
+          Progress { value: game.into; max: game.need; width: 48; height: 4; color: foreground; track: alpha(foreground, 0.2) }
+          Text { text: "${game.today} today"; fontSize: 12; color: muted; maxLines: 1 }
+        }
+      }
+      if said != "" && busy == "" && saidFor != shownQ {
+        Text { text: said; fontSize: 12; color: startsWith(said, "unlocked") ? green : red; maxLines: 1 }
+      } else {
+        Text { text: "${working} working · ${done} done · ${waiting} chats wait${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
+      }
     }
   }
 
@@ -247,22 +382,21 @@ widget "board-alqvimia" {
     Row {
       align: center
       Text { text: only == "" ? "sessions" : only; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(down) > 0 ? "${join(down, ", ")} didn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; style: small; color: data == null || len(down) > 0 || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(down) > 0 ? "${join(down, ", ")} didn't answer" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; fontSize: 12; color: data == null || len(down) > 0 || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if data != null && only != "" && len(boards) == 0 {
       Text { text: "no ${only} board in the feed"; style: body; color: red }
     } else if data != null {
-      Summary {}
-      Score {}
-      if len(asks) > 0 {
-        AskCard { a: asks[0]; lines: 3; wide: floor(((tileWidth ?? 360) - 48) / 8) }
+      Headline { full: false }
+      if card != null {
+        Cards { lines: cardLines; wide: wide }
       }
-      if only == "" {
+      if only == "" && card == null {
         Row {
           gap: 12
-          // Per workboard: agents that need him plus chats that wait; white when an agent is among them.
+          // Per workboard: agents that need him plus chats that wait, green; the screen has the agents by board.
           for b in live.filter(b => b.agents.blocked + (b.waiting ?? 0) > 0).take(5) key b.name {
-            Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: b.agents.blocked > 0 ? foreground : green, bold: true}]; style: small; color: muted; maxLines: 1 }
+            Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: green, bold: true}]; fontSize: 12; color: muted; maxLines: 1 }
           }
         }
       }
@@ -270,7 +404,7 @@ widget "board-alqvimia" {
         Item { i: i; where: "${lower(i.project)}"; withText: false }
       }
       if len(rows) > room {
-        Text { text: "+${len(rows) - room} more · ${only == "" ? "tap for every workboard" : "tap for all of ${only}"}"; style: small; color: muted; maxLines: 1 }
+        Text { text: "+${len(rows) - room} more · ${only == "" ? "tap for every workboard" : "tap for all of ${only}"}"; fontSize: 12; color: muted; maxLines: 1 }
       }
     }
   }
@@ -286,13 +420,12 @@ widget "board-alqvimia" {
       } else if only != "" && len(boards) == 0 {
         Text { text: "no ${only} board in the feed"; style: body; color: red }
       } else {
-        Summary {}
-        Score {}
-        for a in asks key "${a.machine}:${a.session}:${a.pane}:${a.seq}" {
-          AskCard { a: a; lines: 4000; wide: floor(((screenWidth ?? 360) - 40) / 8) }
+        Headline { full: true }
+        if card != null {
+          Cards { lines: 4000; wide: floor(((screenWidth ?? 360) - 64) / 7.5) }
         }
         if stale || len(down) > 0 {
-          Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red }
+          Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }
         }
         let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
         if len(moves) > 0 {
@@ -303,8 +436,9 @@ widget "board-alqvimia" {
               Row {
                 gap: 8
                 align: center
-                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; style: small; width: 62; maxLines: 1; color: m.kind == "done" || m.kind == "chat" ? green : foreground }
-                Text { text: "${m.title} · ${m.text}"; style: small; weight: 1; maxLines: 1 }
+                padding: [0, 3]
+                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "done" || m.kind == "chat" ? green : m.kind == "needs" ? accent : foreground }
+                Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
                 Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
               }
             }
@@ -313,7 +447,7 @@ widget "board-alqvimia" {
         Row {
           gap: 8
           align: center
-          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; style: small; color: muted; weight: 1; maxLines: 2 }
+          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
           Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
         }
         for b in live key b.name {
@@ -322,13 +456,13 @@ widget "board-alqvimia" {
             Row {
               align: center
               Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
-              Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; style: small; color: muted; align: end; maxLines: 1 }
+              Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
             }
             for p in b.projects.filter(p => len(p.top) > 0 || len(p.chats ?? []) > 0) key p.name {
               Column {
                 gap: 2
                 padding: [0, 2]
-                Text { text: p.name; style: small; bold: true; color: muted }
+                Text { text: p.name; fontSize: 13; bold: true; color: muted }
                 for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
                   Item { i: merge(a, {row: "agent", project: p.name}); where: "${a.kind} · ${a.machine}"; withText: true }
                 }
@@ -349,10 +483,10 @@ widget "board-alqvimia" {
           }
         }
         for n in data.notes ?? [] {
-          Text { text: n; style: small; color: muted }
+          Text { text: n; fontSize: 13; color: muted }
         }
         for k in failed {
-          Text { text: "${k}: ${data.errors[k]}"; style: small; color: red }
+          Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
         }
       }
     }

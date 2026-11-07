@@ -38,14 +38,21 @@ What this fork adds to the release below it; none of it is in the Play build.
 - Ormus widgets: sun, now playing, smart notifications, communications, projects,
   mercurio, trainer, the pass, owed, people, pipeline, fleet, raven (the reviews
   waiting longest first), today, markets; and money's face, left of money's first page.
-- Sessions: one tile for every project he has agents in, on every machine, with the
-  WhatsApp chats that belong to each, what needs him first. An agent that asks a
-  question with picks shows them: a tap answers it, and each answer scores. A yes
-  for a command shows with the whole command, and a tap answers it once sg allows
-  it, only when the whole command fits the card. sg tells the tile what moved
-  (`owl-send ... set alert`) and it posts a notification; a quiet switch in its
-  screen turns Do Not Disturb on and off. Kiosk: Mercury's picks, one at a time, a
-  craft pick with the one move to take; swipe for the next, tap to open it.
+- Sessions: who needs him first, one card at a time. Every agent that waits on
+  him, on every machine, is a card: the project, the question, what a yes would
+  run and why, and the answers as wide keys; swipe sideways (or tap the arrows)
+  for the next. A tap answers, and each answer scores. A yes for a command shows
+  only with the whole command: on the tile when it fits there, else the card sends
+  him to the screen, where it all fits; a command the screen does not show whole
+  has no keys, and he opens the agent. An agent with no question the tile can
+  read has one key, open in Mercurio. Under the card, the chats that wait and the
+  agents at work; the screen has every workboard, project, agent and chat, in
+  larger type. A tap on an agent carries its machine's tailnet names to Mercurio
+  (`HERD_HOSTS`), so Mercurio opens the saved host that attaches that session
+  whatever the phone calls it. sg tells the tile what moved (`owl-send ... set
+  alert`) and it posts a notification; a quiet switch in its screen turns Do Not
+  Disturb on and off. Kiosk: Mercury's picks, one at a time, a craft pick with the
+  one move to take; swipe for the next, tap to open it.
 - Board tiles: one for each workboard (raven, ormus, alqvimia, clients), the sessions
   tile for that board alone, with its own counts, chats and moves. They are the
   sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
