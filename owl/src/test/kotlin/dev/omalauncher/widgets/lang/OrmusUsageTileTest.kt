@@ -498,7 +498,7 @@ class OrmusUsageTileTest {
         )) {
             assertEquals("$width dp", "$text [yellow]", row(farUnknown, width))
         }
-        // A note has no short text: it keeps the whole words that fit and "…", so the age stays whole; with no room
+        // A note is its own short text: it keeps the whole words that fit and "…", so the age stays whole; with no room
         // for its first word, the age stays alone.
         for ((width, text) in listOf(
             160 to "3h ago",
@@ -517,6 +517,17 @@ class OrmusUsageTileTest {
         // An age alone: "as of " goes first; with no room for the age either, the renderer cuts it.
         for ((width, text) in listOf(134 to "3h ago", 173 to "3h ago", 180 to "as of 3h ago")) {
             assertEquals("$width dp", "$text [yellow]", row(bareStale, width))
+        }
+    }
+
+    @Test fun aStaleNoteIsCutAtAnySpaceTabOrNewlineAndNeverAtAnEmptyWord() {
+        // Review 5: the cut split on " " only. A space in front or two together made empty words (no word, or a lost
+        // word of room), and a tab or a newline made one long word, so the age stood alone though "180" fitted.
+        fun noted(note: String) = account("grok-9", "Grok", "Noted", note = note, state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
+        for (note in listOf("\" 180 credits left\"", "\"180  credits left\"", "\"180\\tcredits\\nleft\"", "\"180 \\t credits  left\"")) {
+            for ((width, text) in listOf(186 to "3h ago", 187 to "180… · 3h ago", 238 to "180… · 3h ago", 239 to "180 credits… · 3h ago", 249 to "180 credits… · 3h ago")) {
+                assertEquals("$note at $width dp", "$text [yellow]", row(noted(note), width))
+            }
         }
     }
 
