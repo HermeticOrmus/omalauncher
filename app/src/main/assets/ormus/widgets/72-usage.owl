@@ -67,7 +67,7 @@ widget "ai usage" {
         // an error) are cut by the renderer; the screen shows them.
         let due = a.state != "unread" && w != null && w.resets != null && now != null ? fmtAgo(w.resets, now) : ""
         let tail = due == "" ? "" : len(words) + len(old) + 10 + len(due) <= space ? " · resets ${due}" : len(words) + len(old) + 3 + len(due) <= space ? " · ${due}" : ""
-        // The first whole words of the short text that fit before "… · " and the age ("180 credits" of "180 credits left");
+        // The first whole words of the short text that fit before "… · " and the age ("180 credits" of "180 credits left").
         // The builtin words(...), not the let words above, splits at any space, tab or newline and keeps no empty word.
         let parts = words(short)
         let cut = join(take(parts, count(scan(parts, (s, x) => s + len(x) + 1, -1), s => s <= space - len(read) - 4)), " ")
