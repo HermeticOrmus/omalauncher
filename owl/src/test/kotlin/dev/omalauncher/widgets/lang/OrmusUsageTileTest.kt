@@ -465,7 +465,13 @@ class OrmusUsageTileTest {
 
     @Test fun aStaleRowTooLongDropsTheResetTimeThenAsOfThenTheLabelThenCutsItsWords() {
         // At 4x3 (249 dp) "week Fable 73% · as of 3h ago" next to "Claude Raven" was cut by the phone (review 3).
+        // When "73% · 3h ago" does not fit either (below 193 dp), the cut takes the short text, never the label:
+        // 1 character from 187 dp, none at 186.
         for ((width, text) in listOf(
+            186 to "… · 3h ago",
+            187 to "7… · 3h ago",
+            192 to "7… · 3h ago",
+            193 to "73% · 3h ago",
             249 to "73% · 3h ago",
             264 to "73% · 3h ago",
             265 to "week Fable 73% · 3h ago",
@@ -512,6 +518,8 @@ class OrmusUsageTileTest {
         // An unread account says its error, never a reset time, even with a window in the feed.
         val unread = account("claude-12", "Claude", "Dev", """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}]""", state = "unread", read = null, error = "\"token ended\"", peak = "40")
         assertEquals("token ended [yellow]", row(unread, SIX_BY_FOUR))
+        // Too long for its row (10 characters left at 173 dp), it keeps its error as its short text, never the percent.
+        assertEquals("token ended [yellow]", row(unread, 173))
     }
 
     @Test fun everyRowTheTileBuildsFitsFromTheSmallestSizeAtThePhonesMeasuredCharacterWidth() {
