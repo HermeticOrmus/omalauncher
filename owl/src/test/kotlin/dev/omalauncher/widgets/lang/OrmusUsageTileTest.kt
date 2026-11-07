@@ -1,6 +1,7 @@
 package dev.omalauncher.widgets.lang
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -465,12 +466,10 @@ class OrmusUsageTileTest {
 
     @Test fun aStaleRowTooLongDropsTheResetTimeThenAsOfThenTheLabelThenCutsItsWords() {
         // At 4x3 (249 dp) "week Fable 73% · as of 3h ago" next to "Claude Raven" was cut by the phone (review 3).
-        // When "73% · 3h ago" does not fit either (below 193 dp), the cut takes the short text, never the label:
-        // 1 character from 187 dp, none at 186.
+        // When "73% · 3h ago" does not fit either (below 193 dp), the age stays alone: a number is never cut (review 4).
         for ((width, text) in listOf(
-            186 to "… · 3h ago",
-            187 to "7… · 3h ago",
-            192 to "7… · 3h ago",
+            186 to "3h ago",
+            192 to "3h ago",
             193 to "73% · 3h ago",
             249 to "73% · 3h ago",
             264 to "73% · 3h ago",
@@ -490,13 +489,16 @@ class OrmusUsageTileTest {
         for ((width, text) in listOf(231 to "unknown · 2d ago", 232 to "use unknown · 2d ago", 270 to "use unknown · 2d ago", 271 to "use unknown · as of 2d ago")) {
             assertEquals("$width dp", "$text [yellow]", row(farUnknown, width))
         }
-        // A note has no short text: its words are cut with "…" (a space before it goes: OWL trims the end of a value),
-        // so the age stays whole.
+        // A note has no short text: it keeps the whole words that fit and "…", so the age stays whole; with no room
+        // for its first word, the age stays alone.
         for ((width, text) in listOf(
-            160 to "… · 3h ago",
+            160 to "3h ago",
+            186 to "3h ago",
+            187 to "180… · 3h ago",
+            238 to "180… · 3h ago",
+            239 to "180 credits… · 3h ago",
             249 to "180 credits… · 3h ago",
-            256 to "180 credits l… · 3h ago",
-            264 to "180 credits le… · 3h ago",
+            264 to "180 credits… · 3h ago",
             265 to "180 credits left · 3h ago",
             303 to "180 credits left · 3h ago",
             304 to "180 credits left · as of 3h ago",
@@ -506,6 +508,25 @@ class OrmusUsageTileTest {
         // An age alone: "as of " goes first; with no room for the age either, the renderer cuts it.
         for ((width, text) in listOf(134 to "3h ago", 173 to "3h ago", 180 to "as of 3h ago")) {
             assertEquals("$width dp", "$text [yellow]", row(bareStale, width))
+        }
+    }
+
+    @Test fun aStaleRowWithALongNameShowsItsNumberWholeOrItsAgeAlone() {
+        // Review 4: at 4x3 (249 dp) a 21-character name left room for "1… · 3h ago" (100% read as 1%), and a 25-character
+        // name for "… · 3h ago", longer than the row, so the phone cut the age.
+        fun stale(name: String) =
+            account("codex-${name.length}", "ChatGPT", name, """[{"label": "week Fable", "percent": 100, "resets": ${NOW + 2 * DAY}}]""", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "100")
+        assertEquals("3h ago [yellow]", row(stale("Raven Studios"), 249))
+        assertEquals("3h ago [yellow]", row(stale("Raven Studio Team"), 249))
+        assertEquals("3h ago [yellow]", row(stale("Raven Studios"), 257))
+        assertEquals("100% · 3h ago [yellow]", row(stale("Raven Studios"), 258))
+        // At every width, a digit is never followed by "…", and the row ends with its whole age.
+        for (name in listOf("Raven Studios", "Raven Studio Team")) {
+            for (width in 249..420) {
+                val value = row(stale(name), width).substringBeforeLast(" [")
+                assertFalse("$width dp, $name: \"$value\"", Regex("[0-9]…").containsMatchIn(value))
+                assertTrue("$width dp, $name: \"$value\"", value.endsWith("3h ago"))
+            }
         }
     }
 
@@ -527,8 +548,12 @@ class OrmusUsageTileTest {
         val behind = account("claude-13", "Claude", "Behind", """[{"label": "week", "percent": null, "resets": ${NOW - 30}, "reset": true}]""")
         val unread = account("claude-6", "Claude", "Dev", state = "unread", read = null, error = "\"token ended\"")
         val staleFull = full.replace("\"state\": \"ok\"", "\"state\": \"stale\"").replace("\"read\": $NOW", "\"read\": ${NOW - 3 * 3_600}")
-        val rows = arrayOf(staleFull, half, high, credits, behind, unread, ravenStale.replace("claude-1", "claude-14"), oldReset, farUnknown, bareStale, notedStale)
-        val names = setOf("Claude Ormus", "Claude Raven", "ChatGPT Raven", "Grok Ormus", "Claude Behind", "Claude Dev", "Claude Old", "Claude Far", "Grok Bare", "Grok Noted")
+        // Two long names (21 and 25 characters, review 4): the age alone must fit next to them at 4x3.
+        val longNames = listOf("Raven Studios", "Raven Studio Team").map { name ->
+            account("codex-${name.length}", "ChatGPT", name, """[{"label": "week Fable", "percent": 100, "resets": ${NOW + 2 * DAY}}]""", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "100")
+        }
+        val rows = arrayOf(staleFull, half, high, credits, behind, unread, ravenStale.replace("claude-1", "claude-14"), oldReset, farUnknown, bareStale, notedStale, *longNames.toTypedArray())
+        val names = setOf("Claude Ormus", "Claude Raven", "ChatGPT Raven", "Grok Ormus", "Claude Behind", "Claude Dev", "Claude Old", "Claude Far", "Grok Bare", "Grok Noted", "ChatGPT Raven Studios", "ChatGPT Raven Studio Team")
         var checked = 0
         // 249 dp is the smallest size (4x3) on the phone.
         for (width in 249..420) {
