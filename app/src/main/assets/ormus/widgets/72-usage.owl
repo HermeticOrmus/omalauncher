@@ -4,7 +4,7 @@ widget "ai usage" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. The fullest window is gold, a full one red, from 80% yellow. Tap an account for the service's usage page, the tile for every window."; version: "1.0"; license: "MIT"; category: "system" }
+  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, the last numbers stay, with their age. Tap an account for the service's usage page, the tile for every window."; version: "1.0"; license: "MIT"; category: "system" }
 
   // Built on sg (ormus-feeds) every 10 min: a probe reads each account on a machine signed in to it, with that
   // machine's own token, and only usage numbers come back. The feed names the accounts and holds no email.
@@ -12,19 +12,28 @@ widget "ai usage" {
   source now = clock every 1m
 
   // Only the feed counts as the feed: a page in its place (json keeps it as text) is said, never "0 accounts".
-  let data = f != null && f.ok && f.out != null && (f.out.accounts != null || f.out.off != null) ? f.out : null
-  let garbled = f != null && f.ok && data == null
+  let fresh = f != null && f.ok && f.out != null && (f.out.accounts != null || f.out.off != null) ? f.out : null
+  // The last feed with accounts, kept across restarts: while sg doesn't answer, its numbers stay, with their age.
+  state kept = null persist
+  on fresh first { if value.accounts != null { kept = value } }
+  let data = fresh ?? kept
+  let failed = f != null && !f.ok
+  let garbled = f != null && f.ok && fresh == null
   let off = data != null && data.off != null
   let accounts = data != null && !off ? (data.accounts ?? []) : []
   let missed = data != null && !off ? keys(data.machines ?? {}) : []
   let problems = data != null && !off ? (data.errors ?? []) : []
   // Older than 30 min, sg's runner has stopped: the numbers say how old they are.
   let late = data != null && !off && now != null && now - data.generated > 1800
+  // "just now" under a minute (or ahead of the phone's clock), "" while the time or the clock is unknown.
+  let fedAgo = data == null || data.generated == null || now == null ? "" : now - data.generated < 60 ? "just now" : "${fmtAgo(data.generated, now)} ago"
   // The fullest window is the one gold element, until it resets.
   let topKey = data != null && !off && data.top != null && (data.top.resets == null || now == null || data.top.resets > now) ? data.top.key : ""
   // About 32 dp an account under the header.
   let room = max(1, floor(((tileHeight ?? 272) - 40) / 32))
   let hidden = max(0, len(accounts) - room)
+  // Characters a row holds: the small style measured 6.18 dp a character on the phone; 12 dp padding a side.
+  let rowChars = floor(((tileWidth ?? 360) - 24) / 6.25)
 
   // One account: its fullest window that has not reset by the phone's clock, and a bar for it. A tap opens the
   // service's usage page.
@@ -35,15 +44,23 @@ widget "ai usage" {
         gap: 3
         let live = a.windows.filter(x => x.percent != null && (x.resets == null || now == null || x.resets > now))
         let w = live.sortBy(x => -x.percent).first()
-        let gone = len(a.windows) > 0 && len(live) == 0
-        let old = a.state == "stale" ? " · as of ${fmtAgo(a.read, now)} ago" : ""
+        // Reset by the feed or by the phone's clock; a window with no number and no reset time is unknown, not reset.
+        let reset = a.windows.filter(x => x.reset == true || (x.resets != null && now != null && x.resets <= now)).first()
+        let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
+        let old = a.state == "stale" && read != "" ? " · as of ${read}" : ""
         let full = w != null && (w.percent >= 100 || (a.limited && w.percent == a.peak))
+        // A row too long for the tile drops the word "resets", then the reset time (the name, the gap, the number and
+        // the age stay).
+        let due = w != null && w.resets != null && now != null ? fmtAgo(w.resets, now) : ""
+        let pct = w != null ? "${w.label} ${w.percent}%" : ""
+        let used = len("${a.service_name} ${a.name}") + 2 + len(pct) + len(old)
+        let tail = due == "" ? "" : used + 10 + len(due) <= rowChars ? " · resets ${due}" : used + 3 + len(due) <= rowChars ? " · ${due}" : ""
         Row {
           gap: 8
           align: center
           Text { text: "${a.service_name} ${a.name}"; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
           Text {
-            text: a.state == "unread" ? a.error : w != null ? "${w.label} ${w.percent}%${w.resets != null ? " · resets ${fmtAgo(w.resets, now)}" : ""}${old}" : gone ? "reset, not read since${old}" : "${a.note ?? a.plan ?? ""}${old}"
+            text: a.state == "unread" ? a.error : w != null ? "${pct}${tail}${old}" : len(a.windows) > 0 ? (reset != null ? "${reset.label} reset${old}" : "use unknown${old}") : "${a.note ?? a.plan ?? ""}${old}"
             style: small
             maxLines: 1
             weight: 1
@@ -64,14 +81,17 @@ widget "ai usage" {
     gap: 6
     Row {
       align: center
-      Text { text: "ai usage"; style: muted; weight: 1 }
+      Text { text: "ai usage"; style: muted }
+      // Kept numbers say their age next to the failure; hidden rows are counted in front of any message.
+      let age = late ? " · as of ${fedAgo}" : ""
+      let note = f == null ? "…" : failed ? "sg doesn't answer${age}" : garbled ? "not the usage feed${age}" : off ? "off on sg" : late ? "as of ${fedAgo}" : len(problems) > 0 ? join(problems, " · ") : len(missed) > 0 ? "${join(missed, ", ")} not reached" : ""
       Text {
-        text: f == null ? "…" : !f.ok ? "sg doesn't answer" : garbled ? "not the usage feed" : off ? "off on sg" : late ? "as of ${fmtAgo(data.generated, now)} ago" : len(problems) > 0 ? join(problems, " · ") : len(missed) > 0 ? "${join(missed, ", ")} not reached" : hidden > 0 ? "+${hidden} more" : "${len(accounts)} accounts"
+        text: hidden > 0 ? (note == "" ? "+${hidden} more" : "+${hidden} · ${note}") : note != "" ? note : len(accounts) == 1 ? "1 account" : "${len(accounts)} accounts"
         style: small
         maxLines: 1
         weight: 1
         align: end
-        color: f != null && (!f.ok || garbled || off) ? red : late || len(problems) > 0 ? yellow : muted
+        color: failed || garbled || off ? red : late || len(problems) > 0 ? yellow : muted
       }
     }
     if data != null && !off && len(accounts) == 0 && len(problems) == 0 {
@@ -87,12 +107,13 @@ widget "ai usage" {
     Column {
       scroll: true
       gap: 18
-      if data == null || off {
-        Text { text: f == null ? "loading…" : !f.ok ? "sg doesn't answer" : garbled ? "sg's answer is not the usage feed" : "the usage feed is off on sg"; style: body; color: muted }
+      if data == null || off || failed || garbled {
+        Text { text: "${f == null ? "loading…" : failed ? "sg doesn't answer" : garbled ? "sg's answer is not the usage feed" : "the usage feed is off on sg"}${data != null && !off ? "; these are its last numbers" : ""}"; style: body; color: data != null && !off ? yellow : muted }
       }
       for a in accounts key a.key {
         Column {
           gap: 6
+          let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
           Box {
             onTap: url(a.open)
             Row {
@@ -103,7 +124,7 @@ widget "ai usage" {
             }
           }
           if a.state != "ok" {
-            Text { text: a.state == "stale" ? "as of ${fmtAgo(a.read, now)} ago · now: ${a.error}" : a.error; style: small; color: yellow }
+            Text { text: a.state == "stale" ? (read == "" ? "now: ${a.error}" : "as of ${read} · now: ${a.error}") : a.error; style: small; color: yellow }
           }
           for w in a.windows {
             Column {
@@ -114,8 +135,8 @@ widget "ai usage" {
                 gap: 8
                 align: center
                 Text { text: w.label; style: body; maxLines: 1; weight: 1 }
-                Text { text: shown ? "${w.percent}%" : "reset"; style: body; bold: shown; color: shown ? foreground : muted }
-                Text { text: w.resets == null ? "" : "${past ? "reset" : "resets"} ${fmtTime(w.resets, "EEE HH:mm")}"; style: small; color: muted; width: 116; align: end; maxLines: 1 }
+                Text { text: shown ? "${w.percent}%" : past || w.reset == true ? "reset" : "unknown"; style: body; bold: shown; color: shown ? foreground : muted }
+                Text { text: w.resets == null ? "" : "${past || w.reset == true ? "reset" : "resets"} ${fmtTime(w.resets, "EEE d HH:mm", null, "en")}"; style: small; color: muted; width: 116; align: end; maxLines: 1 }
               }
               if shown {
                 Progress { value: w.percent; color: w.percent >= 100 || (a.limited && w.percent == a.peak) ? red : w.percent >= 80 ? yellow : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
@@ -130,7 +151,7 @@ widget "ai usage" {
       if data != null && !off {
         Column {
           gap: 4
-          Text { text: now != null && now - data.generated < 60 ? "read on sg just now" : "read on sg ${fmtAgo(data.generated, now)} ago, every 10 min"; style: small; color: late ? yellow : muted }
+          Text { text: "read on sg ${fedAgo == "" ? "…" : fedAgo}, every 10 min"; style: small; color: late ? yellow : muted }
           for m in missed {
             Text { text: "${m}: ${get(data.machines, m, "")}"; style: small; color: muted }
           }
