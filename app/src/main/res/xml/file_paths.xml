@@ -11,4 +11,6 @@
     <external-path name="phone" path="." />
     <!-- QR codes of widgets, for sharing as an image. -->
     <cache-path name="share" path="share/" />
+    <!-- APKs install(...) downloaded, for Android's installer; the next download clears the last. -->
+    <cache-path name="apks" path="apks/" />
 </paths>

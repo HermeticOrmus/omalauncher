@@ -4,24 +4,24 @@ widget "pass" {
   size: 6x3
   minSize: 4x2
 
-  meta { owl: 8; description: "The newest build of each of Ormus's apps from The Pass on Sun: which have an update waiting, and one tap to get it."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 9; description: "The newest build of each of Ormus's apps from The Pass: which have an update waiting, and one tap installs it."; version: "1.1"; license: "MIT"; category: "productivity" }
 
-  // The Pass on Sun, reachable only on the tailnet. After a tap the widget refreshes its sources, so the list is
-  // current again once an install finishes.
-  source p = http("https://sun.tailb43a3a.ts.net/pass/latest.json") every 15m json timeout 20s status
+  // The Pass on sg, reachable only on the tailnet. The apps source polls each minute, so a row reads "current"
+  // soon after its install finishes.
+  source p = http("https://sg.tailb43a3a.ts.net/pass/latest.json") every 15m json timeout 20s status
   source apps = android.apps every 1m
   source sys = android.system every 1h
   // Only for "2h ago": a minute is fine enough, and it keeps the tile from redrawing every second.
   source now = clock every 1m
 
-  // The last good copy, so the widget still lists builds while Sun is off or the phone is off the tailnet.
+  // The last good copy, so the widget still lists builds while sg is off or the phone is off the tailnet.
   state cached = [] persist
   let fresh = p != null && p.ok ? p.out.apps : null
   let builds = fresh ?? cached
   when fresh != null { cached = fresh }
   on fresh { cached = value ?? cached }
 
-  let page = "https://sun.tailb43a3a.ts.net/pass/"
+  let page = "https://sg.tailb43a3a.ts.net/pass/"
   // The launcher leaves itself out of android.apps; its own versionCode is on android.system (launcherCode). A
   // launcher too old to report it is older than this widget, so it counts as out of date.
   let row = b => {
@@ -47,7 +47,7 @@ widget "pass" {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
       Text { text: "the pass"; style: muted; weight: 1 }
-      Text { text: p != null && !p.ok ? "Sun doesn't answer" : waiting > 0 ? "${waiting} to install" : len(builds) > 0 ? "all current" : "…"; style: small; color: p != null && !p.ok ? red : waiting > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: p != null && !p.ok ? "The Pass doesn't answer" : waiting > 0 ? "${waiting} to install" : len(builds) > 0 ? "all current" : "…"; style: small; color: p != null && !p.ok ? red : waiting > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
     }
     for r in rows key r.b.slug {
       Row {
@@ -57,7 +57,9 @@ widget "pass" {
         Box { width: 22; height: 22; Image { src: "app:${r.b.package}"; width: 22; height: 22 } }
         Text { text: r.b.name; style: body; maxLines: 1; weight: 2 }
         Text { text: r.age == "" ? r.b.version_name : "${r.b.version_name} · ${r.age} ago"; style: small; color: muted; maxLines: 1; weight: 2 }
-        Button { text: r.st; color: r.st == "update" || r.st == "get" ? accent : muted; onTap: url("${page}${r.b.apk}") }
+        // One tap: the launcher gets the APK, checks it against the hash The Pass lists, and Android's installer asks.
+        // A build already current or at an unknown version, or one The Pass lists with no hash, opens the page instead.
+        Button { text: r.st; color: r.st == "update" || r.st == "get" ? accent : muted; onTap: { if (r.st == "update" || r.st == "get") && r.b.sha256 != null { install("${page}${r.b.apk}", r.b.sha256) } else { url(page) } } }
       }
     }
   }

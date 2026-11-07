@@ -31,6 +31,9 @@ What this fork adds to the release below it; none of it is in the Play build.
 - Widgets read each app's installed version (`version`, `versionCode` on
   `android.apps`; `launcherCode` on `android.system`), and `androidIntent(...)` opens
   a place inside an app.
+- The pass tile updates an app in one tap: `install(url, sha256)` gets the APK,
+  checks it against the hash The Pass lists, and opens Android's installer, which
+  asks before anything changes. The tile reads The Pass on sg.
 - A scrolling Column that fits its tile lets home's swipes through.
 - A shipped widget or config that already holds exactly what this version ships is
   the launcher's again, so later versions update it: one an agent previewed before
