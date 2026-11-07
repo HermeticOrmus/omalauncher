@@ -11,7 +11,9 @@ widget "ai usage" {
   source f = http("https://sg.tailb43a3a.ts.net/feeds/usage.json") every 5m json timeout 20s status
   source now = clock every 1m
 
-  let data = f != null && f.ok ? f.out : null
+  // Only the feed counts as the feed: a page in its place (json keeps it as text) is said, never "0 accounts".
+  let data = f != null && f.ok && f.out != null && (f.out.accounts != null || f.out.off != null) ? f.out : null
+  let garbled = f != null && f.ok && data == null
   let off = data != null && data.off != null
   let accounts = data != null && !off ? (data.accounts ?? []) : []
   let missed = data != null && !off ? keys(data.machines ?? {}) : []
@@ -64,12 +66,12 @@ widget "ai usage" {
       align: center
       Text { text: "ai usage"; style: muted; weight: 1 }
       Text {
-        text: f == null ? "…" : !f.ok ? "sg doesn't answer" : off ? "off on sg" : late ? "as of ${fmtAgo(data.generated, now)} ago" : len(problems) > 0 ? join(problems, " · ") : len(missed) > 0 ? "${join(missed, ", ")} not reached" : hidden > 0 ? "+${hidden} more" : "${len(accounts)} accounts"
+        text: f == null ? "…" : !f.ok ? "sg doesn't answer" : garbled ? "not the usage feed" : off ? "off on sg" : late ? "as of ${fmtAgo(data.generated, now)} ago" : len(problems) > 0 ? join(problems, " · ") : len(missed) > 0 ? "${join(missed, ", ")} not reached" : hidden > 0 ? "+${hidden} more" : "${len(accounts)} accounts"
         style: small
         maxLines: 1
         weight: 1
         align: end
-        color: f != null && (!f.ok || off) ? red : late || len(problems) > 0 ? yellow : muted
+        color: f != null && (!f.ok || garbled || off) ? red : late || len(problems) > 0 ? yellow : muted
       }
     }
     if data != null && !off && len(accounts) == 0 && len(problems) == 0 {
@@ -86,7 +88,7 @@ widget "ai usage" {
       scroll: true
       gap: 18
       if data == null || off {
-        Text { text: f == null ? "loading…" : !f.ok ? "sg doesn't answer" : "the usage feed is off on sg"; style: body; color: muted }
+        Text { text: f == null ? "loading…" : !f.ok ? "sg doesn't answer" : garbled ? "sg's answer is not the usage feed" : "the usage feed is off on sg"; style: body; color: muted }
       }
       for a in accounts key a.key {
         Column {
