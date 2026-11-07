@@ -61,15 +61,16 @@ What this fork adds to the release below it; none of it is in the Play build.
   (Claude, ChatGPT, Grok), read every 5 min from sg's usage feed (built every 10 min).
   A row per account with its fullest window that has not reset by the phone's clock,
   a bar (red when full or limited, yellow from 80%) and when it resets ("use unknown"
-  when the feed does not know); on a narrow tile a row drops the word "resets", then
-  the reset time. The account with the fullest window of all has its name in gold. A
-  tap on an account opens the service's usage page; a tap on the tile opens a screen
-  with every window, plan, note and reset time. The header says when sg does not
-  answer, the feed is off, late or not the feed, and which machines were not reached;
-  when sg does not answer, the last numbers it gave stay: the header gives their age
-  once they are more than 30 min old, the screen's footer always. They come back too
-  when sg said the feed is off and then stops answering. A test runs the tile on
-  made-up feeds.
+  when the feed does not know); on a narrow tile a row drops the word "resets", the
+  reset time, "as of " and then the label, and a stale note cuts its own words with
+  "…", so a row's age stays whole. The account with the fullest window of all has its
+  name in gold. A tap on an account opens the service's usage page; a tap on the tile
+  opens a screen with every window, plan, note and reset time. The header says when sg
+  does not answer, the feed is off, late or not the feed, and which machines were not
+  reached; when sg does not answer, the last numbers it gave stay: the header gives
+  their age once they are more than 30 min old, the screen's footer always. They come
+  back too when sg said the feed is off and then stops answering. A test runs the tile
+  on made-up feeds.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
