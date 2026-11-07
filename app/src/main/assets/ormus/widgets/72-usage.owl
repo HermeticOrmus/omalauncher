@@ -47,7 +47,10 @@ widget "ai usage" {
         // Reset by the feed or by the phone's clock; a window with no number and no reset time is unknown, not reset.
         let reset = a.windows.filter(x => x.reset == true || (x.resets != null && now != null && x.resets <= now)).first()
         let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
-        let old = a.state == "stale" && read != "" ? " · as of ${read}" : ""
+        let asOf = a.state == "stale" && read != "" ? "as of ${read}" : ""
+        let old = asOf == "" ? "" : " · ${asOf}"
+        // A row with nothing else in it gives the age alone, with no separator in front.
+        let left = a.note ?? a.plan ?? ""
         let full = w != null && (w.percent >= 100 || (a.limited && w.percent == a.peak))
         // A row too long for the tile drops the word "resets", then the reset time (the name, the gap, the number and
         // the age stay).
@@ -60,7 +63,7 @@ widget "ai usage" {
           align: center
           Text { text: "${a.service_name} ${a.name}"; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
           Text {
-            text: a.state == "unread" ? a.error : w != null ? "${pct}${tail}${old}" : len(a.windows) > 0 ? (reset != null ? "${reset.label} reset${old}" : "use unknown${old}") : "${a.note ?? a.plan ?? ""}${old}"
+            text: a.state == "unread" ? a.error : w != null ? "${pct}${tail}${old}" : len(a.windows) > 0 ? (reset != null ? "${reset.label} reset${old}" : "use unknown${old}") : left == "" ? asOf : "${left}${old}"
             style: small
             maxLines: 1
             weight: 1
