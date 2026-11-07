@@ -240,7 +240,7 @@ class OrmusUsageTileTest {
                 "Claude Old [muted]",
                 "week reset · as of 2d ago [yellow]",
             ),
-            tile(feed(stale, unread, reset)).drop(2),
+            tile(feed(stale, unread, reset), width = SIX_BY_FOUR).drop(2),
         )
     }
 
@@ -298,7 +298,7 @@ class OrmusUsageTileTest {
         val noReset = """{"key": "claude-0", "name": "Claude Ormus", "label": "week", "percent": 100, "resets": null}"""
         assertEquals("Claude Ormus [accent]", tile(feed(full, half, top = noReset))[2])
         val staleFull = full.replace("\"state\": \"ok\"", "\"state\": \"stale\"").replace("\"read\": $NOW", "\"read\": ${NOW - 3 * 3_600}")
-        assertEquals(listOf("Claude Ormus [accent]", "week 100% · resets in 1d · as of 3h ago [yellow]"), tile(feed(staleFull, top = topFull)).subList(2, 4))
+        assertEquals(listOf("Claude Ormus [accent]", "week 100% · resets in 1d · as of 3h ago [yellow]"), tile(feed(staleFull, top = topFull), width = SIX_BY_FOUR).subList(2, 4))
         assertEquals("Claude Ormus [accent]", screen(feed(staleFull, top = topFull))[0])
     }
 
@@ -420,17 +420,61 @@ class OrmusUsageTileTest {
     }
 
     @Test fun aRowTooLongForTheTilesWidthDropsTheWordResetsThenTheResetTime() {
-        // 238 dp is the 4x3 size on the phone (654 px at density 2.75); about 6.25 dp a character, 12 dp padding a side.
+        // 249 dp is the 4x3 size on the phone (a probe tile said so; 654 px at 2.63 px a dp); 12 dp padding a side.
         assertEquals(
             listOf("week 100% · in 1d [foreground]", "week Fable 73% [foreground]", "week 85% · in 5d [foreground]"),
-            tile(feed(full, half, high, top = topFull), width = 238).filter { it.startsWith("week") },
+            tile(feed(full, half, high, top = topFull), width = 249).filter { it.startsWith("week") },
         )
-        // The edges: 262 dp has room for "resets", 218 dp for the time alone.
-        assertEquals("week 100% · resets in 1d [foreground]", tile(feed(full), width = 262)[3])
-        assertEquals("week 100% · in 1d [foreground]", tile(feed(full), width = 261)[3])
-        assertEquals("week 100% · in 1d [foreground]", tile(feed(full), width = 218)[3])
-        assertEquals("week 100% [foreground]", tile(feed(full), width = 217)[3])
+        // The row the phone cut at 4x3 ("week Fable 82% · in …"): its reset time goes.
+        val raven = account("claude-1", "Claude", "Raven", """[{"label": "week Fable", "percent": 82, "resets": ${NOW + 2 * DAY}}]""", peak = "82")
+        assertEquals(listOf("Claude Raven [foreground]", "week Fable 82% [foreground]"), tile(feed(raven), width = 249).subList(2, 4))
+        // The edges: 271 dp has room for "resets", 226 dp for the time alone.
+        assertEquals("week 100% · resets in 1d [foreground]", tile(feed(full), width = 271)[3])
+        assertEquals("week 100% · in 1d [foreground]", tile(feed(full), width = 270)[3])
+        assertEquals("week 100% · in 1d [foreground]", tile(feed(full), width = 226)[3])
+        assertEquals("week 100% [foreground]", tile(feed(full), width = 225)[3])
     }
+
+    @Test fun aRowWithAResetTimeFitsTheTileAtThePhonesMeasuredCharacterWidth() {
+        // On the phone a character of the small style is 6.47 dp wide (monospace); the row's two texts are 8 dp apart.
+        val five = feed(full, half, high, credits, noUsage, top = topFull)
+        var checked = 0
+        for (width in 200..420) {
+            // After the header: each account's name, then its row (and its bar).
+            for ((name, value) in tile(five, width = width).drop(2).map { it.substringBeforeLast(" [") }.zipWithNext()) {
+                if (" · " !in value) continue
+                val dp = (name.length + value.length) * 6.47 + 8
+                assertTrue("$width dp: \"$name\" \"$value\" needs $dp dp", dp <= width - 24)
+                checked++
+            }
+        }
+        assertTrue("no row with a reset time was checked", checked > 300)
+    }
+
+    @Test fun theScreensResetColumnHoldsItsLongestTimeAtThePhonesMeasuredCharacterWidth() {
+        // The longest text the column takes ("EEE d HH:mm" in English), 19 characters of 6.47 dp on the phone.
+        val longest = "resets Wed 30 23:59".length
+        val column = column(program.screen!!) { it.kind == "Text" && it.props.containsKey("width") }
+        assertEquals("the screen has one Text with a width", 1, column.size)
+        val width = column.single().props["width"]!!(Env.root(Tile(feed(half), NOW, null))) as Num
+        assertTrue("width ${width.v} dp < ${longest * 6.47} dp", width.v >= longest * 6.47)
+    }
+
+    /** Every element of [nodes] and their children (any branch, any loop body) that [match] takes. */
+    private fun column(
+        nodes: List<WNode>,
+        match: (WNode.Element) -> Boolean,
+    ): List<WNode.Element> =
+        nodes.flatMap { n ->
+            when (n) {
+                is WNode.Element -> (if (match(n)) listOf(n) else emptyList()) + column(n.children, match)
+                is WNode.If -> column(n.then, match) + column(n.orElse, match)
+                is WNode.For -> column(n.body, match)
+                is WNode.Lets -> column(n.children, match)
+                is WNode.Use -> column(n.body, match)
+                is WNode.Draw -> emptyList()
+            }
+        }
 
     @Test fun resetTimesAreInEnglishWhateverThePhonesLanguage() {
         val before = java.util.Locale.getDefault()
@@ -451,5 +495,8 @@ class OrmusUsageTileTest {
     private companion object {
         const val NOW = 1_800_000_000L
         const val DAY = 86_400L
+
+        /** The 6x4 tile's width on the phone in dp (a probe tile said so); a row of 53 characters fits it. */
+        const val SIX_BY_FOUR = 377
     }
 }
