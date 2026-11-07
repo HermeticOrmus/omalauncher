@@ -392,6 +392,23 @@ class OrmusUsageTileTest {
         assertEquals(listOf("Claude Far [foreground]", " [muted]", "as of 2d ago · now: no answer [yellow]", "week [null]", "unknown [muted]", " [muted]"), lines.take(6))
     }
 
+    @Test fun aStaleAccountWithNothingElseToShowSaysItsAgeWithNoSeparatorInFront() {
+        val bare = account("grok-8", "Grok", "Bare", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
+        val noted = account("grok-9", "Grok", "Noted", note = "\"180 credits left\"", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
+        val noTime = account("grok-10", "Grok", "Blank", state = "stale", read = null, error = "\"no answer\"")
+        assertEquals(
+            listOf(
+                "Grok Bare [muted]",
+                "as of 3h ago [yellow]",
+                "Grok Noted [muted]",
+                "180 credits left · as of 3h ago [yellow]",
+                "Grok Blank [muted]",
+                " [yellow]",
+            ),
+            tile(feed(bare, noted, noTime)).drop(2),
+        )
+    }
+
     @Test fun aReadingWithNoTimeOrAheadOfThePhonesClockSaysNoAge() {
         val week = """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}]"""
         val noTime = account("claude-5", "Claude", "Corvin", week, state = "stale", read = null, error = "\"no answer\"", peak = "40")
