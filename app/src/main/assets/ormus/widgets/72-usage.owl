@@ -32,8 +32,9 @@ widget "ai usage" {
   // About 32 dp an account under the header.
   let room = max(1, floor(((tileHeight ?? 272) - 40) / 32))
   let hidden = max(0, len(accounts) - room)
-  // Characters a row holds: the small style measured 6.18 dp a character on the phone; 12 dp padding a side.
-  let rowChars = floor(((tileWidth ?? 360) - 24) / 6.25)
+  // Characters a row holds: the small style is 6.47 dp a character at 2.63 px a dp (measured on the phone); 12 dp
+  // padding a side.
+  let rowChars = floor(((tileWidth ?? 360) - 24) / 6.5)
 
   // One account: its fullest window that has not reset by the phone's clock, and a bar for it. A tap opens the
   // service's usage page.
@@ -130,6 +131,7 @@ widget "ai usage" {
           if a.state != "ok" {
             Text { text: a.state == "stale" ? (read == "" ? "now: ${a.error}" : "as of ${read} · now: ${a.error}") : a.error; style: small; color: yellow }
           }
+          // The reset column holds "resets Wed 30 23:59": 19 characters of 6.47 dp (measured on the phone).
           for w in a.windows {
             Column {
               gap: 3
@@ -140,7 +142,7 @@ widget "ai usage" {
                 align: center
                 Text { text: w.label; style: body; maxLines: 1; weight: 1 }
                 Text { text: shown ? "${w.percent}%" : past || w.reset == true ? "reset" : "unknown"; style: body; bold: shown; color: shown ? foreground : muted }
-                Text { text: w.resets == null ? "" : "${past || w.reset == true ? "reset" : "resets"} ${fmtTime(w.resets, "EEE d HH:mm", null, "en")}"; style: small; color: muted; width: 116; align: end; maxLines: 1 }
+                Text { text: w.resets == null ? "" : "${past || w.reset == true ? "reset" : "resets"} ${fmtTime(w.resets, "EEE d HH:mm", null, "en")}"; style: small; color: muted; width: 128; align: end; maxLines: 1 }
               }
               if shown {
                 Progress { value: w.percent; color: w.percent >= 100 || (a.limited && w.percent == a.peak) ? red : w.percent >= 80 ? yellow : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
