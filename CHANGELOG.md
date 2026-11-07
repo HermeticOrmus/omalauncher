@@ -57,6 +57,14 @@ What this fork adds to the release below it; none of it is in the Play build.
   tile for that board alone, with its own counts, chats and moves. They are the
   sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
   and the gate pins them to it.
+- AI usage (more, after the fleet): how much of each AI plan is used, on every account
+  (Claude, ChatGPT, Grok), from sg's usage feed every 5 min. A row per account with
+  its fullest window that has not reset by the phone's clock, a bar (red when full or
+  limited, yellow from 80%) and when it resets; the fullest window of all is gold. A
+  tap on an account opens the service's usage page, a tap on the tile every window,
+  plan, note and reset time. The header says when sg does not answer, the feed is
+  off, late or not the feed, and which machines were not reached. A test runs the
+  tile on made-up feeds.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
