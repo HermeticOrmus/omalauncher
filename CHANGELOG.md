@@ -66,8 +66,10 @@ What this fork adds to the release below it; none of it is in the Play build.
   tap on an account opens the service's usage page; a tap on the tile opens a screen
   with every window, plan, note and reset time. The header says when sg does not
   answer, the feed is off, late or not the feed, and which machines were not reached;
-  when sg does not answer, the last numbers stay, with their age. A test runs the tile
-  on made-up feeds.
+  when sg does not answer, the last numbers it gave stay: the header gives their age
+  once they are more than 30 min old, the screen's footer always. They come back too
+  when sg said the feed is off and then stops answering. A test runs the tile on
+  made-up feeds.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 

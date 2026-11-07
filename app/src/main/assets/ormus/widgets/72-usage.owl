@@ -4,7 +4,7 @@ widget "ai usage" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, the last numbers stay, with their age. Tap an account for the service's usage page, the tile for every window."; version: "1.0"; license: "MIT"; category: "system" }
+  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.0"; license: "MIT"; category: "system" }
 
   // Built on sg (ormus-feeds) every 10 min: a probe reads each account on a machine signed in to it, with that
   // machine's own token, and only usage numbers come back. The feed names the accounts and holds no email.
@@ -13,7 +13,7 @@ widget "ai usage" {
 
   // Only the feed counts as the feed: a page in its place (json keeps it as text) is said, never "0 accounts".
   let fresh = f != null && f.ok && f.out != null && (f.out.accounts != null || f.out.off != null) ? f.out : null
-  // The last feed with accounts, kept across restarts: while sg doesn't answer, its numbers stay, with their age.
+  // The last feed with accounts, kept across restarts: while sg doesn't answer, its numbers stay.
   state kept = null persist
   on fresh first { if value.accounts != null { kept = value } }
   let data = fresh ?? kept
@@ -85,7 +85,8 @@ widget "ai usage" {
     Row {
       align: center
       Text { text: "ai usage"; style: muted }
-      // Kept numbers say their age next to the failure; hidden rows are counted in front of any message.
+      // Kept numbers older than 30 min say their age next to the failure (the screen always does); hidden rows are
+      // counted in front of any message.
       let age = late ? " · as of ${fedAgo}" : ""
       let note = f == null ? "…" : failed ? "sg doesn't answer${age}" : garbled ? "not the usage feed${age}" : off ? "off on sg" : late ? "as of ${fedAgo}" : len(problems) > 0 ? join(problems, " · ") : len(missed) > 0 ? "${join(missed, ", ")} not reached" : ""
       Text {
