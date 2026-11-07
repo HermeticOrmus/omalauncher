@@ -62,16 +62,20 @@ widget "ai usage" {
         // Characters left for the text after the name and the 8 dp gap (2 characters).
         let space = rowChars - len("${a.service_name} ${a.name}") - 2
         // A row too long for the tile drops one part at a time: the word "resets", the reset time, "as of ", the
-        // label (a row that is not stale keeps only its short text), then cuts its own words with "…", so the age
-        // stays whole. The feed's own words with no age (a note, an error) are cut by the renderer; the screen shows them.
+        // label (a row that is not stale keeps only its short text), then the last words of its short text, with "…",
+        // so the age stays whole and a number is shown whole or not at all. The feed's own words with no age (a note,
+        // an error) are cut by the renderer; the screen shows them.
         let due = a.state != "unread" && w != null && w.resets != null && now != null ? fmtAgo(w.resets, now) : ""
         let tail = due == "" ? "" : len(words) + len(old) + 10 + len(due) <= space ? " · resets ${due}" : len(words) + len(old) + 3 + len(due) <= space ? " · ${due}" : ""
+        // The first whole words of the short text that fit before "… · " and the age ("180 credits" of "180 credits left").
+        let parts = split(short, " ")
+        let cut = join(take(parts, count(scan(parts, (s, x) => s + len(x) + 1, -1), s => s <= space - len(read) - 4)), " ")
         Row {
           gap: 8
           align: center
           Text { text: "${a.service_name} ${a.name}"; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
           Text {
-            text: len(words) + len(old) <= space ? "${words}${tail}${old}" : !stale ? short : len(aged) <= space ? aged : len(shortAged) <= space ? shortAged : words == "" ? read : "${take(short, max(0, space - len(read) - 4))}… · ${read}"
+            text: len(words) + len(old) <= space ? "${words}${tail}${old}" : !stale ? short : len(aged) <= space ? aged : len(shortAged) <= space ? shortAged : cut == "" ? read : "${cut}… · ${read}"
             style: small
             maxLines: 1
             weight: 1

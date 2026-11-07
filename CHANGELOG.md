@@ -62,8 +62,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   A row per account with its fullest window that has not reset by the phone's clock,
   a bar (red when full or limited, yellow from 80%) and when it resets ("use unknown"
   when the feed does not know); on a narrow tile a row drops the word "resets", the
-  reset time, "as of " and then the label, and a stale note cuts its own words with
-  "…", so a row's age stays whole. The account with the fullest window of all has its
+  reset time, "as of " and then the label, and a stale row keeps the first whole words
+  of its short text with "…", so a row's age stays whole and a number is never cut.
+  The account with the fullest window of all has its
   name in gold. A tap on an account opens the service's usage page; a tap on the tile
   opens a screen with every window, plan, note and reset time. The header says when sg
   does not answer, the feed is off, late or not the feed, and which machines were not
