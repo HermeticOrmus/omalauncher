@@ -48,23 +48,30 @@ widget "ai usage" {
         // Reset by the feed or by the phone's clock; a window with no number and no reset time is unknown, not reset.
         let reset = a.windows.filter(x => x.reset == true || (x.resets != null && now != null && x.resets <= now)).first()
         let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
-        let asOf = a.state == "stale" && read != "" ? "as of ${read}" : ""
-        let old = asOf == "" ? "" : " · ${asOf}"
-        // A row with nothing else in it gives the age alone, with no separator in front.
+        let stale = a.state == "stale" && read != ""
         let left = a.note ?? a.plan ?? ""
         let full = w != null && (w.percent >= 100 || (a.limited && w.percent == a.peak))
-        // A row too long for the tile drops the word "resets", then the reset time (the name, the gap, the number and
-        // the age stay).
-        let due = w != null && w.resets != null && now != null ? fmtAgo(w.resets, now) : ""
-        let pct = w != null ? "${w.label} ${w.percent}%" : ""
-        let used = len("${a.service_name} ${a.name}") + 2 + len(pct) + len(old)
-        let tail = due == "" ? "" : used + 10 + len(due) <= rowChars ? " · resets ${due}" : used + 3 + len(due) <= rowChars ? " · ${due}" : ""
+        // Each row has a long text and a short one ("week Fable 73%" and "73%"); a stale row adds its age. A row with
+        // nothing else in it gives the age alone, with no separator in front.
+        let words = a.state == "unread" ? a.error ?? "" : w != null ? "${w.label} ${w.percent}%" : len(a.windows) > 0 ? (reset != null ? "${reset.label} reset" : "use unknown") : left
+        let short = a.state == "unread" ? a.error ?? "" : w != null ? "${w.percent}%" : len(a.windows) > 0 ? (reset != null ? "reset" : "unknown") : left
+        // OWL trims the end of an interpolated value: the " · " stays in the literal text.
+        let old = !stale ? "" : words == "" ? "as of ${read}" : " · as of ${read}"
+        let aged = words == "" ? read : "${words} · ${read}"
+        let shortAged = words == "" ? read : "${short} · ${read}"
+        // Characters left for the text after the name and the 8 dp gap (2 characters).
+        let space = rowChars - len("${a.service_name} ${a.name}") - 2
+        // A row too long for the tile drops one part at a time: the word "resets", the reset time, "as of ", the
+        // label (a row that is not stale keeps only its short text), then cuts its own words with "…", so the age
+        // stays whole. The feed's own words with no age (a note, an error) are cut by the renderer; the screen shows them.
+        let due = a.state != "unread" && w != null && w.resets != null && now != null ? fmtAgo(w.resets, now) : ""
+        let tail = due == "" ? "" : len(words) + len(old) + 10 + len(due) <= space ? " · resets ${due}" : len(words) + len(old) + 3 + len(due) <= space ? " · ${due}" : ""
         Row {
           gap: 8
           align: center
           Text { text: "${a.service_name} ${a.name}"; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
           Text {
-            text: a.state == "unread" ? a.error : w != null ? "${pct}${tail}${old}" : len(a.windows) > 0 ? (reset != null ? "${reset.label} reset${old}" : "use unknown${old}") : left == "" ? asOf : "${left}${old}"
+            text: len(words) + len(old) <= space ? "${words}${tail}${old}" : !stale ? short : len(aged) <= space ? aged : len(shortAged) <= space ? shortAged : words == "" ? read : "${take(short, max(0, space - len(read) - 4))}… · ${read}"
             style: small
             maxLines: 1
             weight: 1
