@@ -68,12 +68,19 @@ What this fork adds to the release below it; none of it is in the Play build.
   Periskope after its checks: that chat was offered in the feed's last run, one reply
   a chat a minute). The card says what sg answered (sent, you just replied, the chat
   moved on, sg's list is old, not confirmed); a chat he replied to shows that and an
-  open key until the next read shows his word; a tap anywhere else on the card opens
-  the chat in WhatsApp; swipe for the next. Under the card, the other chats that wait;
+  open key until the next read shows his word, and "sent" retires the keys at once; a
+  tap on the body of the card (the header, the name, their line) opens the chat in
+  WhatsApp, and no key sits under that handler; swipe for the next. A card is the chat
+  and the text he read: a new text under a pinned card unpins it (its keys were for
+  the text he read) and drops a stale answer. No answer from sg (ssh dropped) says "no
+  answer: open the chat to check", never "nothing was sent"; a reply whose answer never
+  comes frees the card after half a minute. Under the card, the other chats that wait;
   the screen lists every project's chats and the ones with no project. The tile fits
   its height (measured on the emulator at 420 dpi): at 6x6 the keys stack under the
-  card's meta line with the dots row; at 6x4 the meta line folds into the header row,
-  the three keys go side by side (a long label wraps once) and the dots go.
+  card's meta line with the dots row; at 6x4 the meta line folds into the header row
+  (the age first), the three keys go side by side (a long label wraps once; a label
+  that would not fit two lines leaves the lead key and a "more" key to the screen)
+  and the dots go. 6x4 is the smallest size the card fits.
 - Board tiles: one for each workboard (raven, ormus, alqvimia, clients), the sessions
   tile for that board alone, with its own counts, chats and moves. They are the
   sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
