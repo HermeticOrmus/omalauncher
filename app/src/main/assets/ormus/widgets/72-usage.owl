@@ -4,12 +4,15 @@ widget "ai usage" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.0"; license: "MIT"; category: "system" }
+  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. Each account shows its email when the phone's own file gives it (the feed holds none). The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.1"; license: "MIT"; category: "system" }
 
   // Built on sg (ormus-feeds) every 10 min: a probe reads each account on a machine signed in to it, with that
   // machine's own token, and only usage numbers come back. The feed names the accounts and holds no email.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/usage.json") every 5m json timeout 20s status
   source now = clock every 1m
+  // The phone's own map of account keys to emails, written from sg by hand (`usage.py emails`), as the feed holds no
+  // email. A missing file reads as "": every account keeps its name.
+  source mails = file("~/.config/omalauncher/usage-emails.json") json optional
 
   // Only the feed counts as the feed: a page in its place (json keeps it as text) is said, never "0 accounts".
   let fresh = f != null && f.ok && f.out != null && (f.out.accounts != null || f.out.off != null) ? f.out : null
@@ -59,8 +62,12 @@ widget "ai usage" {
         let old = !stale ? "" : words == "" ? "as of ${read}" : " · as of ${read}"
         let aged = words == "" ? read : "${words} · ${read}"
         let shortAged = words == "" ? read : "${short} · ${read}"
-        // Characters left for the text after the name and the 8 dp gap (2 characters).
-        let space = rowChars - len("${a.service_name} ${a.name}") - 2
+        // The account's email when its short text still fits beside it (a stale row's with its age), else its name:
+        // the email never costs the number.
+        let mail = str(get(mails, a.key, ""))
+        let label = mail != "" && rowChars - len("${a.service_name} ${mail}") - 2 >= len(stale ? shortAged : short) ? "${a.service_name} ${mail}" : "${a.service_name} ${a.name}"
+        // Characters left for the text after the label and the 8 dp gap (2 characters).
+        let space = rowChars - len(label) - 2
         // A row too long for the tile drops one part at a time: the word "resets", the reset time, "as of ", the
         // label (a row that is not stale keeps only its short text), then the last words of its short text, with "…",
         // so the age stays whole and a number is shown whole or not at all. The feed's own words with no age (a note,
@@ -74,7 +81,7 @@ widget "ai usage" {
         Row {
           gap: 8
           align: center
-          Text { text: "${a.service_name} ${a.name}"; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
+          Text { text: label; style: small; bold: true; maxLines: 1; color: gold ? accent : a.state == "ok" ? foreground : muted }
           Text {
             text: len(words) + len(old) <= space ? "${words}${tail}${old}" : !stale ? short : len(aged) <= space ? aged : len(shortAged) <= space ? shortAged : cut == "" ? read : "${cut}… · ${read}"
             style: small
@@ -131,6 +138,7 @@ widget "ai usage" {
         Column {
           gap: 6
           let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
+          let mail = str(get(mails, a.key, ""))
           Box {
             onTap: url(a.open)
             Row {
@@ -139,6 +147,9 @@ widget "ai usage" {
               Text { text: "${a.service_name} ${a.name}"; style: title; maxLines: 1; weight: 1; color: a.key == topKey ? accent : foreground }
               Text { text: a.plan ?? ""; style: small; color: muted; maxLines: 1 }
             }
+          }
+          if mail != "" {
+            Text { text: mail; style: small; color: muted; maxLines: 1 }
           }
           if a.state != "ok" {
             Text { text: a.state == "stale" ? (read == "" ? "now: ${a.error}" : "as of ${read} · now: ${a.error}") : a.error; style: small; color: yellow }

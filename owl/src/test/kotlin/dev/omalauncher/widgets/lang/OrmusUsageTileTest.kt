@@ -272,9 +272,11 @@ class OrmusUsageTileTest {
         var checked = 0
         for (width in 200..420) {
             for ((name, value) in tile(rows, height = 400, width = width, mails = many).drop(2).map { it.substringBeforeLast(" [") }.zipWithNext()) {
-                if ("@" !in name) continue
+                if ("@" !in name || name.startsWith("bar ")) continue // a bar's color holds an @ (its alpha)
                 val dp = (name.length + value.length) * 6.47 + 8
                 assertTrue("$width dp: \"$name\" \"$value\" needs $dp dp", dp <= width - 24)
+                // And within the tile's own count: the characters a row holds, less the 8 dp gap (2 characters).
+                assertTrue("$width dp: \"$name\" \"$value\" is over the row", name.length + value.length + 2 <= ((width - 24) / 6.5).toInt())
                 checked++
             }
         }
