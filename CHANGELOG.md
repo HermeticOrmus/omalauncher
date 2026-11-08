@@ -61,6 +61,16 @@ What this fork adds to the release below it; none of it is in the Play build.
   alert`) and it posts a notification; a quiet switch in its screen turns Do Not
   Disturb on and off. Kiosk: Mercury's picks, one at a time, a craft pick with the
   one move to take; swipe for the next, tap to open it.
+- Comms: the WhatsApp chats that wait on him, one card at a time, under the sessions
+  tile on now: who, their last line, how long ago, and his own quick replies as up to
+  three numbered keys (the texts are his, in sg's registry; a key sends the chat's
+  short name and the number, never text, and sg's reply tool sends the text through
+  Periskope after its checks: that chat was offered in the feed's last run, one reply
+  a chat a minute). The card says what sg answered (sent, you just replied, the chat
+  moved on, sg's list is old, not confirmed); a chat he replied to shows that and an
+  open key until the next read shows his word; a tap anywhere else on the card opens
+  the chat in WhatsApp; swipe for the next. Under the card, the other chats that wait;
+  the screen lists every project's chats and the ones with no project.
 - Board tiles: one for each workboard (raven, ormus, alqvimia, clients), the sessions
   tile for that board alone, with its own counts, chats and moves. They are the
   sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
