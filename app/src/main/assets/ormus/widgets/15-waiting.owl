@@ -7,7 +7,7 @@ widget "communications" {
   meta { owl: 8; description: "People waiting on Ormus: WhatsApp chats whose last word is theirs and email drafts waiting for Send. Newest first, the last 30 days; tap one to open it. Projects has the reviews and decisions."; version: "2.0"; license: "MIT"; category: "productivity" }
 
   // Built on Sun (ormus-feeds), where the keys live; the phone only reads the result over the tailnet.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

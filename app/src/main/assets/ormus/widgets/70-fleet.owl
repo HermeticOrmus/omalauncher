@@ -7,7 +7,7 @@ widget "fleet" {
   meta { owl: 8; description: "Ormus's machines up or down, and any loop or service that failed on Sun; tap a machine for a shell."; version: "1.0"; license: "MIT"; category: "system" }
 
   // Built on Sun (ormus-feeds) from tailscale status, the loops' state and failed systemd units.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/fleet.json") every 1m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/fleet.json") every 1m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

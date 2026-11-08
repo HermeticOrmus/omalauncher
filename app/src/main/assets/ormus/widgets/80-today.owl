@@ -7,7 +7,7 @@ widget "today" {
   meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day."; version: "1.0"; license: "MIT"; category: "productivity" }
 
   // Built on Sun (ormus-feeds) from his calendar and the Alqvimia API.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

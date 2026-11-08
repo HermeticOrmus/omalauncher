@@ -7,7 +7,7 @@ widget "projects" {
   meta { owl: 8; description: "Project work waiting on Ormus: pull requests that ask for his review and Linear issues in review or with an open question. Newest first, however old; tap one to open it."; version: "1.0"; license: "MIT"; category: "productivity" }
 
   // Built on Sun (ormus-feeds), where the keys live; the phone only reads the result over the tailnet.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

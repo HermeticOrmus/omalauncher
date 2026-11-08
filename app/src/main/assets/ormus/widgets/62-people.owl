@@ -6,7 +6,7 @@ widget "people" {
 
   meta { owl: 8; description: "The people Ormus wants to stay close to, the most overdue first: how long since they last talked on WhatsApp, against how often he wants to, and what their company owes. Tap one to message them. The list lives on Sun in ~/.config/ormus-feeds/people.json."; version: "1.0"; license: "MIT"; category: "social" }
 
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null
