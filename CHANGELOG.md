@@ -70,7 +70,10 @@ What this fork adds to the release below it; none of it is in the Play build.
   moved on, sg's list is old, not confirmed); a chat he replied to shows that and an
   open key until the next read shows his word; a tap anywhere else on the card opens
   the chat in WhatsApp; swipe for the next. Under the card, the other chats that wait;
-  the screen lists every project's chats and the ones with no project.
+  the screen lists every project's chats and the ones with no project. The tile fits
+  its height (measured on the emulator at 420 dpi): at 6x6 the keys stack under the
+  card's meta line with the dots row; at 6x4 the meta line folds into the header row,
+  the three keys go side by side (a long label wraps once) and the dots go.
 - Board tiles: one for each workboard (raven, ormus, alqvimia, clients), the sessions
   tile for that board alone, with its own counts, chats and moves. They are the
   sessions tile with three lines changed (`scripts/ormus-board-tiles.sh` makes them)
