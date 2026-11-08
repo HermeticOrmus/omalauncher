@@ -6,7 +6,7 @@ widget "pipeline" {
 
   meta { owl: 8; description: "Ormus Solutions' sales pipeline from its leads table: leads by stage, and the follow-ups that are due, the furthest along first. Tap one for its proposal."; version: "1.0"; license: "MIT"; category: "finance" }
 
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

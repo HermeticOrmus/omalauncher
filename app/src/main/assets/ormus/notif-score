@@ -25,13 +25,12 @@ CACHE = Path.home() / ".cache/notif-score/cache.json"
 CONTEXT = Path.home() / ".config/notif-score/context.md"
 KEEP_SECS = 3 * 86400
 
-DEFAULT_CONTEXT = """Diego (Ormus): founder of Ormus Solutions, engineering lead at Raven Cargo (freight, Chicago), in Panama.
+DEFAULT_CONTEXT = """Who this phone belongs to and what matters to him: written here once, then edited by hand or by an agent.
+The scorer reads this file on every run; nothing about him ships in the launcher.
 
 Matters most, score high:
 - Money: payments, invoices, wires, clients paying or asking about money, banks flagging something.
-- People waiting on him: clients and partners (Guy Bodart is his father and runs Altum Wealth; Fouzan leads EuroLuxe;
-  Cynthia DeBriey, Floralia; Kate Edelstein, Serprana; Stefano; Jatnna, Carpeta Panda; Tomas, embry0 partner;
-  David Swift, Second 50), Raven people (James Loewen, Kevin, Hubert, Scott Urban) and JTEKT (Ricky Bruce).
+- People waiting on him: name the clients, partners and colleagues here, one a line, with who they are.
 - Production down or failing for many users, security alerts on his accounts.
 - Decisions only he can make, deadlines today.
 

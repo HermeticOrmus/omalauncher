@@ -5,8 +5,8 @@ face "money" {
   meta { owl: 13; description: "Money in one place: what's owed to you, the pipeline's follow-ups that are due, the people to be in touch with and the markets. Tap a row to open it."; version: "1.0"; license: "MIT"; category: "finance" }
 
   // Built on Sun (ormus-feeds money and markets): the invoicer, the leads table, WhatsApp, Salamander.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
-  source mk = http("https://sun.tailb43a3a.ts.net/feeds/markets.json") every 5m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
+  source mk = http("https://sg.tailb43a3a.ts.net/feeds/markets.json") every 5m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null

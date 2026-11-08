@@ -7,7 +7,7 @@ widget "markets" {
   meta { owl: 8; description: "Ormus's markets desk: Salamander P&L since start and today, its open positions, and his top Kalshi edges. Read-only."; version: "1.0"; license: "MIT"; category: "finance" }
 
   // Built on Sun (ormus-feeds) from Salamander's state and the Kalshi co-pilot; nothing here can trade.
-  source f = http("https://sun.tailb43a3a.ts.net/feeds/markets.json") every 2m json timeout 20s status
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/markets.json") every 2m json timeout 20s status
   source now = clock every 1m
 
   let data = f != null && f.ok ? f.out : null
