@@ -286,7 +286,7 @@ class OrmusUsageTileTest {
     @Test fun withoutTheFileOrWithAnOddOneEachAccountKeepsItsName() {
         // A missing file reads as "", and before the first read the source is null: the tile is the one without emails.
         val five = feed(full, half, high, credits, noUsage, top = topFull)
-        val odd = listOf(Str(""), Null, Json.parse("[]"), Str("not json"), Json.parse("""{"claude-9": "x@example.org"}"""), Json.parse("""{"claude-0": null}"""))
+        val odd = listOf(Str(""), Null, Json.parse("[]"), Str("not json"), Json.parse("""{"claude-9": "x@example.org"}"""), Json.parse("""{"claude-0": null}"""), Json.parse("5"), Json.parse("true"))
         for (file in odd) {
             assertEquals("$file", tile(five, width = SIX_BY_FOUR), tile(five, width = SIX_BY_FOUR, mails = file))
             assertEquals("$file", screen(five), screen(five, mails = file))
@@ -308,6 +308,17 @@ class OrmusUsageTileTest {
         assertEquals(tile(five, width = SIX_BY_FOUR, mails = clean), tile(five, width = SIX_BY_FOUR, mails = padded))
         assertEquals(screen(five, mails = clean), screen(five, mails = padded))
         assertTrue(tile(five, width = SIX_BY_FOUR, mails = clean).any { it.startsWith("Claude ana@example.org") })
+    }
+
+    @Test fun textWithoutAnAtIsNotAnEmail() {
+        // trim drops whitespace only: a zero-width space, a NUL or a word would take the name's place and say nothing.
+        // A no-break space is whitespace, so it is blank already.
+        val five = feed(full, half, high, credits, noUsage, top = topFull)
+        for (value in listOf("\\u200b", "\\u0000", "\\u00a0", "\\u200b \\u200b", "Diego", "example.org")) {
+            val file = Json.parse("""{"claude-0": "$value", "claude-1": "$value"}""")
+            assertEquals(value, tile(five, width = SIX_BY_FOUR), tile(five, width = SIX_BY_FOUR, mails = file))
+            assertEquals(value, screen(five), screen(five, mails = file))
+        }
     }
 
     @Test fun theScreenShowsEachAccountsEmailUnderItsName() {
