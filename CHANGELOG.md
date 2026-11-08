@@ -75,6 +75,12 @@ What this fork adds to the release below it; none of it is in the Play build.
   their age once they are more than 30 min old, the screen's footer always. They come
   back too when sg said the feed is off and then stops answering. A test runs the tile
   on made-up feeds.
+- AI usage shows each account's email, from the phone's own file
+  `~/.config/omalauncher/usage-emails.json` (sg's feed holds none; `usage.py emails`
+  on sg makes the file's map of account keys to emails). A row says the service and
+  the email when its short text still fits beside it (a stale row's with its age),
+  else the account's name, so the email never costs the number; the screen gives the
+  email under each name. Without the file every account keeps its name.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
