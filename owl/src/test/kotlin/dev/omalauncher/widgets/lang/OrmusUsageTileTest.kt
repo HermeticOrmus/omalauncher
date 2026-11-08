@@ -293,6 +293,23 @@ class OrmusUsageTileTest {
         }
     }
 
+    @Test fun onlyTextThatIsNotBlankIsAnEmailAndItIsTrimmed() {
+        // A hand-written file can hold a number, a yes/no, a list, a map or a blank where an email goes: the row
+        // keeps its name, as without the file (a blank email would leave "Claude" alone and two rows the same).
+        val five = feed(full, half, high, credits, noUsage, top = topFull)
+        for (value in listOf("5", "0", "true", "false", """["x@example.org"]""", """{"x": "y"}""", "[]", "{}", "\" \"", "\"\\t\\n\"")) {
+            val file = Json.parse("""{"claude-0": $value, "claude-1": $value}""")
+            assertEquals(value, tile(five, width = SIX_BY_FOUR), tile(five, width = SIX_BY_FOUR, mails = file))
+            assertEquals(value, screen(five), screen(five, mails = file))
+        }
+        // Spaces around an email are not part of it: the row and the screen show it as a clean one.
+        val clean = Json.parse("""{"claude-1": "ana@example.org"}""")
+        val padded = Json.parse("""{"claude-1": "  ana@example.org \t"}""")
+        assertEquals(tile(five, width = SIX_BY_FOUR, mails = clean), tile(five, width = SIX_BY_FOUR, mails = padded))
+        assertEquals(screen(five, mails = clean), screen(five, mails = padded))
+        assertTrue(tile(five, width = SIX_BY_FOUR, mails = clean).any { it.startsWith("Claude ana@example.org") })
+    }
+
     @Test fun theScreenShowsEachAccountsEmailUnderItsName() {
         val lines = screen(feed(full, credits, top = topFull), mails = mails)
         assertEquals(listOf("Claude Ormus [accent]", "Ultra [muted]", "first.longest@example.org [muted]", "week [null]"), lines.take(4))
