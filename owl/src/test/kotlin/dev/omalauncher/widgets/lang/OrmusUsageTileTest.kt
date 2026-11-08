@@ -12,12 +12,16 @@ import org.junit.Test
 class OrmusUsageTileTest {
     private val program = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/72-usage.owl").readText())
 
-    /** The feed source [f] (http with `status`: {ok, code, out}), the clock [now] and the tile's height and width in dp. */
+    /**
+     * The feed source [f] (http with `status`: {ok, code, out}), the clock [now], the tile's height and width in dp, and
+     * the phone's own file of emails [mails] (unset: the source has not read it yet).
+     */
     private inner class Tile(
         f: Value,
         now: Long?,
         private val height: Int?,
         private val width: Int? = null,
+        mails: Value? = null,
     ) : Host {
         private val slots = Array<Value>(program.globals.size) { Null }
 
@@ -27,6 +31,7 @@ class OrmusUsageTileTest {
         init {
             slots[slot("f")] = f
             slots[slot("now")] = now?.let { Num(it.toDouble()) } ?: Null
+            if (mails != null) slots[slot("mails")] = mails
         }
 
         /** A new answer of the feed source. */
@@ -141,12 +146,14 @@ class OrmusUsageTileTest {
         now: Long? = NOW,
         height: Int? = null,
         width: Int? = null,
-    ) = Tile(f, now, height, width).lines(program.root)
+        mails: Value? = null,
+    ) = Tile(f, now, height, width, mails).lines(program.root)
 
     private fun screen(
         f: Value,
         now: Long? = NOW,
-    ) = Tile(f, now, null).lines(program.screen!!)
+        mails: Value? = null,
+    ) = Tile(f, now, null, mails = mails).lines(program.screen!!)
 
     private fun account(
         key: String,
@@ -168,6 +175,7 @@ class OrmusUsageTileTest {
     private val high = account("codex-2", "ChatGPT", "Raven", """[{"label": "week", "percent": 85, "resets": ${NOW + 5 * DAY}}]""", "\"Pro Lite\"", peak = "85")
     private val credits = account("grok-3", "Grok", "Ormus", note = "\"180 credits left\"")
     private val noUsage = account("grok-4", "Grok", "Raven", plan = "\"SuperGrok Pro\"", note = "\"xAI gives no usage for this plan\"")
+    private val staleAna = account("claude-6", "Claude", "Corvin", """[{"label": "week Fable", "percent": 73, "resets": ${NOW + 2 * DAY}}]""", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "73")
     private val topFull = """{"key": "claude-0", "name": "Claude Ormus", "label": "week", "percent": 100, "resets": ${NOW + 90_000}}"""
 
     @Test fun eachAccountShowsItsFullestWindowAndWhenItResets() {
@@ -191,6 +199,103 @@ class OrmusUsageTileTest {
             ),
             tile(feed(full, half, high, credits, noUsage, top = topFull)),
         )
+    }
+
+    /** The phone's own map of account keys to emails, as `source mails = file(...) json` reads it. */
+    private val mails =
+        Json.parse("""{"claude-0": "first.longest@example.org", "claude-1": "ana@example.org", "codex-2": "first.longest@example.org", "grok-3": "grok.user@example.org"}""")
+
+    @Test fun eachAccountShowsItsEmailFromThePhonesOwnFile() {
+        // His 6x4 tile: every email fits with its row; an account not in the file keeps its name.
+        assertEquals(
+            listOf(
+                "ai usage [null]",
+                "5 accounts [muted]",
+                "Claude first.longest@example.org [accent]",
+                "week 100% · in 1d [foreground]",
+                "bar 100 red",
+                "Claude ana@example.org [foreground]",
+                "week Fable 73% · resets in 2d [foreground]",
+                "bar 73 foreground@0.55",
+                "ChatGPT first.longest@example.org [foreground]",
+                "week 85% · in 5d [foreground]",
+                "bar 85 yellow",
+                "Grok grok.user@example.org [foreground]",
+                "180 credits left [muted]",
+                "Grok Raven [foreground]",
+                "xAI gives no usage for this plan [muted]",
+            ),
+            tile(feed(full, half, high, credits, noUsage, top = topFull), width = SIX_BY_FOUR, mails = mails),
+        )
+    }
+
+    private val withStale =
+        Json.parse("""{"claude-0": "first.longest@example.org", "claude-1": "ana@example.org", "codex-2": "first.longest@example.org", "grok-3": "grok.user@example.org", "claude-6": "ana@example.org"}""")
+
+    @Test fun anEmailThatLeavesNoRoomForTheNumberGivesWayToTheName() {
+        // 4x3 (249 dp, 34 characters): an email shows only when its row's short text still fits beside it, and a stale
+        // row's short text keeps its age ("73% · 3h ago"), so the email never costs the number.
+        assertEquals(
+            listOf(
+                "ai usage [null]",
+                "6 accounts [muted]",
+                "Claude Ormus [accent]",
+                "week 100% · in 1d [foreground]",
+                "bar 100 red",
+                "Claude ana@example.org [foreground]",
+                "73% [foreground]",
+                "bar 73 foreground@0.55",
+                "ChatGPT Raven [foreground]",
+                "week 85% · in 5d [foreground]",
+                "bar 85 yellow",
+                "Grok Ormus [foreground]",
+                "180 credits left [muted]",
+                "Grok Raven [foreground]",
+                "xAI gives no usage for this plan [muted]",
+                "Claude Corvin [muted]",
+                "73% · 3h ago [yellow]",
+                "bar 73 foreground@0.55",
+            ),
+            tile(feed(full, half, high, credits, noUsage, staleAna, top = topFull), height = 272, width = 249, mails = withStale),
+        )
+        // At 6x4 the stale row has room for its email and its whole text.
+        assertEquals(
+            listOf("Claude ana@example.org [muted]", "week Fable 73% · as of 3h ago [yellow]"),
+            tile(feed(staleAna), width = SIX_BY_FOUR, mails = Json.parse("""{"claude-6": "ana@example.org"}""")).subList(2, 4),
+        )
+    }
+
+    @Test fun aRowWithAnEmailFitsTheTileWholeAtEveryWidth() {
+        // At the phone's 6.47 dp a character, a row that shows an email is never cut: its text fits beside it whole.
+        val rows = feed(full, half, high, credits, noUsage, staleAna, top = topFull)
+        val many = Json.parse("""{"claude-0": "first.longest@example.org", "claude-1": "ana@example.org", "codex-2": "first.longest@example.org", "grok-3": "grok.user@example.org", "grok-4": "first.longest@example.org", "claude-6": "ana@example.org"}""")
+        var checked = 0
+        for (width in 200..420) {
+            for ((name, value) in tile(rows, height = 400, width = width, mails = many).drop(2).map { it.substringBeforeLast(" [") }.zipWithNext()) {
+                if ("@" !in name) continue
+                val dp = (name.length + value.length) * 6.47 + 8
+                assertTrue("$width dp: \"$name\" \"$value\" needs $dp dp", dp <= width - 24)
+                checked++
+            }
+        }
+        assertTrue("only $checked rows with an email were checked", checked > 600)
+    }
+
+    @Test fun withoutTheFileOrWithAnOddOneEachAccountKeepsItsName() {
+        // A missing file reads as "", and before the first read the source is null: the tile is the one without emails.
+        val five = feed(full, half, high, credits, noUsage, top = topFull)
+        val odd = listOf(Str(""), Null, Json.parse("[]"), Str("not json"), Json.parse("""{"claude-9": "x@example.org"}"""), Json.parse("""{"claude-0": null}"""))
+        for (file in odd) {
+            assertEquals("$file", tile(five, width = SIX_BY_FOUR), tile(five, width = SIX_BY_FOUR, mails = file))
+            assertEquals("$file", screen(five), screen(five, mails = file))
+        }
+    }
+
+    @Test fun theScreenShowsEachAccountsEmailUnderItsName() {
+        val lines = screen(feed(full, credits, top = topFull), mails = mails)
+        assertEquals(listOf("Claude Ormus [accent]", "Ultra [muted]", "first.longest@example.org [muted]", "week [null]"), lines.take(4))
+        val grok = lines.indexOf("Grok Ormus [foreground]")
+        assertEquals(listOf(" [muted]", "grok.user@example.org [muted]", "180 credits left [muted]"), lines.subList(grok + 1, grok + 4))
     }
 
     @Test fun theHeaderSaysWhenTheFeedCannotBeShown() {
