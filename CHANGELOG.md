@@ -80,7 +80,8 @@ What this fork adds to the release below it; none of it is in the Play build.
   on sg makes the file's map of account keys to emails). A row says the service and
   the email when its short text still fits beside it (a stale row's with its age),
   else the account's name, so the email never costs the number; the screen gives the
-  email under each name. Without the file every account keeps its name.
+  email under each name. Without the file, or where its value is not text or is
+  blank, an account keeps its name; spaces around an email are dropped.
 
 ## 0.12.2 (versionCode 23) – 2026-10-25
 
