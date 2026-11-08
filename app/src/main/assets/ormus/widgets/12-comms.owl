@@ -1,0 +1,350 @@
+widget "comms" {
+  page: 1
+  order: 1
+  size: 6x4
+  minSize: 4x3
+
+  meta { owl: 13; description: "The WhatsApp chats that wait on Ormus, one card at a time: who, their last line, how long ago, and his own quick replies as numbered keys that send through sg; a tap on the card opens the chat in WhatsApp; swipe for the next. Under it, the other chats that wait; the tile's screen lists every project's chats and the ones with no project."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // Built on sg (ormus-feeds), where the chat registry, his reply texts and the Periskope key live. The phone only
+  // reads the result over the tailnet and names a chat by `k` (the feed's short hash) and a reply by its number.
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 60s json timeout 20s status
+  source now = clock every 1m
+
+  // One-tap replies. `busy` is the chat being replied to, `sent` what came back for it, and `said` the line shown
+  // for it. sg's reply tool checks everything again (his text by its number, the chat among the ones the feed
+  // offered, one a minute) before a text goes out. What comes back is wrapped as {"n": a number of its own, "r": the
+  // tool's answer}, so two equal answers in a row still count as two.
+  state busy = ""
+  state sent = ""
+  state said = ""
+  // The chat `said` is about, so the line shows on that card, or under the headline when another card shows.
+  state saidFor = ""
+  on sent {
+    let got = parseJson(value ?? "")
+    let reply = got != null ? got.r : null
+    saidFor = busy
+    busy = ""
+    dragX = 0
+    if reply != null && reply.ok {
+      haptic()
+      said = "sent"
+    } else {
+      said = reply == null ? "sg did not answer" : reply.outcome == "too soon" ? "you just replied: wait a minute" : reply.outcome == "unknown chat" ? "the chat moved on: look again" : reply.outcome == "feed stale" ? "sg's list is old: open the chat" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "not confirmed: open the chat" : "it did not go through: open the chat"
+    }
+    refresh()
+  }
+
+  let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
+  let boards = data != null ? data.boards : []
+  // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
+  let stale = data != null && now != null && now - data.generated > 180
+  let failed = data != null ? keys(data.errors ?? {}) : []
+
+  // Every project's chat with where it lives, then the chats with no project (they wait on him by definition).
+  let chats = flatten(boards.map(b => flatten(b.projects.map(p => (p.chats ?? []).map(c => merge(c, {board: b.name, project: p.name}))))))
+  let loose = data != null ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: ""})) : []
+  let everyone = flatten([chats, loose])
+
+  // The cards: every chat that waits on him, by project as the feed orders them, then the ones with no project.
+  // `pick` is the card shown, by the chat's `k`, so a card keeps its place when the list changes under it; a pick
+  // that is gone shows the first. `dragX` is how far the finger has pulled the card sideways.
+  let cards = everyone.filter(c => c.waiting)
+  let ids = cards.map(c => c.k)
+  state pick = ""
+  state dragX = 0
+  let found = indexOf(ids, pick)
+  // A card is `pinned` while it is the one picked: only then are its keys live, so a refresh that puts another card
+  // in its place cannot take a tap meant for the one he read. The first card is pinned as the feed comes in.
+  let pinned = found != null && found >= 0
+  let at = pinned ? found : 0
+  let card = len(cards) > 0 ? cards[at] : null
+  on f {
+    if pick == "" && len(ids) > 0 {
+      pick = ids[0]
+    }
+  }
+  // The other chats that wait, under the card.
+  let rows = cards.filter(c => card == null || c.k != card.k)
+  // Characters one key label holds at about 9 dp a character (bold, 15 sp).
+  let wide = floor(((tileWidth ?? 360) - 64) / 9)
+  // The card's keys go side by side when each numbered label fits its share of the width, else in a stack.
+  let cardKeys = card == null || card.replied != null ? [] : (card.replies ?? [])
+  let cardPer = max(6, floor(wide / max(1, len(cardKeys))) - 3)
+  let cardStack = len(cardKeys) > 0 && !(len(cardKeys) <= 3 && all(cardKeys, o => len(o.label) + 2 <= cardPer))
+  // Their last line wraps once at most (14 sp, about 7 dp a character).
+  let cardTextRows = card == null ? 0 : len(card.text ?? "") > floor(((tileWidth ?? 360) - 64) / 7) ? 2 : 1
+  // Rows the tile holds under the headline and the card: the card's height at one line of text with its keys side
+  // by side is taken as 190 dp, a stacked key as 38 dp more, a second line of text as 18 dp (to be measured on the
+  // emulator, as the work tile's were).
+  let cardHeight = card == null ? 0 : (cardStack ? 152 + 38 * len(cardKeys) : 190) + 18 * (cardTextRows - 1)
+  let room = max(0, floor(((tileHeight ?? 400) - 80 - cardHeight) / 28))
+
+  component Age(m) {
+    Text { text: m == null ? "" : m < 60 ? "${m}m" : m < 1440 ? "${floor(m / 60)}h" : "${floor(m / 1440)}d"; fontSize: 12; color: muted; width: 30; align: end; maxLines: 1 }
+  }
+
+  // A key: a wide button a thumb finds. `strong` is the one reply the card leads with.
+  component Key(word, strong = false) {
+    Box {
+      fill: width
+      padding: [14, 12]
+      radius: 8 * corners
+      background: alpha(foreground, strong ? 0.16 : 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+    }
+  }
+
+  // Open a chat in WhatsApp: a person by number, a group by its invite link, else by its id.
+  component OpenChat(c, word) {
+    Box {
+      fill: width
+      onTap: {
+        if c.open.url != null {
+          androidIntent({package: "com.whatsapp", action: "android.intent.action.VIEW", data: c.open.url})
+        } else {
+          androidIntent({package: "com.whatsapp", component: "com.whatsapp.Conversation", extras: {jid: c.open.jid}})
+        }
+      }
+      Key { word: word }
+    }
+  }
+
+  component ChatLine(c, where, withText) {
+    Row {
+      gap: 8
+      align: center
+      padding: [0, 4]
+      Text { text: c.replied != null ? "replied" : c.waiting ? "chat" : c.mine ? "you" : "quiet"; fontSize: 12; width: 66; maxLines: 1; color: c.waiting ? green : muted }
+      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; fontSize: 14; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
+      Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
+      Age { m: c.age_min }
+    }
+  }
+
+  // One row that opens the chat it shows.
+  component Item(c, where, withText) {
+    Box {
+      onTap: {
+        if c.open.url != null {
+          androidIntent({package: "com.whatsapp", action: "android.intent.action.VIEW", data: c.open.url})
+        } else {
+          androidIntent({package: "com.whatsapp", component: "com.whatsapp.Conversation", extras: {jid: c.open.jid}})
+        }
+      }
+      ChatLine { c: c; where: where; withText: withText }
+    }
+  }
+
+  // One reply, numbered: it sends the chat's `k`, the number and the label this key showed (the text is sg's, from
+  // his registry, and sg sends it only when it is still that label; the phone never sends text of its own). It goes
+  // to sg's reply tool as JSON on stdin, so no shell on the way reads it as code.
+  component Reply(c, o, n, strong) {
+    Box {
+      fill: width
+      onTap: {
+        if busy == "" {
+          busy = c.k
+          said = ""
+          sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson({k: c.k, n: n, label: o.label}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -; printf '}'")
+        }
+      }
+      Key { word: busy == c.k ? "…" : "${n} ${o.label}"; strong: strong }
+    }
+  }
+
+  // The one chat that waits on him now (`card`): who, their last line, how long ago; then his replies as numbered
+  // keys. A chat he replied to from here (`replied`) shows that and an open key instead (sg takes one reply a chat
+  // a minute, and the next read shows his word). A chat the feed offers no reply on (a big group) has the open key
+  // alone. A tap anywhere else on the card opens the chat in WhatsApp.
+  component ChatCard(c, compact) {
+    Column {
+      gap: 6
+      padding: [12, 10]
+      radius: 10 * corners
+      background: alpha(foreground, 0.07)
+      onTap: {
+        if c.open.url != null {
+          androidIntent({package: "com.whatsapp", action: "android.intent.action.VIEW", data: c.open.url})
+        } else {
+          androidIntent({package: "com.whatsapp", component: "com.whatsapp.Conversation", extras: {jid: c.open.jid}})
+        }
+      }
+      let replies = c.replied != null ? [] : (c.replies ?? [])
+      let per = max(6, floor(wide / max(1, len(replies))) - 3)
+      let short = len(replies) <= 3 && all(replies, o => len(o.label) + 2 <= per)
+      Row {
+        gap: 8
+        align: center
+        Text { text: c.project != "" ? "${lower(c.project)} · ${c.board}" : "no project"; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
+        Text { text: len(cards) > 1 ? "${at + 1} of ${len(cards)}" : ""; fontSize: 12; color: muted; maxLines: 1 }
+      }
+      Text { text: c.name; fontSize: 17; bold: true; maxLines: 1 }
+      if c.text != "" {
+        Text { text: c.text; fontSize: 14; maxLines: compact ? 2 : 6 }
+      }
+      Text { text: "${c.group ? "group" : "chat"}${c.age_min != null ? " · ${c.age_min < 60 ? "${c.age_min}m" : c.age_min < 1440 ? "${floor(c.age_min / 60)}h" : "${floor(c.age_min / 1440)}d"} ago" : ""}${c.slot != null ? " · priority ${c.slot}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
+      if c.replied != null {
+        Row {
+          gap: 8
+          align: center
+          Text { text: "replied ${c.replied}m ago"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
+          OpenChat { c: c; word: "open" }
+        }
+      } else if len(replies) > 0 && !pinned {
+        // The card came in under the thumb, not by his hand: one tap pins it, and its keys show.
+        Box {
+          fill: width
+          onTap: pick = ids[at]
+          Key { word: "show ${join(range(len(replies)).map(i => "${i + 1}"), " · ")}"; strong: true }
+        }
+      } else if len(replies) > 0 && short {
+        Row {
+          gap: 8
+          for o, i in replies key "${i}" {
+            Reply { c: c; o: o; n: i + 1; strong: i == 0; weight: 1 }
+          }
+        }
+      } else if len(replies) > 0 {
+        Column {
+          gap: 6
+          for o, i in replies key "${i}" {
+            Reply { c: c; o: o; n: i + 1; strong: i == 0; fill: width }
+          }
+        }
+      } else {
+        OpenChat { c: c; word: "open in WhatsApp"; fill: width }
+      }
+      if said != "" && busy == "" && saidFor == c.k {
+        Text { text: said; fontSize: 13; color: said == "sent" ? green : red; maxLines: 2 }
+      }
+    }
+  }
+
+  // The cards, one at a time: swipe sideways for the next or the one before, or tap the arrows. The card follows
+  // the finger a little and springs back; a pull past 70 dp, or a flick, turns it.
+  component Cards(compact) {
+    Column {
+      gap: 4
+      Box {
+        drag: horizontal
+        onDrag: dragX = dragX + dx
+        onDragEnd: {
+          let n = len(cards)
+          if n > 1 && (dragX < -70 || vx < -600) && at < n - 1 {
+            pick = ids[at + 1]
+            haptic()
+          } else if n > 1 && (dragX > 70 || vx > 600) && at > 0 {
+            pick = ids[at - 1]
+            haptic()
+          }
+          dragX = 0
+        }
+        offset: [dragX * 0.6, 0]
+        opacity: 1 - min(0.5, abs(dragX) / 400)
+        animate offset: spring()
+        animate opacity: tween(150ms, "out")
+        ChatCard { c: card; compact: compact }
+      }
+      if len(cards) > 1 {
+        // Up to seven dots (the card's header counts them all), the one shown bigger and brighter.
+        Row {
+          gap: 6
+          align: center
+          justify: center
+          Text { text: "‹"; fontSize: 20; color: at > 0 ? foreground : alpha(foreground, 0.3); padding: [18, 10]; onTap: { dragX = 0; if at > 0 { pick = ids[at - 1] } } }
+          for id, i in ids.take(7) key "${id}:${i}" {
+            Box { size: i == at ? 8 : 6; radius: 4; background: i == at ? foreground : alpha(foreground, 0.3) }
+          }
+          Text { text: "›"; fontSize: 20; color: at < len(cards) - 1 ? foreground : alpha(foreground, 0.3); padding: [18, 10]; onTap: { dragX = 0; if at < len(cards) - 1 { pick = ids[at + 1] } } }
+        }
+      }
+    }
+  }
+
+  // The headline: who waits on him is the one thing in gold.
+  component Headline() {
+    Column {
+      gap: 2
+      Text { text: len(cards) > 0 ? "${len(cards)} chat${len(cards) == 1 ? "" : "s"} wait${len(cards) == 1 ? "s" : ""}" : "nobody waits"; fontSize: 24; bold: true; color: len(cards) > 0 ? accent : green; maxLines: 1 }
+      if said != "" && busy == "" && (card == null || saidFor != card.k) {
+        Text { text: said; fontSize: 12; color: said == "sent" ? green : red; maxLines: 1 }
+      }
+    }
+  }
+
+  onTap: screen()
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "comms"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; fontSize: 12; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+    }
+    if data != null {
+      Headline { }
+      if card != null {
+        Cards { compact: true }
+      }
+      for c in rows.take(room) key c.k {
+        Item { c: c; where: c.project != "" ? lower(c.project) : ""; withText: false }
+      }
+      if len(rows) > room {
+        Text { text: "+${len(rows) - room} more · tap for every chat"; fontSize: 12; color: muted; maxLines: 1 }
+      }
+    }
+  }
+
+  screen {
+    title: "comms"
+    Column {
+      scroll: true
+      gap: 12
+      padding: [4, 8]
+      if data == null {
+        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else {
+        Headline { }
+        if card != null {
+          Cards { compact: false }
+        }
+        if stale {
+          Text { text: "as of ${floor((now - data.generated) / 60)}m ago"; fontSize: 13; color: red }
+        }
+        for b in boards.filter(b => sum(b.projects.map(p => len(p.chats ?? []))) > 0) key b.name {
+          Column {
+            gap: 4
+            Row {
+              align: center
+              Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
+              Text { text: "${b.waiting ?? 0} wait"; fontSize: 12; color: muted; align: end; maxLines: 1 }
+            }
+            for p in b.projects.filter(p => len(p.chats ?? []) > 0) key p.name {
+              Column {
+                gap: 2
+                padding: [0, 2]
+                Text { text: p.name; fontSize: 13; bold: true; color: muted }
+                for c in p.chats key c.k ?? c.name {
+                  Item { c: c; where: c.slot != null ? "priority ${c.slot}" : c.group ? "group" : ""; withText: true }
+                }
+              }
+            }
+          }
+        }
+        if len(loose) > 0 {
+          Column {
+            gap: 2
+            Text { text: "WAITS ON YOU, NO PROJECT"; style: label }
+            for c in loose key c.k ?? c.name {
+              Item { c: c; where: c.group ? "group" : ""; withText: true }
+            }
+          }
+        }
+        for k in failed {
+          Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
+        }
+      }
+    }
+  }
+}
