@@ -297,7 +297,7 @@ class OrmusUsageTileTest {
         // A hand-written file can hold a number, a yes/no, a list, a map or a blank where an email goes: the row
         // keeps its name, as without the file (a blank email would leave "Claude" alone and two rows the same).
         val five = feed(full, half, high, credits, noUsage, top = topFull)
-        for (value in listOf("5", "0", "true", "false", """["x@example.org"]""", """{"x": "y"}""", "[]", "{}", "\" \"", "\"\\t\\n\"")) {
+        for (value in listOf("5", "0", "true", "false", """["x@example.org"]""", """["@"]""", """{"x": "y"}""", """{"@": "x"}""", "[]", "{}", "\" \"", "\"\\t\\n\"")) {
             val file = Json.parse("""{"claude-0": $value, "claude-1": $value}""")
             assertEquals(value, tile(five, width = SIX_BY_FOUR), tile(five, width = SIX_BY_FOUR, mails = file))
             assertEquals(value, screen(five), screen(five, mails = file))
