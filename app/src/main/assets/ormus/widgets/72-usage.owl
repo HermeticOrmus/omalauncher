@@ -4,7 +4,7 @@ widget "ai usage" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. Each account shows its email in place of its name when the phone's own file gives it and the row still has room for its number (the feed holds none). The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.1"; license: "MIT"; category: "system" }
+  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. Each account shows its email in place of its name when the phone's own file gives one (text with an @) and the row still has room for its number (the feed holds none). The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.1"; license: "MIT"; category: "system" }
 
   // Built on sg (ormus-feeds) every 10 min: a probe reads each account on a machine signed in to it, with that
   // machine's own token, and only usage numbers come back. The feed names the accounts and holds no email.
@@ -64,10 +64,10 @@ widget "ai usage" {
         let shortAged = words == "" ? read : "${short} · ${read}"
         // The account's email when its short text still fits beside it (a stale row's with its age), else its name:
         // the email never costs the number.
-        // Only text is an email (toJson writes text, and only text, in quotes), without the spaces around it: a
-        // number, a yes/no, a list, a map or a blank leaves the name.
+        // Only text that holds an "@" is an email (toJson writes text, and only text, in quotes), without the spaces
+        // around it: a number, a yes/no, a list, a map, a blank or an invisible character leaves the name.
         let raw = get(mails, a.key, "")
-        let mail = startsWith(toJson(raw), "\"") ? trim(raw) : ""
+        let mail = startsWith(toJson(raw), "\"") && contains(raw, "@") ? trim(raw) : ""
         let label = mail != "" && rowChars - len("${a.service_name} ${mail}") - 2 >= len(stale ? shortAged : short) ? "${a.service_name} ${mail}" : "${a.service_name} ${a.name}"
         // Characters left for the text after the label and the 8 dp gap (2 characters).
         let space = rowChars - len(label) - 2
@@ -142,7 +142,7 @@ widget "ai usage" {
           gap: 6
           let read = a.read == null || now == null ? "" : now - a.read < 60 ? "just now" : "${fmtAgo(a.read, now)} ago"
           let raw = get(mails, a.key, "")
-          let mail = startsWith(toJson(raw), "\"") ? trim(raw) : ""
+          let mail = startsWith(toJson(raw), "\"") && contains(raw, "@") ? trim(raw) : ""
           Box {
             onTap: url(a.open)
             Row {
