@@ -48,8 +48,10 @@ What this fork adds to the release below it; none of it is in the Play build.
   up to three numbered keys that move it forward (the dialog's answers, or his
   own replies at a free prompt, typed by sg from his registry); a tap anywhere
   else on the card opens the agent in Mercurio; swipe sideways (or tap the
-  arrows) for the next. Each answer scores. The tile's card shows no command; the
-  screen keeps the question, what a yes would run and why, and the whole command.
+  arrows) for the next. Each answer scores. The tile's card shows no command, but
+  the first line of one whose summary is the agent's own line about it; the
+  screen keeps the question, what a yes would run and why, the whole command and
+  every answer the dialog offers.
   A yes for a command goes only with the whole command in the feed; a command the
   screen does not show whole has no keys, and he opens the agent. Under the card,
   the chats that wait and the agents at work; the screen has every workboard,
