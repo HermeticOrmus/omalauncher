@@ -68,17 +68,29 @@ widget "comms" {
   let rows = cards.filter(c => card == null || c.k != card.k)
   // Characters one key label holds at about 9 dp a character (bold, 15 sp).
   let wide = floor(((tileWidth ?? 360) - 64) / 9)
-  // The card's keys go side by side when each numbered label fits its share of the width, else in a stack.
+  // Heights in dp, measured on the emulator at 420 dpi (a 6x4 tile is 254 dp, a 6x6 one 384): the tile's head down
+  // to the card and the tile's bottom padding, 80; the card with its header row, the name, one line of text, its
+  // meta line, one row of keys and its padding, 151; the meta line and its gap, 21; a key 42 and 6 between stacked
+  // keys, so 48 a key beyond the first; a second line of text 17; a second line in a key's label 20; the dots row
+  // and its gap 40; a chat row 28.
+  let below = (tileHeight ?? 400) - 80
+  // Tall enough for three stacked keys under one line of text (247 dp): the card keeps its meta line and stacks
+  // long labels. A shorter tile (6x4) folds the meta line into the header row, puts the keys side by side whatever
+  // their length (a long label wraps once), and shows no dots: the header counts the cards, a swipe turns them.
+  let tall = below >= 247
+  let fold = !tall
   let cardKeys = card == null || card.replied != null ? [] : (card.replies ?? [])
   let cardPer = max(6, floor(wide / max(1, len(cardKeys))) - 3)
-  let cardStack = len(cardKeys) > 0 && !(len(cardKeys) <= 3 && all(cardKeys, o => len(o.label) + 2 <= cardPer))
-  // Their last line wraps once at most (14 sp, about 7 dp a character).
-  let cardTextRows = card == null ? 0 : len(card.text ?? "") > floor(((tileWidth ?? 360) - 64) / 7) ? 2 : 1
-  // Rows the tile holds under the headline and the card: the card's height at one line of text with its keys side
-  // by side is taken as 190 dp, a stacked key as 38 dp more, a second line of text as 18 dp (to be measured on the
-  // emulator, as the work tile's were).
-  let cardHeight = card == null ? 0 : (cardStack ? 152 + 38 * len(cardKeys) : 190) + 18 * (cardTextRows - 1)
-  let room = max(0, floor(((tileHeight ?? 400) - 80 - cardHeight) / 28))
+  let cardShort = len(cardKeys) <= 3 && all(cardKeys, o => len(o.label) + 2 <= cardPer)
+  let cardStack = tall && len(cardKeys) > 0 && !cardShort
+  let keyRows = fold && len(cardKeys) > 0 && !cardShort ? 2 : 1
+  // Their last line wraps once at most on the tile (14 sp mono, about 8.5 dp a character, inside the card's padding).
+  let cardTextRows = card == null ? 0 : len(card.text ?? "") > floor(((tileWidth ?? 360) - 44) / 8.5) ? 2 : 1
+  let cardHeight = card == null ? 0 : 151 - (fold ? 21 : 0) + (cardStack ? 48 * (len(cardKeys) - 1) : 0) + 20 * (keyRows - 1) + 17 * (cardTextRows - 1)
+  let dots = len(cards) > 1 && below - cardHeight >= 40
+  // Rows of the other waiting chats under the card; the last slot goes to the "+N more" line when they do not all fit.
+  let slots = max(0, floor((below - cardHeight - (dots ? 40 : 0)) / 28))
+  let room = len(rows) <= slots ? slots : max(0, slots - 1)
 
   component Age(m) {
     Text { text: m == null ? "" : m < 60 ? "${m}m" : m < 1440 ? "${floor(m / 60)}h" : "${floor(m / 1440)}d"; fontSize: 12; color: muted; width: 30; align: end; maxLines: 1 }
@@ -172,24 +184,39 @@ widget "comms" {
       }
       let replies = c.replied != null ? [] : (c.replies ?? [])
       let per = max(6, floor(wide / max(1, len(replies))) - 3)
-      let short = len(replies) <= 3 && all(replies, o => len(o.label) + 2 <= per)
+      // On a short tile (`compact` and not `tall`) the meta line folds into the header row, the keys go side by side
+      // whatever their length, and sg's answer takes the place of their last line.
+      let folded = compact && fold
+      let short = folded || (len(replies) <= 3 && all(replies, o => len(o.label) + 2 <= per))
+      let where = c.project != "" ? "${lower(c.project)} · ${c.board}" : "no project"
+      let age = c.age_min == null ? "" : c.age_min < 60 ? "${c.age_min}m" : c.age_min < 1440 ? "${floor(c.age_min / 60)}h" : "${floor(c.age_min / 1440)}d"
+      let slotWord = c.slot != null ? " · priority ${c.slot}" : ""
+      let meta = "${c.group ? "group" : "chat"}${age != "" ? " · ${age} ago" : ""}${slotWord}"
+      // The folded header has the room for "group" and the age alone (12 sp mono, about 46 characters).
+      let brief = "${c.group ? " · group" : ""}${age != "" ? " · ${age}" : ""}${slotWord}"
+      let answered = said != "" && busy == "" && saidFor == c.k
       Row {
         gap: 8
         align: center
-        Text { text: c.project != "" ? "${lower(c.project)} · ${c.board}" : "no project"; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
+        Text { text: folded ? "${where}${brief}" : where; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
         Text { text: len(cards) > 1 ? "${at + 1} of ${len(cards)}" : ""; fontSize: 12; color: muted; maxLines: 1 }
       }
       Text { text: c.name; fontSize: 17; bold: true; maxLines: 1 }
-      if c.text != "" {
+      if folded && answered {
+        Text { text: said; fontSize: 13; color: said == "sent" ? green : red; maxLines: 2 }
+      } else if c.text != "" {
         Text { text: c.text; fontSize: 14; maxLines: compact ? 2 : 6 }
       }
-      Text { text: "${c.group ? "group" : "chat"}${c.age_min != null ? " · ${c.age_min < 60 ? "${c.age_min}m" : c.age_min < 1440 ? "${floor(c.age_min / 60)}h" : "${floor(c.age_min / 1440)}d"} ago" : ""}${c.slot != null ? " · priority ${c.slot}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
+      if !folded {
+        Text { text: meta; fontSize: 12; color: muted; maxLines: 1 }
+      }
       if c.replied != null {
         Row {
           gap: 8
           align: center
+          // Both weighted: a key that fills its width alone would push the words out of the row.
           Text { text: "replied ${c.replied}m ago"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
-          OpenChat { c: c; word: "open" }
+          OpenChat { c: c; word: "open"; weight: 1 }
         }
       } else if len(replies) > 0 && !pinned {
         // The card came in under the thumb, not by his hand: one tap pins it, and its keys show.
@@ -215,7 +242,7 @@ widget "comms" {
       } else {
         OpenChat { c: c; word: "open in WhatsApp"; fill: width }
       }
-      if said != "" && busy == "" && saidFor == c.k {
+      if answered && !folded {
         Text { text: said; fontSize: 13; color: said == "sent" ? green : red; maxLines: 2 }
       }
     }
@@ -246,7 +273,7 @@ widget "comms" {
         animate opacity: tween(150ms, "out")
         ChatCard { c: card; compact: compact }
       }
-      if len(cards) > 1 {
+      if len(cards) > 1 && (!compact || dots) {
         // Up to seven dots (the card's header counts them all), the one shown bigger and brighter.
         Row {
           gap: 6
@@ -262,12 +289,14 @@ widget "comms" {
     }
   }
 
-  // The headline: who waits on him is the one thing in gold.
-  component Headline() {
+  // The headline: who waits on him is the one thing in gold. Under it, sg's answer about a card that is not the one
+  // shown; not on a short tile (`compact` and not `tall`), where the line would take the keys' second line: there
+  // the answer shows on its own card alone.
+  component Headline(compact) {
     Column {
       gap: 2
       Text { text: len(cards) > 0 ? "${len(cards)} chat${len(cards) == 1 ? "" : "s"} wait${len(cards) == 1 ? "s" : ""}" : "nobody waits"; fontSize: 24; bold: true; color: len(cards) > 0 ? accent : green; maxLines: 1 }
-      if said != "" && busy == "" && (card == null || saidFor != card.k) {
+      if said != "" && busy == "" && !(compact && fold) && (card == null || saidFor != card.k) {
         Text { text: said; fontSize: 12; color: said == "sent" ? green : red; maxLines: 1 }
       }
     }
@@ -283,14 +312,14 @@ widget "comms" {
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; fontSize: 12; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if data != null {
-      Headline { }
+      Headline { compact: true }
       if card != null {
         Cards { compact: true }
       }
       for c in rows.take(room) key c.k {
         Item { c: c; where: c.project != "" ? lower(c.project) : ""; withText: false }
       }
-      if len(rows) > room {
+      if slots > 0 && len(rows) > room {
         Text { text: "+${len(rows) - room} more · tap for every chat"; fontSize: 12; color: muted; maxLines: 1 }
       }
     }
@@ -305,7 +334,7 @@ widget "comms" {
       if data == null {
         Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
       } else {
-        Headline { }
+        Headline { compact: false }
         if card != null {
           Cards { compact: false }
         }

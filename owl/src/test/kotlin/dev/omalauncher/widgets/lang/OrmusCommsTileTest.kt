@@ -179,11 +179,79 @@ class OrmusCommsTileTest {
         assertFalse("no key shows before the card is pinned: $lines", "1 On it." in lines)
         assertTrue("the other waiting chat is a row under the card: $lines", "Team" in lines)
         assertFalse("a chat that does not wait is not on the tile: $lines", "Ben" in lines)
-        assertEquals("one line of text, his three replies stacked (12 characters do not fit a third of 360 dp)", 266.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one line of text, his three replies stacked (12 characters do not fit a third of 360 dp)", 247.0, (t.let("cardHeight") as Num).v, 0.0)
         val short = Tile(feed(ana.replace(replies, """[{"n": 1, "label": "Ok"}, {"n": 2, "label": "Yes"}, {"n": 3, "label": "No"}]""")))
-        assertEquals("three short replies go side by side", 190.0, (short.let("cardHeight") as Num).v, 0.0)
+        assertEquals("three short replies go side by side", 151.0, (short.let("cardHeight") as Num).v, 0.0)
         val wrapped = Tile(feed(chat("aaaaaaaaaaaa", "Ana", text = "can you look at the invoice before the call with the client?")))
-        assertEquals("a second line of their text adds 18 dp", 284.0, (wrapped.let("cardHeight") as Num).v, 0.0)
+        assertEquals("a second line of their text adds 17 dp", 264.0, (wrapped.let("cardHeight") as Num).v, 0.0)
+    }
+
+    /** The heights the emulator measured at 420 dpi: a 6x4 tile is 254 dp tall, a 6x6 one 384. */
+    @Test fun aShortTileFoldsTheMetaLineIntoTheHeaderAndPutsTheKeysSideBySideWithNoDots() {
+        val t = Tile(feed(ana, team), height = 254)
+        t.pin("aaaaaaaaaaaa")
+        val lines = t.tile()
+        assertEquals("the three keys still show, in a row that wraps the long label", listOf("1 On it.", "2 Yes.", "3 Later today."), keys(lines))
+        assertTrue("the meta line rides in the header row, as the age alone: $lines", "customer portals · raven · 12m" in lines)
+        assertFalse("and not on its own line: $lines", "chat · 12m ago" in lines)
+        val group = Tile(feed(team), height = 254)
+        assertTrue("a group says so: ${group.tile()}", "customer portals · raven · group · 1h" in group.tile())
+        assertFalse("no arrows: the header counts the cards and a swipe turns them: $lines", "‹" in lines)
+        assertFalse("no room for a row under the card: $lines", "Team" in lines)
+        assertFalse("and no more-line either: $lines", lines.any { it.startsWith("+") })
+        assertEquals("the folded card with a two-line key label", 150.0, (t.let("cardHeight") as Num).v, 0.0)
+        val wrapped = Tile(feed(chat("aaaaaaaaaaaa", "Ana", text = "can you look at the invoice before the call?")), height = 254)
+        assertEquals("44 characters wrap once at 377 dp: 167 of the 174 dp under the head", 167.0, (wrapped.let("cardHeight") as Num).v, 0.0)
+        assertTrue((wrapped.let("below") as Num).v >= 167.0)
+    }
+
+    @Test fun aTallTileStacksTheKeysAndShowsTheDotsOnlyWhenTheyFit() {
+        val t = Tile(feed(ana, team), height = 384)
+        t.pin("aaaaaaaaaaaa")
+        val lines = t.tile()
+        assertEquals(listOf("1 On it.", "2 Yes.", "3 Later today."), keys(lines))
+        assertTrue("the meta line on its own: $lines", "chat · 12m ago" in lines)
+        assertTrue("two cards, 57 dp left under a 247 dp card: the dots show: $lines", "‹" in lines)
+        assertFalse("but 17 dp hold no row and no more-line: $lines", "Team" in lines || lines.any { it.startsWith("+") })
+        val long = Tile(feed(chat("aaaaaaaaaaaa", "Ana", text = "can you look at the invoice before the call with the client?"), team), height = 384)
+        long.pin("aaaaaaaaaaaa")
+        assertTrue("a 264 dp card leaves 40 dp: the dots just fit: ${long.tile()}", "‹" in long.tile())
+        val longer = Tile(feed(chat("aaaaaaaaaaaa", "Ana", text = "can you look at the invoice before the call with the client?").replace(replies, """[{"n": 1, "label": "On it, give me an hour."}, {"n": 2, "label": "Yes, go ahead with it."}, {"n": 3, "label": "Later today, after the call."}, {"n": 4, "label": "No."}]"""), team), height = 384)
+        longer.pin("aaaaaaaaaaaa")
+        assertFalse("four stacked keys leave none: no dots: ${longer.tile()}", "‹" in longer.tile())
+        val roomy = Tile(feed(ana, team, loose), height = 500)
+        roomy.pin("aaaaaaaaaaaa")
+        assertTrue("173 dp under the dots: two rows: ${roomy.tile()}", "Team" in roomy.tile() && "Bo" in roomy.tile())
+        val tight = Tile(feed(ana, team, loose, chat("gggggggggggg", "Dee")), height = 500)
+        tight.pin("aaaaaaaaaaaa")
+        assertTrue("three rows for six slots… no: 133 dp hold four slots; three rows fit, no more-line: ${tight.tile()}", "Dee" in tight.tile() && tight.tile().none { it.startsWith("+") })
+    }
+
+    @Test fun onAShortTileSgsAnswerTakesThePlaceOfTheirLastLine() {
+        val t = Tile(feed(ana), height = 254)
+        t.pin("aaaaaaaaaaaa")
+        t.write(t.slot("said"), Str("sg refused it"))
+        t.write(t.slot("saidFor"), Str("aaaaaaaaaaaa"))
+        val lines = t.tile()
+        assertTrue("$lines", "sg refused it" in lines)
+        assertFalse("their line gives way: $lines", "can you look?" in lines)
+        val tall = Tile(feed(ana), height = 400)
+        tall.pin("aaaaaaaaaaaa")
+        tall.write(tall.slot("said"), Str("sg refused it"))
+        tall.write(tall.slot("saidFor"), Str("aaaaaaaaaaaa"))
+        assertTrue("a tall tile shows both: ${tall.tile()}", "sg refused it" in tall.tile() && "can you look?" in tall.tile())
+        // He swiped on: the answer is about a card that is not the one shown.
+        val away = Tile(feed(ana, team), height = 254)
+        away.pin("bbbbbbbbbbbb")
+        away.write(away.slot("said"), Str("sg refused it"))
+        away.write(away.slot("saidFor"), Str("aaaaaaaaaaaa"))
+        assertFalse("a short tile keeps its headline to the count: ${away.tile()}", "sg refused it" in away.tile())
+        assertTrue("its screen says it under the headline: ${away.screen()}", "sg refused it" in away.screen())
+        val awayTall = Tile(feed(ana, team), height = 400)
+        awayTall.pin("bbbbbbbbbbbb")
+        awayTall.write(awayTall.slot("said"), Str("sg refused it"))
+        awayTall.write(awayTall.slot("saidFor"), Str("aaaaaaaaaaaa"))
+        assertTrue("a tall tile says it under the headline: ${awayTall.tile()}", "sg refused it" in awayTall.tile())
     }
 
     @Test fun aPinnedCardSendsTheChatsKeyTheNumberAndTheLabelOfTheReplyTapped() {
@@ -207,7 +275,7 @@ class OrmusCommsTileTest {
         val lines = t.tile()
         assertTrue("a group, how long ago: $lines", "group · 12m ago" in lines)
         assertEquals(listOf("1 On it, give me an hour.", "2 Yes, go ahead with it.", "3 Later today, after the call."), keys(lines))
-        assertEquals("the stack of three", 266.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("the stack of three", 247.0, (t.let("cardHeight") as Num).v, 0.0)
         assertTrue("a group with no link opens by its id", t.taps(program.root).any { it.startsWith("androidIntent") && it.contains("com.whatsapp.Conversation") && it.contains("g1@g.us") })
     }
 
