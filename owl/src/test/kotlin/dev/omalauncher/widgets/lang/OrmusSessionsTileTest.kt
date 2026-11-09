@@ -258,4 +258,25 @@ class OrmusSessionsTileTest {
         assertTrue("$lines", "open in Mercurio" in lines)
         assertEquals(emptyList<String>(), keys(lines))
     }
+
+    /** The chats are the comms tile's: a chat that waits, in a project or loose, is nowhere on this tile or its screen. */
+    @Test fun theTileShowsNoChatsTheyAreTheCommsTiles() {
+        val chat = """{"name": "Ana", "group": false, "waiting": true, "mine": false, "age_min": 5, "text": "can you look?", "open": {"url": "https://wa.me/5550002"}, "k": "aaaaaaaaaaaa"}"""
+        val f =
+            Json.parse(
+                """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": {"sg": "ok"}, "errors": {}, "needs": 0,
+                "agents": {"blocked": 0, "working": 1, "done": 0, "idle": 0}, "waiting": 2, "unsorted": [$chat],
+                "links": {"sg": "ssh://ormus@sg:22#sg"}, "hosts": {"sg": ["sg"]}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+                "boards": [{"name": "raven", "agents": {"blocked": 0, "working": 1, "done": 0, "idle": 0}, "waiting": 1,
+                  "projects": [{"name": "CUSTOMER PORTALS", "agents": {"blocked": 0, "working": 1, "done": 0, "idle": 0}, "chats": [$chat],
+                    "top": [{"kind": "claude", "status": "working", "title": "the portal's invoices", "tab": "", "machine": "sg", "session": "raven", "pane": "w1:p1", "seq": 1}]}]}]}}""",
+            )
+        val t = Tile(f)
+        val tile = t.tile()
+        val screen = t.screen()
+        assertTrue("the agent at work is a row: $tile", tile.any { "the portal's invoices" in it })
+        assertFalse("no chat on the tile: $tile", tile.any { "Ana" in it || "can you look?" in it || "chats wait" in it })
+        assertFalse("no chat on the screen: $screen", screen.any { "Ana" in it || "can you look?" in it || "WAITS ON YOU" in it })
+        assertTrue("the counts are the agents' alone: $tile", "1 working · 0 done" in tile)
+    }
 }

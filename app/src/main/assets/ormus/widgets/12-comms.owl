@@ -9,6 +9,9 @@ widget "comms" {
 
   // Built on sg (ormus-feeds), where the chat registry, his reply texts and the Periskope key live. The phone only
   // reads the result over the tailnet and names a chat by `k` (the feed's short hash) and a reply by its number.
+  // `only` is "" for every workboard's chats, or one workboard's name: then the tile shows that board's chats alone
+  // (the board comms tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh).
+  let only = ""
   source f = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 60s json timeout 20s status
   source now = clock every 1m
 
@@ -54,14 +57,15 @@ widget "comms" {
   }
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
-  let boards = data != null ? data.boards : []
+  let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
   // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
   let stale = data != null && now != null && data.generated != null && now - data.generated > 180
   let failed = data != null ? keys(data.errors ?? {}) : []
 
-  // Every project's chat with where it lives, then the chats with no project (they wait on him by definition).
+  // Every project's chat with where it lives, then the chats with no project (they wait on him by definition). A
+  // chat with no project belongs to no workboard: only the tile of every workboard shows them.
   let chats = flatten(boards.map(b => flatten((b.projects ?? []).map(p => (p.chats ?? []).map(c => merge(c, {board: b.name, project: p.name}))))))
-  let loose = data != null ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: ""})) : []
+  let loose = data != null && only == "" ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: ""})) : []
   let everyone = flatten([chats, loose])
 
   // The cards: every chat that waits on him, by project as the feed orders them, then the ones with no project; a
@@ -393,7 +397,7 @@ widget "comms" {
     gap: 6
     Row {
       align: center
-      Text { text: "comms"; style: muted; weight: 1 }
+      Text { text: only == "" ? "comms" : "${only} chats"; style: muted; weight: 1 }
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; fontSize: 12; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if data != null {
@@ -411,7 +415,7 @@ widget "comms" {
   }
 
   screen {
-    title: "comms"
+    title: only == "" ? "comms" : "${only} chats"
     Column {
       scroll: true
       gap: 12

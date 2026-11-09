@@ -17,6 +17,7 @@ class OrmusCommsTileTest {
         f: Value,
         private val height: Int? = 400,
         private val width: Int? = 360,
+        private val program: Program = this@OrmusCommsTileTest.program,
     ) : Host {
         private val slots = Array<Value>(program.globals.size) { Null }
 
@@ -551,5 +552,30 @@ class OrmusCommsTileTest {
         assertTrue("$lines", "1 chat waits" in lines)
         assertFalse("no row under the card for the same chat: $lines", "1 of 3" in lines || "1 of 2" in lines)
         assertEquals(1, (t.let("cards") as Lst).items.size)
+    }
+
+    /** A board comms tile (13-comms-raven.owl, the comms tile with `only`): its board's chats alone, no loose ones, its name. */
+    @Test fun aBoardCommsTileShowsItsBoardsChatsAloneAndNoLooseOnes() {
+        val raven = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/13-comms-raven.owl").readText())
+        val two =
+            Json.parse(
+                """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": {"sg": "ok"}, "errors": {}, "needs": 0,
+                "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "waiting": 3, "unsorted": [$loose],
+                "links": {}, "hosts": {}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+                "boards": [{"name": "raven", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "waiting": 1,
+                  "projects": [{"name": "CUSTOMER PORTALS", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "top": [], "chats": [$ana]}]},
+                 {"name": "ormus", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "waiting": 1,
+                  "projects": [{"name": "WEBSITE", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "top": [], "chats": [$team]}]}]}}""",
+            )
+        val all = Tile(two)
+        assertTrue("the tile of every workboard counts the three: ${all.tile()}", "3 chats wait" in all.tile() && "comms" in all.tile())
+        assertTrue("and its screen has the loose one: ${all.screen()}", "Bo: hola" in all.screen())
+        val board = Tile(two, program = raven)
+        val tile = board.lines(raven.root)
+        val screen = board.lines(raven.screen!!)
+        assertTrue("the board's chat alone, counted alone: $tile", "1 chat waits" in tile && "Ana" in tile && "raven chats" in tile)
+        assertFalse("not the other board's: $tile $screen", "Team" in tile || "Team" in screen || "deploy tonight?" in screen)
+        assertFalse("not the loose one: $tile $screen", "Bo" in tile || "Bo: hola" in screen || "WAITS ON YOU, NO PROJECT" in screen)
+        assertTrue("the screen lists the board's project and chat: $screen", "RAVEN" in screen && "Ana: can you look?" in screen)
     }
 }

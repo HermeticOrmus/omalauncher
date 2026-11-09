@@ -1,10 +1,10 @@
-widget "board-ormus" {
+widget "sessions-ormus" {
   page: 201
   order: 0
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 13; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the chats that wait and the agents at work; the tile's screen has every workboard, project, agent and chat with the whole question and command. Tap a chat to open it in WhatsApp. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "2.1"; license: "MIT"; category: "productivity" }
+  meta { owl: 13; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -63,18 +63,14 @@ widget "board-ormus" {
   let down = data != null ? keys(data.machines ?? {}).filter(m => data.machines[m] != "ok") : []
   let failed = data != null ? keys(data.errors ?? {}) : []
 
-  // Every agent and every project chat, each with where it lives.
-  let agents = flatten(boards.map(b => flatten(b.projects.map(p => p.top.map(a => merge(a, {board: b.name, project: p.name, row: "agent"}))))))
-  let chats = flatten(boards.map(b => flatten(b.projects.map(p => (p.chats ?? []).map(c => merge(c, {board: b.name, project: p.name, row: "chat"}))))))
-  // A chat with no project belongs to no workboard: only the tile of every workboard shows them.
-  let loose = data != null && only == "" ? (data.unsorted ?? []).map(c => merge(c, {board: "", project: "", row: "chat"})) : []
+  // Every agent, each with where it lives. The chats are the comms tile's: this tile is the builds.
+  let agents = flatten(boards.map(b => flatten(b.projects.map(p => p.top.map(a => merge(a, {board: b.name, project: p.name}))))))
   let needs = data == null ? 0 : only == "" ? data.needs : sum(boards.map(b => b.agents.blocked))
   let working = data == null ? 0 : only == "" ? data.agents.working : sum(boards.map(b => b.agents.working))
   let done = data == null ? 0 : only == "" ? data.agents.done : sum(boards.map(b => b.agents.done))
-  let waiting = data == null ? 0 : only == "" ? (data.waiting ?? 0) : sum(boards.map(b => b.waiting ?? 0))
   let game = data != null ? data.game : null
-  // Boards with something in them; a board with no agent and no chat stays out of the way.
-  let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0 || (b.waiting ?? 0) > 0)
+  // Boards with an agent in them; a board with none stays out of the way.
+  let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0)
 
   // The cards: every agent that needs him, one at a time: first the ones one tap can answer, then the ones whose
   // question the feed read but cannot answer from here, then the rest. `pick` is the card shown, by the agent's
@@ -97,8 +93,8 @@ widget "board-ormus" {
       pick = ids[0]
     }
   }
-  // What moves besides: the chats that wait on him, then the agents at work. The finished ones are on the screen.
-  let rows = flatten([chats.filter(c => c.waiting), agents.filter(a => a.status == "working")])
+  // What moves besides: the agents at work. The finished ones are on the screen.
+  let rows = agents.filter(a => a.status == "working")
   // Characters one line of a card's command holds at least (mono, 12 sp).
   let wide = floor(((tileWidth ?? 360) - 64) / 7.5)
   // The card's label: what the blockage is, in one line (the feed's `summary`, else the question); with no ask,
@@ -134,39 +130,17 @@ widget "board-ormus" {
     }
   }
 
-  component ChatLine(c, where, withText) {
-    Row {
-      gap: 8
-      align: center
-      padding: [0, 4]
-      Text { text: c.waiting ? "chat" : c.mine ? "you" : "quiet"; fontSize: 12; width: 66; maxLines: 1; color: c.waiting ? green : muted }
-      Text { text: withText && c.text != "" ? "${c.name}: ${c.text}" : c.name; fontSize: 14; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
-      Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
-      Age { m: c.age_min }
-    }
-  }
-
-  // One row that opens what it shows: an agent's chat in Mercurio, or a WhatsApp chat.
-  component Item(i, where, withText) {
+  // One row that opens the agent's chat in Mercurio.
+  component Item(i, where) {
     Box {
       onTap: {
-        if i.row == "agent" {
-          if mercurio != null && get(links, i.machine, null) != null {
-            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
-          } else {
-            androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
-          }
-        } else if i.open.url != null {
-          androidIntent({package: "com.whatsapp", action: "android.intent.action.VIEW", data: i.open.url})
+        if mercurio != null && get(links, i.machine, null) != null {
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
         } else {
-          androidIntent({package: "com.whatsapp", component: "com.whatsapp.Conversation", extras: {jid: i.open.jid}})
+          androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
-      if i.row == "agent" {
-        AgentLine { a: i; where: where }
-      } else {
-        ChatLine { c: i; where: where; withText: withText }
-      }
+      AgentLine { a: i; where: where }
     }
   }
 
@@ -374,7 +348,7 @@ widget "board-ormus" {
       if said != "" && busy == "" && saidFor != shownQ {
         Text { text: said; fontSize: 12; color: startsWith(said, "unlocked") ? green : red; maxLines: 1 }
       } else {
-        Text { text: "${working} working · ${done} done · ${waiting} chats wait${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
+        Text { text: "${working} working · ${done} done${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
       }
     }
   }
@@ -398,14 +372,14 @@ widget "board-ormus" {
       if only == "" && card == null {
         Row {
           gap: 12
-          // Per workboard: agents that need him plus chats that wait, green; the screen has the agents by board.
-          for b in live.filter(b => b.agents.blocked + (b.waiting ?? 0) > 0).take(5) key b.name {
-            Text { spans: [b.name, " ", {text: "${b.agents.blocked + (b.waiting ?? 0)}", color: green, bold: true}]; fontSize: 12; color: muted; maxLines: 1 }
+          // Per workboard: the agents that need him, green; the screen has the agents by board.
+          for b in live.filter(b => b.agents.blocked > 0).take(5) key b.name {
+            Text { spans: [b.name, " ", {text: "${b.agents.blocked}", color: green, bold: true}]; fontSize: 12; color: muted; bold: false; maxLines: 1 }
           }
         }
       }
-      for i in rows.take(room) key "${i.row}:${i.board}:${i.project}:${i.machine ?? ""}:${i.session ?? ""}:${i.pane ?? i.k ?? i.name}" {
-        Item { i: i; where: "${lower(i.project)}"; withText: false }
+      for i in rows.take(room) key "${i.board}:${i.project}:${i.machine}:${i.session}:${i.pane}" {
+        Item { i: i; where: "${lower(i.project)}" }
       }
       if len(rows) > room {
         Text { text: "+${len(rows) - room} more · ${only == "" ? "tap for every workboard" : "tap for all of ${only}"}"; fontSize: 12; color: muted; maxLines: 1 }
@@ -462,27 +436,15 @@ widget "board-ormus" {
               Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
               Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
             }
-            for p in b.projects.filter(p => len(p.top) > 0 || len(p.chats ?? []) > 0) key p.name {
+            for p in b.projects.filter(p => len(p.top) > 0) key p.name {
               Column {
                 gap: 2
                 padding: [0, 2]
                 Text { text: p.name; fontSize: 13; bold: true; color: muted }
                 for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
-                  Item { i: merge(a, {row: "agent", project: p.name}); where: "${a.kind} · ${a.machine}"; withText: true }
-                }
-                for c in p.chats ?? [] key c.k ?? c.name {
-                  Item { i: merge(c, {row: "chat"}); where: c.slot != null ? "priority ${c.slot}" : c.group ? "group" : ""; withText: true }
+                  Item { i: merge(a, {project: p.name}); where: "${a.kind} · ${a.machine}" }
                 }
               }
-            }
-          }
-        }
-        if len(loose) > 0 {
-          Column {
-            gap: 2
-            Text { text: "WAITS ON YOU, NO PROJECT"; style: label }
-            for c in loose key c.k ?? c.name {
-              Item { i: c; where: c.group ? "group" : ""; withText: true }
             }
           }
         }

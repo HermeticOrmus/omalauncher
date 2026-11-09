@@ -46,17 +46,22 @@ class OrmusWidgetsTest {
         for ((st, sha) in listOf("get" to Null, "update" to Null, "current" to Str(h), "on phone" to Str(h))) assertEquals("$st without install", listOf("url https://sg.tailb43a3a.ts.net/pass/"), tap(st, sha))
     }
 
-    /** The board tiles are the sessions tile with three lines changed (scripts/ormus-board-tiles.sh); one edited by hand drifts from it. */
-    @Test fun boardTilesAreTheSessionsTileWithThreeLinesChanged() {
+    /**
+     * Each workboard space mirrors now: the board tiles are the sessions tile and the board comms tiles the comms tile, each
+     * with three lines changed (scripts/ormus-board-tiles.sh); one edited by hand drifts from its source.
+     */
+    @Test fun boardTilesAreTheSessionsAndCommsTilesWithThreeLinesChanged() {
         val dir = java.io.File("../app/src/main/assets/ormus/widgets")
-        val lines = java.io.File(dir, "10-sessions.owl").readText().split("\n")
         val boards = listOf("raven" to 101, "ormus" to 201, "alqvimia" to 301, "clients" to 401)
-        assertEquals("every board tile is one the script writes", boards.map { "11-board-${it.first}.owl" }.toSet(), dir.listFiles().orEmpty().map { it.name }.filter { it.startsWith("11-board-") }.toSet())
-        for ((board, page) in boards) {
-            val swaps = mapOf("widget \"sessions\" {" to "widget \"board-$board\" {", "  page: 1" to "  page: $page", "  let only = \"\"" to "  let only = \"$board\"")
-            for (from in swaps.keys) assertEquals("$from once in 10-sessions.owl", 1, lines.count { it == from })
-            val expected = lines.joinToString("\n") { swaps[it] ?: it }
-            assertEquals("11-board-$board.owl is 10-sessions.owl with three lines changed", expected, java.io.File(dir, "11-board-$board.owl").readText())
+        for ((source, name, prefix) in listOf(Triple("10-sessions.owl", "sessions", "11-board"), Triple("12-comms.owl", "comms", "13-comms"))) {
+            val lines = java.io.File(dir, source).readText().split("\n")
+            assertEquals("every $prefix tile is one the script writes", boards.map { "$prefix-${it.first}.owl" }.toSet(), dir.listFiles().orEmpty().map { it.name }.filter { it.startsWith("$prefix-") }.toSet())
+            for ((board, page) in boards) {
+                val swaps = mapOf("widget \"$name\" {" to "widget \"$name-$board\" {", "  page: 1" to "  page: $page", "  let only = \"\"" to "  let only = \"$board\"")
+                for (from in swaps.keys) assertEquals("$from once in $source", 1, lines.count { it == from })
+                val expected = lines.joinToString("\n") { swaps[it] ?: it }
+                assertEquals("$prefix-$board.owl is $source with three lines changed", expected, java.io.File(dir, "$prefix-$board.owl").readText())
+            }
         }
     }
 }
