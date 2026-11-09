@@ -17,6 +17,7 @@ class OrmusSessionsTileTest {
         f: Value,
         private val height: Int? = 600,
         private val width: Int? = 360,
+        private val program: Program = this@OrmusSessionsTileTest.program,
     ) : Host {
         private val slots = Array<Value>(program.globals.size) { Null }
 
@@ -189,7 +190,7 @@ class OrmusSessionsTileTest {
         assertTrue("two keys, so the pin key names two: $lines", "show 1 · 2" in lines)
         assertFalse("no key shows before the card is pinned: $lines", "1 Yes" in lines)
         assertFalse("the tile's card shows no command: $lines", lines.any { it.startsWith("rm -rf build/") })
-        assertEquals("one line of label, two keys side by side", 215.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one line of label, two keys side by side", 126.0, (t.let("cardHeight") as Num).v, 0.0)
     }
 
     @Test fun anApprovalWhoseSummaryIsTheAgentsOwnLineShowsTheCommandsFirstLineOnTheTile() {
@@ -197,7 +198,7 @@ class OrmusSessionsTileTest {
         val lines = t.tile()
         assertTrue("the agent's line is the label: $lines", "Bash command: clean the build" in lines)
         assertTrue("the first line of the command, marked as not all of it: $lines", "rm -rf build/ …" in lines)
-        assertEquals("one line of label, the command's line, two keys side by side", 231.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one line of label, the command's line, two keys side by side", 142.0, (t.let("cardHeight") as Num).v, 0.0)
         val screen = t.screen()
         assertTrue("the screen shows the whole command: $screen", "rm -rf build/\nmake all" in screen)
         assertFalse("and not its first line twice: $screen", "rm -rf build/ …" in screen)
@@ -234,7 +235,7 @@ class OrmusSessionsTileTest {
         val t = Tile(feed(pick))
         t.pin("sg:raven:w4:p2")
         assertEquals(listOf("1 Moonlight", "2 Quicksilver", "3 Aurum"), keys(t.tile()))
-        assertEquals("the stack of three", 314.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("the stack of three", 220.0, (t.let("cardHeight") as Num).v, 0.0)
         assertEquals(listOf("1 Moonlight", "2 Quicksilver", "3 Aurum", "4 Something else"), keys(t.screen()))
         val sent = t.taps(program.screen!!).first { it.startsWith("run ") }
         assertTrue("the screen's key sends the dialog's own key: $sent", sent.contains("\"key\":\"1\""))
@@ -244,11 +245,72 @@ class OrmusSessionsTileTest {
         assertTrue("three on the tile", "show 1 · 2 · 3" in unpinned.tile())
     }
 
-    @Test fun aLabelOfTwoLinesTakesItsRoomFromTheRowsUnderTheCard() {
+    @Test fun aLabelOfTwoLinesTakesItsRoomFromTheRowsUnderTheCardAndTheKeysStackOnlyOncePinned() {
         val short = Tile(feed(prompt("the merge word")))
         val long = Tile(feed(prompt("the merge word for the Corvin site PRs")))
-        assertEquals(314.0, (short.let("cardHeight") as Num).v, 0.0)
-        assertEquals("a second line of label at 17 sp is 22 dp", 336.0, (long.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one row of keys before the pin, whatever the labels", 126.0, (short.let("cardHeight") as Num).v, 0.0)
+        assertEquals("a second line of label at 17 sp is 22 dp", 148.0, (long.let("cardHeight") as Num).v, 0.0)
+        short.pin("sg:raven:w4:p3")
+        long.pin("sg:raven:w4:p3")
+        assertEquals("pinned, three labels too long for one row stack: 79 + 3 × 47", 220.0, (short.let("cardHeight") as Num).v, 0.0)
+        assertEquals(242.0, (long.let("cardHeight") as Num).v, 0.0)
+    }
+
+    /**
+     * Measured on the emulator (420 dpi, font scale 1) on 2026-11-08: a 6x6 tile is 384 dp tall and 377 wide inside its
+     * border (`tileHeight`, `tileWidth`), its title and headline 81 dp, the card with a two-line label and its pin key
+     * 148 dp, the same card pinned with its three keys stacked 242 dp; a row of an agent at work 24 dp. The agents at work
+     * have room under the card either way; the build before counted the unpinned card as a stack and hid them.
+     */
+    @Test fun theAgentsAtWorkShowUnderACardOnASixBySixTile() {
+        val blocked = prompt("Approve the deploy of the portal fix?")
+        val working = """{"kind": "claude", "status": "working", "title": "RAV-4031", "tab": "5 · RAV-4031", "machine": "sg", "session": "raven", "pane": "w4:p2", "seq": 102, "term": "term_t", "ask": null}"""
+        val one =
+            Json.parse(
+                """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": {"sg": "ok"}, "errors": {}, "needs": 1,
+                "agents": {"blocked": 1, "working": 1, "done": 0, "idle": 0}, "waiting": 0, "unsorted": [],
+                "links": {}, "hosts": {}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+                "boards": [{"name": "raven", "agents": {"blocked": 1, "working": 1, "done": 0, "idle": 0}, "waiting": 0,
+                  "projects": [{"name": "CUSTOMER PORTALS", "agents": {"blocked": 1, "working": 1, "done": 0, "idle": 0}, "chats": [], "top": [$blocked, $working]}]}]}}""",
+            )
+        val t = Tile(one, height = 384, width = 377)
+        assertEquals("two lines of label, the pin key", 148.0, (t.let("cardHeight") as Num).v, 0.0)
+        val lines = t.tile()
+        assertTrue("$lines", "1 need you" in lines && "1 working · 0 done" in lines)
+        assertTrue("the agent at work has its row: $lines", "RAV-4031" in lines)
+        assertFalse("and is not folded into a count: $lines", lines.any { it.startsWith("+1 more") })
+        val pinned = Tile(one, height = 384, width = 377)
+        pinned.pin("sg:raven:w4:p3")
+        assertEquals("the stack of three under two lines", 242.0, (pinned.let("cardHeight") as Num).v, 0.0)
+        assertTrue("the row still fits under the stack: ${pinned.tile()}", "RAV-4031" in pinned.tile())
+    }
+
+    /** A board copy (11-board-raven.owl, this tile with `only`): its board's agents alone, its own count, its name. */
+    @Test fun aBoardCopyShowsItsBoardsAgentsAloneAndSaysWhenTheFeedHasNoSuchBoard() {
+        val raven = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/11-board-raven.owl").readText())
+        fun board(name: String, project: String, agent: String) =
+            """{"name": "$name", "agents": {"blocked": 1, "working": 0, "done": 0, "idle": 0}, "waiting": 0,
+               "projects": [{"name": "$project", "agents": {"blocked": 1, "working": 0, "done": 0, "idle": 0}, "chats": [], "top": [$agent]}]}"""
+        fun feedOf(vararg boards: String) =
+            Json.parse(
+                """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": {"sg": "ok"}, "errors": {}, "needs": ${boards.size},
+                "agents": {"blocked": ${boards.size}, "working": 0, "done": 0, "idle": 0}, "waiting": 0, "unsorted": [],
+                "links": {}, "hosts": {}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+                "boards": [${boards.joinToString(",")}]}}""",
+            )
+        val two = feedOf(board("raven", "CUSTOMER PORTALS", prompt("the merge word")), board("clients", "OA", approval()))
+        val all = Tile(two)
+        assertTrue("the tile of every workboard counts both: ${all.tile()}", "2 need you" in all.tile() && "sessions" in all.tile())
+        val copy = Tile(two, program = raven)
+        assertEquals("raven", (copy.let("only") as Str).v)
+        val tile = copy.lines(raven.root)
+        val screen = copy.lines(raven.screen!!)
+        assertTrue("its board's agent alone, counted alone: $tile", "1 need you" in tile && "the merge word" in tile && "raven" in tile)
+        assertFalse("not the other board's: $tile $screen", "Bash command: rm -rf build/" in tile || "Bash command: rm -rf build/" in screen || "OA" in screen)
+        assertTrue("the screen lists the board's project: $screen", "CUSTOMER PORTALS" in screen)
+        val gone = Tile(feedOf(board("clients", "OA", approval())), program = raven)
+        assertTrue("a feed without the board says so on the tile: ${gone.lines(raven.root)}", "no raven board in the feed" in gone.lines(raven.root))
+        assertTrue("and on the screen: ${gone.lines(raven.screen!!)}", "no raven board in the feed" in gone.lines(raven.screen!!))
     }
 
     @Test fun aCardWithNoAskOpensTheAgent() {

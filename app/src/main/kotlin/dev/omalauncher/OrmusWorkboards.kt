@@ -6,8 +6,10 @@ import dev.omalauncher.widgets.Cell
  * Omalauncher Ormus: home's spaces went from areas of life (now, money, work, mind, world) to workboards (now, raven,
  * ormus, alqvimia, clients, mercury, more: [Ormus.SPACES]). A home laid out under the old names is moved over once, at
  * the first start of a build with the new ones (the widget engine's migrateWorkboards): every kept tile keeps its size
- * and its page mates, the tiles of money and the world and the communications tile leave the home (their files stay,
- * in widgets/.removed; the comms tile is the chats' place now), and each workboard space starts with its board tile. Pure: [plan] says where everything goes; the engine moves it.
+ * and its page mates, the tiles of money and the world leave the home (their files stay, in widgets/.removed), the
+ * communications tile goes to more (the comms tile is the chats' place now, but its email drafts show nowhere else), and
+ * each workboard space starts with its board tile and, under it, its comms copy. Pure: [plan] says where everything
+ * goes; the engine moves it.
  */
 object OrmusWorkboards {
     /** The marker file in widgets/ once the move is done; a build that changes the spaces again takes another name. */
@@ -27,21 +29,25 @@ object OrmusWorkboards {
     val BOARDS = linkedMapOf("raven" to "11-board-raven.owl", "ormus" to "11-board-ormus.owl", "alqvimia" to "11-board-alqvimia.owl", "clients" to "11-board-clients.owl")
     const val BOARD_HEIGHT = 6
 
+    /**
+     * The comms copy under each board tile (scripts/ormus-board-tiles.sh writes both). A new build seeds it with no
+     * cell on its space's first page, which the old numbering would read as money's or work's: it is placed by name.
+     */
+    val COMMS = linkedMapOf("raven" to "13-comms-raven.owl", "ormus" to "13-comms-ormus.owl", "alqvimia" to "13-comms-alqvimia.owl", "clients" to "13-comms-clients.owl")
+    const val COMMS_HEIGHT = 4
+
     /** Where a widget goes, by its file; one not named here stays with its page's space when that is still one, else goes to more. */
     private val HOMES =
         mapOf(
             "45-kiosk.owl" to "mercury", "40-trainer.owl" to "mercury", "market-kingdompaulo-ai-stars.owl" to "mercury",
             "50-pass.owl" to "more", "70-fleet.owl" to "more", "80-today.owl" to "more", "05-sun.owl" to "more",
-            "75-raven.owl" to "raven",
-        ) + BOARDS.entries.associate { (space, file) -> file to space }
+            "75-raven.owl" to "raven", "15-waiting.owl" to "more",
+        ) + BOARDS.entries.associate { (space, file) -> file to space } + COMMS.entries.associate { (space, file) -> file to space }
 
-    /**
-     * Widgets that leave the home: money's face, owed, people, pipeline and markets, GitHub trending and the world's, and the
-     * communications tile (the comms tile under the sessions tile is where the chats that wait are now).
-     */
+    /** Widgets that leave the home: money's face, owed, people, pipeline and markets, GitHub trending and the world's. */
     private val LEAVE =
         setOf(
-            "15-waiting.owl", "55-money-face.owl", "60-owed.owl", "62-people.owl", "64-pipeline.owl", "90-markets.owl",
+            "55-money-face.owl", "60-owed.owl", "62-people.owl", "64-pipeline.owl", "90-markets.owl",
             "market-simonschubert-github-trending.owl", "market-simonschubert-picture-of-the-day.owl",
             "market-jdblackwell-spacex.owl", "market-simonschubert-earthquakes.owl",
         )
@@ -80,8 +86,9 @@ object OrmusWorkboards {
     /**
      * The move for [items], the tiles on home under the old spaces. A page's kept tiles that go to one space stay together,
      * moved up so the first starts at row 0, and stack under what is on their new page when they fit in [rows]; else they
-     * take the next page. Each workboard space keeps the first [BOARD_HEIGHT] rows of its first page for its board tile. A
-     * kept face takes the page left of its space's first. Nothing is lost but what leaves.
+     * take the next page. Each workboard space keeps the first [BOARD_HEIGHT] rows of its first page for its board tile and
+     * the [COMMS_HEIGHT] under them for its comms copy. A kept face takes the page left of its space's first. Nothing is
+     * lost but what leaves.
      */
     fun plan(
         items: List<Item>,
@@ -95,11 +102,13 @@ object OrmusWorkboards {
         val faces = HashMap<String, Int>() // space -> faces placed
         for ((space, file) in BOARDS) {
             val first = Ormus.firstPage(Ormus.SPACES.indexOf(space))
-            used[first] = BOARD_HEIGHT
+            used[first] = BOARD_HEIGHT + COMMS_HEIGHT
             last[space] = first
             if (items.any { it.widget && it.key == file }) moves += Move(file, first, Cell(0, 0, columns, BOARD_HEIGHT))
+            val comms = COMMS.getValue(space)
+            if (items.any { it.widget && it.key == comms }) moves += Move(comms, first, Cell(0, BOARD_HEIGHT, columns, COMMS_HEIGHT))
         }
-        val kept = items.filter { home(it) != null && it.key !in BOARDS.values }
+        val kept = items.filter { home(it) != null && it.key !in BOARDS.values && it.key !in COMMS.values }
         // Faces keep their order: the one nearest its space's first page stays nearest.
         for (face in kept.filter { it.face }.sortedByDescending { it.page }) {
             val space = home(face)!!
