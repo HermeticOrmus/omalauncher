@@ -32,7 +32,7 @@ widget "pipeline" {
     Row {
       align: center
       Text { text: pipe != null ? "pipeline · ${pipe.count} leads" : "pipeline"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.pipeline != null ? "leads unreadable" : cold ? "untouched ${floor((now - pipe.as_of) / 86400)}d" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.pipeline != null ? "leads unreadable" : cold ? "untouched ${floor((now - pipe.as_of) / 86400)}d" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
     }
     if pipe != null {
       Flow {

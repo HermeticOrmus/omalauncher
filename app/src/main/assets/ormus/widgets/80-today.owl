@@ -6,7 +6,7 @@ widget "today" {
 
   meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day."; version: "1.0"; license: "MIT"; category: "productivity" }
 
-  // Built on Sun (ormus-feeds) from his calendar and the Alqvimia API.
+  // Built on Sun (ormus-feeds), served as sg's copy from his calendar and the Alqvimia API.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
   source now = clock every 1m
 
@@ -27,7 +27,7 @@ widget "today" {
 
   Column {
     gap: 6
-    Text { text: data == null ? (f == null ? "today …" : "today · Sun doesn't answer") : "today · ${len(events)} ahead"; style: muted }
+    Text { text: data == null ? (f == null ? "today …" : "today · sg doesn't answer") : "today · ${len(events)} ahead"; style: muted }
     if data != null && len(events) == 0 {
       Text { text: "no meetings through tomorrow"; style: body; color: green }
     }

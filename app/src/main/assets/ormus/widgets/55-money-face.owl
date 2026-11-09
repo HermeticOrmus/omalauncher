@@ -4,7 +4,7 @@ face "money" {
 
   meta { owl: 13; description: "Money in one place: what's owed to you, the pipeline's follow-ups that are due, the people to be in touch with and the markets. Tap a row to open it."; version: "1.0"; license: "MIT"; category: "finance" }
 
-  // Built on Sun (ormus-feeds money and markets): the invoicer, the leads table, WhatsApp, Salamander.
+  // Built on Sun (ormus-feeds money and markets), served as sg's copy: the invoicer, the leads table, WhatsApp, Salamander.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
   source mk = http("https://sg.tailb43a3a.ts.net/feeds/markets.json") every 5m json timeout 20s status
   source now = clock every 1m
@@ -79,7 +79,7 @@ face "money" {
     Row {
       align: center
       Text { text: "money"; style: title; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
     }
 
     // What's owed: the invoicer's sent invoices, paid status as fresh as its last change.

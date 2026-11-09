@@ -6,7 +6,7 @@ widget "fleet" {
 
   meta { owl: 8; description: "Ormus's machines up or down, and any loop or service that failed on Sun; tap a machine for a shell."; version: "1.0"; license: "MIT"; category: "system" }
 
-  // Built on Sun (ormus-feeds) from tailscale status, the loops' state and failed systemd units.
+  // Built on Sun (ormus-feeds), served as sg's copy from tailscale status, the loops' state and failed systemd units.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/fleet.json") every 1m json timeout 20s status
   source now = clock every 1m
 
@@ -24,7 +24,7 @@ widget "fleet" {
     Row {
       align: center
       Text { text: "fleet · ${len(machines) - len(down)}/${len(machines)} up"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || stale || len(failing) > 0 ? yellow : green; weight: 1; align: end }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || stale || len(failing) > 0 ? yellow : green; weight: 1; align: end }
     }
     Flow {
       gap: 6
