@@ -19,7 +19,10 @@ class OrmusWorkboardsTest {
         widget: Boolean = true,
     ) = Item(key, page, Cell(x, y, w, h), widget)
 
-    /** His home on 2026-11-06, under now, money, work, mind, world, plus the four board tiles as the new build seeds them. */
+    /**
+     * His home on 2026-11-06, under now, money, work, mind, world, plus the tiles the new build seeds with no cell: the
+     * comms tile on page 1 and, for each workboard, its board tile and its comms copy on the space's first page.
+     */
     private val his =
         listOf(
             tile("10-sessions.owl", 1, 0, 0, 6, 6), tile("45-kiosk.owl", 1, 0, 6, 6, 4),
@@ -36,6 +39,8 @@ class OrmusWorkboardsTest {
             tile("market-simonschubert-picture-of-the-day.owl", 401, 0, 0, 6, 7),
             tile("market-jdblackwell-spacex.owl", 402, 0, 0, 6, 4), tile("market-simonschubert-earthquakes.owl", 402, 0, 4, 6, 6),
             Item("11-board-raven.owl", 101, null), Item("11-board-ormus.owl", 201, null), Item("11-board-alqvimia.owl", 301, null), Item("11-board-clients.owl", 401, null),
+            Item("12-comms.owl", 1, null),
+            Item("13-comms-raven.owl", 101, null), Item("13-comms-ormus.owl", 201, null), Item("13-comms-alqvimia.owl", 301, null), Item("13-comms-clients.owl", 401, null),
         )
 
     @Test fun hisHomeMovesByWorkboardAndNothingIsLostButWhatLeaves() {
@@ -43,25 +48,29 @@ class OrmusWorkboardsTest {
         val expected =
             setOf(
                 // now keeps its three pages, the kiosk, today and the communications tile gone from them; the rows close up.
-                Move("10-sessions.owl", 1, Cell(0, 0, 6, 6)),
+                // The comms tile has no cell yet: it takes the first free spot under the sessions tile.
+                Move("10-sessions.owl", 1, Cell(0, 0, 6, 6)), Move("12-comms.owl", 1, null),
                 Move("30-mercurio.owl", 2, Cell(0, 0, 6, 5)),
                 Move("20-notifications.owl", 3, Cell(0, 0, 6, 4)), Move("16-projects.owl", 3, Cell(0, 4, 6, 4)),
-                // each workboard's board tile on its first page; raven's old tile does not fit under it.
-                Move("11-board-raven.owl", 101, Cell(0, 0, 6, 6)), Move("75-raven.owl", 102, Cell(0, 0, 6, 7)),
-                Move("11-board-ormus.owl", 201, Cell(0, 0, 6, 6)), Move("11-board-alqvimia.owl", 301, Cell(0, 0, 6, 6)), Move("11-board-clients.owl", 401, Cell(0, 0, 6, 6)),
+                // each workboard's board tile on its first page with its comms copy under it; raven's old tile takes the next.
+                Move("11-board-raven.owl", 101, Cell(0, 0, 6, 6)), Move("13-comms-raven.owl", 101, Cell(0, 6, 6, 4)), Move("75-raven.owl", 102, Cell(0, 0, 6, 7)),
+                Move("11-board-ormus.owl", 201, Cell(0, 0, 6, 6)), Move("13-comms-ormus.owl", 201, Cell(0, 6, 6, 4)),
+                Move("11-board-alqvimia.owl", 301, Cell(0, 0, 6, 6)), Move("13-comms-alqvimia.owl", 301, Cell(0, 6, 6, 4)),
+                Move("11-board-clients.owl", 401, Cell(0, 0, 6, 6)), Move("13-comms-clients.owl", 401, Cell(0, 6, 6, 4)),
                 // mercury: the kiosk and the trainer share a page (4 + 6 rows), AI stars take the next.
                 Move("45-kiosk.owl", 501, Cell(0, 0, 6, 4)), Move("40-trainer.owl", 501, Cell(0, 4, 6, 6)),
                 Move("market-kingdompaulo-ai-stars.owl", 502, Cell(0, 0, 6, 5)),
-                // more: today, then the work page's tiles under it, together as they were.
-                Move("80-today.owl", 601, Cell(0, 0, 6, 2)),
-                Move("50-pass.owl", 601, Cell(0, 2, 6, 3)), Move("70-fleet.owl", 601, Cell(0, 5, 6, 3)), Move("05-sun.owl", 601, Cell(0, 8, 4, 1)),
-                Move("app:one", 601, Cell(4, 8, 1, 1)), Move("app:two", 601, Cell(5, 8, 1, 1)),
+                // more: the communications tile (its email drafts show nowhere else), today under it, and the work page's
+                // tiles together as they were on the next page.
+                Move("15-waiting.owl", 601, Cell(0, 0, 6, 5)), Move("80-today.owl", 601, Cell(0, 5, 6, 2)),
+                Move("50-pass.owl", 602, Cell(0, 0, 6, 3)), Move("70-fleet.owl", 602, Cell(0, 3, 6, 3)), Move("05-sun.owl", 602, Cell(0, 6, 4, 1)),
+                Move("app:one", 602, Cell(4, 6, 1, 1)), Move("app:two", 602, Cell(5, 6, 1, 1)),
             )
         assertEquals(expected, plan.moves.toSet())
         assertEquals(expected.size, plan.moves.size)
         assertEquals(
             setOf(
-                "15-waiting.owl", "55-money-face.owl", "60-owed.owl", "90-markets.owl", "62-people.owl", "64-pipeline.owl",
+                "55-money-face.owl", "60-owed.owl", "90-markets.owl", "62-people.owl", "64-pipeline.owl",
                 "market-simonschubert-github-trending.owl", "market-simonschubert-picture-of-the-day.owl",
                 "market-jdblackwell-spacex.owl", "market-simonschubert-earthquakes.owl",
             ),
@@ -83,6 +92,8 @@ class OrmusWorkboardsTest {
         assertEquals("now", OrmusWorkboards.home(tile("app:x", 1, 0, 0, 1, 1, widget = false)))
         assertNull(OrmusWorkboards.home(tile("60-owed.owl", 1, 0, 0, 6, 4)))
         assertEquals("mercury", OrmusWorkboards.home(tile("45-kiosk.owl", 1, 0, 0, 6, 4)))
+        assertEquals("the communications tile keeps its email drafts, in more", "more", OrmusWorkboards.home(tile("15-waiting.owl", 2, 0, 5, 6, 5)))
+        assertEquals("raven", OrmusWorkboards.home(Item("13-comms-raven.owl", 101, null)))
     }
 
     @Test fun aGroupWithATileThatHasNoCellTakesAPageOfItsOwnAndAKeptFaceGoesLeftOfItsSpace() {
@@ -117,5 +128,8 @@ class OrmusWorkboardsTest {
     @Test fun anEmptyHomeMovesNothingAndTheBoardsStillHaveTheirPages() {
         assertEquals(OrmusWorkboards.Plan(emptyList(), emptyList()), OrmusWorkboards.plan(emptyList()))
         assertEquals(listOf(101, 201, 301, 401), OrmusWorkboards.BOARDS.keys.map { Ormus.firstPage(Ormus.SPACES.indexOf(it)) })
+        assertEquals("every workboard space has a board tile, and only those", Ormus.SPACES - setOf("now", "mercury", "more"), OrmusWorkboards.BOARDS.keys.toList())
+        assertEquals("and a comms copy", OrmusWorkboards.BOARDS.keys, OrmusWorkboards.COMMS.keys)
+        assertEquals("the board tile and its comms copy fill a page", OrmusWorkboards.ROWS, OrmusWorkboards.BOARD_HEIGHT + OrmusWorkboards.COMMS_HEIGHT)
     }
 }

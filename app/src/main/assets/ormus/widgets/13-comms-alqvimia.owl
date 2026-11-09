@@ -400,7 +400,10 @@ widget "comms-alqvimia" {
       Text { text: only == "" ? "comms" : "${only} chats"; style: muted; weight: 1 }
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : ""; fontSize: 12; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
-    if data != null {
+    if data != null && only != "" && len(boards) == 0 {
+      // The board is not in the feed (renamed, or its Herdr session gone): a broken mapping, not a quiet day.
+      Text { text: "no ${only} board in the feed"; style: body; color: red }
+    } else if data != null {
       Headline { compact: true }
       if card != null {
         Cards { compact: true }
@@ -422,6 +425,8 @@ widget "comms-alqvimia" {
       padding: [4, 8]
       if data == null {
         Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else if only != "" && len(boards) == 0 {
+        Text { text: "no ${only} board in the feed"; style: body; color: red }
       } else {
         Headline { compact: false }
         if card != null {

@@ -578,4 +578,25 @@ class OrmusCommsTileTest {
         assertFalse("not the loose one: $tile $screen", "Bo" in tile || "Bo: hola" in screen || "WAITS ON YOU, NO PROJECT" in screen)
         assertTrue("the screen lists the board's project and chat: $screen", "RAVEN" in screen && "Ana: can you look?" in screen)
     }
+
+    /** A board whose name the feed does not carry (renamed, or its Herdr session gone) is a broken mapping, not a quiet day. */
+    @Test fun aBoardCommsTileSaysWhenTheFeedHasNoSuchBoard() {
+        val raven = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/13-comms-raven.owl").readText())
+        val other =
+            Json.parse(
+                """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": {"sg": "ok"}, "errors": {}, "needs": 0,
+                "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "waiting": 1, "unsorted": [],
+                "links": {}, "hosts": {}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+                "boards": [{"name": "ormus", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "waiting": 1,
+                  "projects": [{"name": "WEBSITE", "agents": {"blocked": 0, "working": 0, "done": 0, "idle": 0}, "top": [], "chats": [$team]}]}]}}""",
+            )
+        val board = Tile(other, program = raven)
+        val tile = board.lines(raven.root)
+        val screen = board.lines(raven.screen!!)
+        assertTrue("the tile names the missing board: $tile", "no raven board in the feed" in tile)
+        assertFalse("and does not pass it off as a quiet day: $tile", "nobody waits" in tile)
+        assertTrue("so does the screen: $screen", "no raven board in the feed" in screen)
+        val all = Tile(other)
+        assertTrue("the tile of every workboard has no such state: ${all.tile()}", "1 chat waits" in all.tile())
+    }
 }
