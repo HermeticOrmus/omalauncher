@@ -8,6 +8,12 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- Two needs-you tiles, and a space that mirrors each workboard. The sessions tile is the builds:
+  the agent that needs him, the agents at work, every workboard's agents on its screen; the chats
+  left it for the comms tile. Each workboard space (raven, ormus, alqvimia, clients) opens on its
+  board tile and, under it, its own comms tile (`13-comms-<board>.owl`: the comms tile with `only`,
+  the board's chats alone; the loose chats stay on now's). The communications tile leaves the home
+  with the move to the workboards (its file stays in widgets/.removed; a fresh home puts it in more).
 - The feed tiles read sg, the host that is always on. The six feeds built on Sun (today, waiting,
   money, raven, markets, fleet) reach the phone as sg's copy (ormus-feeds `bin/mirror-feeds`): while
   Sun sleeps the copy stays and each tile shows its age, as before when Sun answered late. The

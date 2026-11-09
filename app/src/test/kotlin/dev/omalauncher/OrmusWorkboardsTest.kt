@@ -42,9 +42,9 @@ class OrmusWorkboardsTest {
         val plan = OrmusWorkboards.plan(his)
         val expected =
             setOf(
-                // now keeps its three pages, the kiosk and today gone from them; the rows close up.
+                // now keeps its three pages, the kiosk, today and the communications tile gone from them; the rows close up.
                 Move("10-sessions.owl", 1, Cell(0, 0, 6, 6)),
-                Move("30-mercurio.owl", 2, Cell(0, 0, 6, 5)), Move("15-waiting.owl", 2, Cell(0, 5, 6, 5)),
+                Move("30-mercurio.owl", 2, Cell(0, 0, 6, 5)),
                 Move("20-notifications.owl", 3, Cell(0, 0, 6, 4)), Move("16-projects.owl", 3, Cell(0, 4, 6, 4)),
                 // each workboard's board tile on its first page; raven's old tile does not fit under it.
                 Move("11-board-raven.owl", 101, Cell(0, 0, 6, 6)), Move("75-raven.owl", 102, Cell(0, 0, 6, 7)),
@@ -61,7 +61,7 @@ class OrmusWorkboardsTest {
         assertEquals(expected.size, plan.moves.size)
         assertEquals(
             setOf(
-                "55-money-face.owl", "60-owed.owl", "90-markets.owl", "62-people.owl", "64-pipeline.owl",
+                "15-waiting.owl", "55-money-face.owl", "60-owed.owl", "90-markets.owl", "62-people.owl", "64-pipeline.owl",
                 "market-simonschubert-github-trending.owl", "market-simonschubert-picture-of-the-day.owl",
                 "market-jdblackwell-spacex.owl", "market-simonschubert-earthquakes.owl",
             ),

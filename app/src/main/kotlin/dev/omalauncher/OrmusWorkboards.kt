@@ -6,8 +6,8 @@ import dev.omalauncher.widgets.Cell
  * Omalauncher Ormus: home's spaces went from areas of life (now, money, work, mind, world) to workboards (now, raven,
  * ormus, alqvimia, clients, mercury, more: [Ormus.SPACES]). A home laid out under the old names is moved over once, at
  * the first start of a build with the new ones (the widget engine's migrateWorkboards): every kept tile keeps its size
- * and its page mates, the tiles of money and the world leave the home (their files stay, in widgets/.removed), and each
- * workboard space starts with its board tile. Pure: [plan] says where everything goes; the engine moves it.
+ * and its page mates, the tiles of money and the world and the communications tile leave the home (their files stay,
+ * in widgets/.removed; the comms tile is the chats' place now), and each workboard space starts with its board tile. Pure: [plan] says where everything goes; the engine moves it.
  */
 object OrmusWorkboards {
     /** The marker file in widgets/ once the move is done; a build that changes the spaces again takes another name. */
@@ -35,10 +35,13 @@ object OrmusWorkboards {
             "75-raven.owl" to "raven",
         ) + BOARDS.entries.associate { (space, file) -> file to space }
 
-    /** Widgets that leave the home: money's face, owed, people, pipeline and markets, GitHub trending and the world's. */
+    /**
+     * Widgets that leave the home: money's face, owed, people, pipeline and markets, GitHub trending and the world's, and the
+     * communications tile (the comms tile under the sessions tile is where the chats that wait are now).
+     */
     private val LEAVE =
         setOf(
-            "55-money-face.owl", "60-owed.owl", "62-people.owl", "64-pipeline.owl", "90-markets.owl",
+            "15-waiting.owl", "55-money-face.owl", "60-owed.owl", "62-people.owl", "64-pipeline.owl", "90-markets.owl",
             "market-simonschubert-github-trending.owl", "market-simonschubert-picture-of-the-day.owl",
             "market-jdblackwell-spacex.owl", "market-simonschubert-earthquakes.owl",
         )
