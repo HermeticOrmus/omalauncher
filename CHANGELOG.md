@@ -8,10 +8,11 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
-- Every feed tile reads sg, the host that is always on: the six feeds built on Sun (today,
-  waiting, money, raven, markets, fleet) reach the phone as sg's copy (ormus-feeds `bin/mirror-feeds`),
-  so a tile goes stale with its age shown instead of failing while Sun sleeps. The trainer's decks
-  still come from Sun. The notification scorer's default context names nobody: the file on the phone
+- The feed tiles read sg, the host that is always on. The six feeds built on Sun (today, waiting,
+  money, raven, markets, fleet) reach the phone as sg's copy (ormus-feeds `bin/mirror-feeds`): while
+  Sun sleeps the copy stays and each tile shows its age, as before when Sun answered late. The
+  trainer's decks still come from Sun.
+- The notification scorer's default context names nobody: the file on the phone
   (`~/.config/notif-score/context.md`) is where the people and what matters are written.
 - Installs beside the Play build as dev.omalauncher.ormus, "Omalauncher Ormus", with
   the Aurum theme, Grok and the Sun bridge preloaded.

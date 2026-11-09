@@ -6,7 +6,7 @@ widget "communications" {
 
   meta { owl: 8; description: "People waiting on Ormus: WhatsApp chats whose last word is theirs and email drafts waiting for Send. Newest first, the last 30 days; tap one to open it. Projects has the reviews and decisions."; version: "2.0"; license: "MIT"; category: "productivity" }
 
-  // Built on Sun (ormus-feeds), where the keys live; the phone only reads the result over the tailnet.
+  // Built on Sun (ormus-feeds), served as sg's copy, where the keys live; the phone only reads the result over the tailnet.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/waiting.json") every 2m json timeout 20s status
   source now = clock every 1m
 
@@ -16,7 +16,7 @@ widget "communications" {
   let items = all.filter(i => i.age_min < 43200)
   let older = len(all) - len(items)
   let failed = data != null ? keys(data.errors ?? {}).filter(k => k == "whatsapp" || k == "email") : []
-  // Sun off: say how old the list is instead of passing it off as live.
+  // sg off, or Sun behind it: say how old the list is instead of passing it off as live.
   let stale = data != null && now != null && now - data.generated > 600
   let room = max(2, floor(((tileHeight ?? 204) - 50) / 25))
 
@@ -36,7 +36,7 @@ widget "communications" {
     Row {
       align: center
       Text { text: "communications · ${len(items)}"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: !f.ok || stale || len(failed) > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: !f.ok || stale || len(failed) > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
     }
     if data != null && len(items) == 0 {
       Text { text: "nobody waits on you"; style: body; color: green }

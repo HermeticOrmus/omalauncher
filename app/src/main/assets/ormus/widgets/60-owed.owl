@@ -6,7 +6,7 @@ widget "owed" {
 
   meta { owl: 8; description: "Money owed to Ormus: invoices sent and not paid, from the invoicer on Sun, the latest due first. Tap one to message the client."; version: "1.0"; license: "MIT"; category: "finance" }
 
-  // Built on Sun (ormus-feeds money); paid status is only as fresh as the invoicer, so its date shows.
+  // Built on Sun (ormus-feeds money), served as sg's copy; paid status is only as fresh as the invoicer, so its date shows.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/money.json") every 5m json timeout 20s status
   source now = clock every 1m
 
@@ -32,7 +32,7 @@ widget "owed" {
     Row {
       align: center
       Text { text: "owed to you"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.owed != null ? "invoicer unreadable" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.owed != null ? "invoicer unreadable" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
     }
     if owed != null {
       Text { text: owed.total_text; fontSize: 30; bold: true; color: accent }

@@ -6,7 +6,7 @@ widget "raven" {
 
   meta { owl: 8; description: "Ormus's Raven Cargo work: how many RAV issues are in progress and in review, the ones waiting longest in review first, and whether the JTEKT portal answers and which deploy it runs. Tap an issue to open it in Linear."; version: "1.1"; license: "MIT"; category: "productivity" }
 
-  // Built on Sun (ormus-feeds raven) from Linear, the portal itself and Vercel.
+  // Built on Sun (ormus-feeds raven), served as sg's copy from Linear, the portal itself and Vercel.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/raven.json") every 3m json timeout 20s status
   source now = clock every 1m
 
@@ -34,7 +34,7 @@ widget "raven" {
     Row {
       align: center
       Text { text: lin != null ? "raven · ${lin.in_progress} doing · ${lin.in_review} review" : "raven"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "Sun doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null || data.errors.reviews != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || stale || data.errors.linear != null || data.errors.reviews != null ? yellow : muted; width: 120; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null || data.errors.reviews != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || stale || data.errors.linear != null || data.errors.reviews != null ? yellow : muted; width: 120; align: end; maxLines: 1 }
     }
     Row {
       gap: 8
