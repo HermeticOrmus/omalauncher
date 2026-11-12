@@ -19,7 +19,12 @@ widget "needs" {
   // read from the reply itself. The store checks everything again: a card closed elsewhere is a 409.
   state sentFor = ""
   state sent = null
-  let pending = sentFor != "" && sent == null
+  // When the key was pressed (clock seconds). A reply counts for two minutes: post() always replies within its
+  // timeout, but a tile stopped mid-request never writes one, and a key must not stay at "…" for good.
+  state sentTime = 0
+  let fresh = now == null || now - sentTime < 120
+  let pending = sentFor != "" && sent == null && fresh
+  let answered = sent != null && sent.ok
   on sent {
     if value != null && value.ok {
       haptic()
@@ -31,9 +36,6 @@ widget "needs" {
   // The store lists the open cards oldest first; the newest one is what he is likely being asked now.
   let cards = listed ? reverse(f.out.asks) : []
   let ids = cards.map(c => c.id)
-  let sentAt = indexOf(ids, sentFor)
-  // The answered card left the list (the store said answered, and the list came back without it).
-  let gone = sentFor != "" && (sentAt == null || sentAt < 0)
   // `pick` is the card shown, by its id, so a card keeps its place when the list changes under it. Only a picked card
   // has live keys: a refresh that puts another card in its place cannot take a tap meant for the one he read.
   state pick = ""
@@ -47,6 +49,9 @@ widget "needs" {
   when pick == "" && len(ids) > 0 {
     pick = ids[0]
   }
+  // A reply for a card not on screen (answered and gone, or swiped away) shows in the headline, for two minutes.
+  let away = sentFor != "" && (card == null || card.id != sentFor)
+  let headSaid = said != "" && away && fresh
 
   // What a card offers: one key per option (`keys`), or the cards page (`page`) for several picks, no options, or more
   // options than the tile holds. The kind alone picks the key row.
@@ -73,8 +78,11 @@ widget "needs" {
     Box {
       fill: width
       onTap: {
-        if !pending && pinned && c.id == pick {
+        // Only the card on screen, not one already answered, and only the label that card has at this place now.
+        let live = c.options ?? []
+        if !pending && pinned && c.id == pick && !(sentFor == c.id && answered) && n <= len(live) && live[n - 1].label == o.label {
           sentFor = c.id
+          sentTime = now ?? 0
           sent = null
           sent = post("https://sg.tailb43a3a.ts.net/needs/api/asks/${enc(c.id)}/answer", {choice: [o.label], via: "launcher"})
         }
@@ -101,7 +109,10 @@ widget "needs" {
       if (c.context ?? "") != "" {
         Text { text: c.context; fontSize: 13; color: muted; maxLines: 2 }
       }
-      if kind == "page" {
+      if sentFor == c.id && answered {
+        // The store took the answer; the card leaves with the next list.
+        Text { text: "answered"; fontSize: 13; color: green; maxLines: 1 }
+      } else if kind == "page" {
         Box {
           fill: width
           onTap: url("https://sg.tailb43a3a.ts.net/needs/")
@@ -129,8 +140,8 @@ widget "needs" {
           }
         }
       }
-      if said != "" && sentFor == c.id {
-        Text { text: said; fontSize: 13; color: sent.ok ? green : red; maxLines: 2 }
+      if said != "" && sentFor == c.id && !answered {
+        Text { text: said; fontSize: 13; color: red; maxLines: 2 }
       }
     }
   }
@@ -140,8 +151,8 @@ widget "needs" {
     Row {
       align: center
       Text { text: len(cards) > 0 ? "${len(cards)} need you" : "needs you"; fontSize: 15; bold: true; color: len(cards) > 0 ? accent : foreground; weight: 1; maxLines: 1 }
-      // An answer whose card already left the list says how it went here.
-      Text { text: said != "" && gone ? said : f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : ""; fontSize: 12; color: said != "" && gone ? (sent.ok ? green : red) : yellow; maxLines: 1 }
+      // A list that fails says so first; else how an answer for a card not on screen went.
+      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? green : red) : yellow; maxLines: 1 }
     }
     if card == null {
       Text { text: listed ? "nobody waits on you" : ""; fontSize: 15; color: green; maxLines: 1 }

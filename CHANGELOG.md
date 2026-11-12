@@ -8,13 +8,15 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
-- A Needs you tile beside Mercurio (`31-needs.owl`, page 2). It reads the open Needs you cards
-  from sg's store, the questions Claude sessions wait on, newest first, one at a time: the
-  question, its project and host, how old it is. One numbered key per option answers the card in
-  the store, marked `via: launcher`; a card with several picks, no options or more than four opens
-  the cards page instead. A card's keys are live only once it is picked, so a refresh cannot put
-  another card under his thumb. A closed card, a refused phone or sg down each say so on the tile.
-  A tap on the card opens Mercurio.
+- A Needs you tile beside Mercurio (`31-needs.owl`, page 2; on a page with no room, the first
+  free spot). It reads the open Needs you cards from sg's store, the questions Claude sessions
+  wait on, newest first, one at a time: the question, its project and host, how old it is. One
+  numbered key per option answers the card in the store, marked `via: launcher`; a card with
+  several picks, no options or more than four opens the cards page instead. Keys belong to the
+  picked card: the first one as the list comes in, then the one he swipes to or taps "show" on, so
+  a refresh cannot put another card under his thumb. An answered card shows no keys. A closed
+  card, a refused phone or sg down each say so on the tile; a reply for a card off screen shows in
+  the headline for two minutes. A tap on the card opens Mercurio.
 - Two needs-you tiles, and a space that mirrors each workboard. The sessions tile is the builds:
   the agent that needs him, the agents at work, every workboard's agents on its screen; the chats
   left it for the comms tile. Each workboard space (raven, ormus, alqvimia, clients) opens on its

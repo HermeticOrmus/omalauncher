@@ -31,18 +31,20 @@ class OrmusNeedsTileTest {
             slots[slot("apps")] = Json.parse("""[{"package": "solutions.ormus.logos.debug", "label": "Mercurio"}]""")
         }
 
-        /** Picks a card by hand, as his tap on "show 1 · 2" does (or the first list does, through `on f`). */
+        /** Picks a card by hand, as his tap on "show 1 · 2" does (or the first list does, through the `when`). */
         fun pin(id: String) {
             slots[slot("pick")] = Str(id)
         }
 
-        /** The store's reply to an answer for card [id], as `post` writes it into `sent`. */
+        /** An answer for card [id] sent at [at] (clock seconds), and the store's [reply] as `post` writes it into `sent` (null: on its way). */
         fun replied(
             id: String,
-            reply: String,
+            reply: String?,
+            at: Double = NOW,
         ) {
             slots[slot("sentFor")] = Str(id)
-            slots[slot("sent")] = Json.parse(reply)
+            slots[slot("sentTime")] = Num(at)
+            slots[slot("sent")] = if (reply == null) Null else Json.parse(reply)
         }
 
         fun slot(name: String) = program.globals.indexOfFirst { it.name == name }.also { assertTrue("no global $name", it >= 0) }
@@ -273,5 +275,49 @@ class OrmusNeedsTileTest {
         val down = Tile(Json.parse("""{"ok": false, "code": -1, "out": null}""")).lines()
         assertTrue("$down", "sg doesn't answer" in down)
         assertFalse("$down", "nobody waits on you" in down)
+    }
+
+    private val ok = """{"code": 200, "ok": true, "out": {"id": "c3new", "state": "answered", "via": "launcher"}, "err": ""}"""
+
+    @Test fun anAnsweredCardStillListedOffersNoKeys() {
+        val t = Tile(store(older, newest))
+        t.pin("c3new")
+        t.replied("c3new", ok)
+        val lines = t.lines()
+        assertTrue("$lines", "answered" in lines)
+        assertFalse("no key after the store said answered: $lines", "1 tile" in lines || "2 Mercurio" in lines)
+        assertTrue("${t.taps()}", t.taps().none { it.startsWith("post") })
+    }
+
+    @Test fun theHeadlineForgetsAReplyAfterTwoMinutes() {
+        val t = Tile(store(older))
+        t.replied("c3new", ok, at = NOW - 300)
+        assertFalse("${t.lines()}", "answered" in t.lines())
+    }
+
+    @Test fun aStoreThatDoesNotAnswerWinsOverARecentReply() {
+        val t = Tile(Json.parse("""{"ok": false, "code": -1, "out": null}"""))
+        t.replied("c3new", ok)
+        val lines = t.lines()
+        assertTrue("$lines", "sg doesn't answer" in lines)
+        assertFalse("$lines", "answered" in lines)
+    }
+
+    @Test fun aReplyForACardSwipedAwayShowsInTheHeadline() {
+        val t = Tile(store(older, newest))
+        t.pin("a1old")
+        t.replied("c3new", """{"code": 409, "ok": false, "out": {"error": "this ask is answered"}, "err": ""}""")
+        val lines = t.lines()
+        assertTrue("$lines", "Ship the old thing?" in lines)
+        assertTrue("$lines", "already closed" in lines)
+    }
+
+    @Test fun anAnswerWithNoReplyForTwoMinutesFreesTheKeys() {
+        val t = Tile(store(newest))
+        t.pin("c3new")
+        t.replied("c3new", null)
+        assertTrue("on its way: ${t.lines()}", "…" in t.lines())
+        t.replied("c3new", null, at = NOW - 300)
+        assertTrue("the keys come back: ${t.lines()}", "1 tile" in t.lines())
     }
 }
