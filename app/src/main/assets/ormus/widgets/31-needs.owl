@@ -1,0 +1,184 @@
+widget "needs" {
+  page: 2
+  order: 2
+  size: 6x4
+  minSize: 4x3
+
+  meta { owl: 13; description: "The Needs you cards beside Mercurio: the questions Claude sessions wait on, newest first, one at a time. One numbered key per option answers the card in sg's store (marked via launcher); a card with several picks or more than four options opens the cards page instead. A tap on the card opens Mercurio; swipe for the next."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // The store itself (ormus-platform apps/needs-you on sg), not a feed copy: its web listener lets his phone alone
+  // list and answer, so the question text never leaves that gate. The phone reads it over the tailnet.
+  source f = http("https://sg.tailb43a3a.ts.net/needs/api/asks") every 60s json timeout 20s status
+  source now = clock every 1m
+  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
+  source apps = android.apps every 10m
+  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+
+  // One answer at a time. `sentFor` is the card a key answered and `sent` the store's reply, null while it is on its
+  // way. Two equal replies in a row are not a change, so no `on` handler waits for one: the line below the card is
+  // read from the reply itself. The store checks everything again: a card closed elsewhere is a 409.
+  state sentFor = ""
+  state sent = null
+  // When the key was pressed (clock seconds). A reply counts for two minutes: post() always replies within its
+  // timeout, but a tile stopped mid-request never writes one, and a key must not stay at "…" for good.
+  state sentTime = 0
+  let fresh = now == null || now - sentTime < 120
+  let pending = sentFor != "" && sent == null && fresh
+  let answered = sent != null && sent.ok
+  on sent {
+    if value != null && value.ok {
+      haptic()
+    }
+  }
+  let said = sent == null ? "" : sent.ok ? "answered" : sent.code == 409 ? "already closed" : sent.code == 403 ? "this phone may not answer" : sent.code == -1 ? "sg did not answer" : "refused: ${sent.out != null && sent.out.error != null ? sent.out.error : sent.code}"
+
+  let listed = f != null && f.ok && f.out != null && f.out.asks != null
+  // The store lists the open cards oldest first; the newest one is what he is likely being asked now.
+  let cards = listed ? reverse(f.out.asks) : []
+  let ids = cards.map(c => c.id)
+  // `pick` is the card shown, by its id, so a card keeps its place when the list changes under it. Only a picked card
+  // has live keys: a refresh that puts another card in its place cannot take a tap meant for the one he read.
+  state pick = ""
+  state dragX = 0
+  let found = indexOf(ids, pick)
+  let pinned = found != null && found >= 0
+  let at = pinned ? found : 0
+  let card = len(cards) > 0 ? cards[at] : null
+  // The first card is picked as the list comes in. `when` runs also when it is already true as the tile starts; an
+  // `on f` would not run for the first list, nor again while the store's list stays the same.
+  when pick == "" && len(ids) > 0 {
+    pick = ids[0]
+  }
+  // A reply for a card not on screen (answered and gone, or swiped away) shows in the headline, for two minutes.
+  let away = sentFor != "" && (card == null || card.id != sentFor)
+  let headSaid = said != "" && away && fresh
+
+  // What a card offers: one key per option (`keys`), or the cards page (`page`) for several picks, no options, or more
+  // options than the tile holds. The kind alone picks the key row.
+  let kind = card == null ? "none" : card.multi || len(card.options ?? []) == 0 || len(card.options) > 4 ? "page" : "keys"
+  let opts = kind == "keys" ? card.options : []
+  // Keys side by side when each numbered label fits its share of the width (about 9 dp a character at 15 sp).
+  let per = max(6, floor(((tileWidth ?? 360) - 40) / max(1, len(opts)) / 9) - 3)
+  let side = len(opts) <= 3 && all(opts, o => len(o.label) + 2 <= per)
+  let created = card != null ? parseTime(card.created) : null
+  let age = created == null || now == null ? null : floor(max(0, now - created) / 60)
+
+  component Key(word, strong = false) {
+    Box {
+      fill: width
+      padding: [14, 12]
+      radius: 8 * corners
+      background: alpha(foreground, strong ? 0.16 : 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+    }
+  }
+
+  // One option, numbered. It sends the label the key shows, nothing typed on the phone.
+  component Answer(c, o, n, strong) {
+    Box {
+      fill: width
+      onTap: {
+        // Only the card on screen, not one already answered, and only the label that card has at this place now.
+        let live = c.options ?? []
+        if !pending && pinned && c.id == pick && !(sentFor == c.id && answered) && n <= len(live) && live[n - 1].label == o.label {
+          sentFor = c.id
+          sentTime = now ?? 0
+          sent = null
+          sent = post("https://sg.tailb43a3a.ts.net/needs/api/asks/${enc(c.id)}/answer", {choice: [o.label], via: "launcher"})
+        }
+      }
+      Key { word: pending && sentFor == c.id ? "…" : "${n} ${o.label}"; strong: strong }
+    }
+  }
+
+  component Card(c) {
+    Column {
+      gap: 6
+      padding: [12, 10]
+      radius: 10 * corners
+      background: alpha(foreground, 0.07)
+      onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+      Row {
+        gap: 8
+        align: center
+        Text { text: "${lower(c.project ?? "")}${(c.host ?? "") != "" ? " · ${c.host}" : ""}"; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
+        Text { text: age == null ? "" : age < 60 ? "${age}m" : age < 1440 ? "${floor(age / 60)}h" : "${floor(age / 1440)}d"; fontSize: 12; color: muted; maxLines: 1 }
+        Text { text: len(cards) > 1 ? "${at + 1} of ${len(cards)}" : ""; fontSize: 12; color: muted; maxLines: 1 }
+      }
+      Text { text: c.question; fontSize: 17; bold: true; maxLines: 3 }
+      if (c.context ?? "") != "" {
+        Text { text: c.context; fontSize: 13; color: muted; maxLines: 2 }
+      }
+      if sentFor == c.id && answered {
+        // The store took the answer; the card leaves with the next list.
+        Text { text: "answered"; fontSize: 13; color: green; maxLines: 1 }
+      } else if kind == "page" {
+        Box {
+          fill: width
+          onTap: url("https://sg.tailb43a3a.ts.net/needs/")
+          Key { word: "answer on the cards page"; strong: true }
+        }
+      } else if !pinned {
+        // The card came in under the thumb, not by his hand: one tap picks it, and its keys show.
+        Box {
+          fill: width
+          onTap: pick = c.id
+          Key { word: "show ${join(range(len(opts)).map(i => "${i + 1}"), " · ")}"; strong: true }
+        }
+      } else if side {
+        Row {
+          gap: 8
+          for o, i in opts key "${i}" {
+            Answer { c: c; o: o; n: i + 1; strong: i == 0; weight: 1 }
+          }
+        }
+      } else {
+        Column {
+          gap: 6
+          for o, i in opts key "${i}" {
+            Answer { c: c; o: o; n: i + 1; strong: i == 0 }
+          }
+        }
+      }
+      if said != "" && sentFor == c.id && !answered {
+        Text { text: said; fontSize: 13; color: red; maxLines: 2 }
+      }
+    }
+  }
+
+  Column {
+    gap: 8
+    Row {
+      align: center
+      Text { text: len(cards) > 0 ? "${len(cards)} need you" : "needs you"; fontSize: 15; bold: true; color: len(cards) > 0 ? accent : foreground; weight: 1; maxLines: 1 }
+      // A list that fails says so first; else how an answer for a card not on screen went.
+      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? green : red) : yellow; maxLines: 1 }
+    }
+    if card == null {
+      Text { text: listed ? "nobody waits on you" : ""; fontSize: 15; color: green; maxLines: 1 }
+    } else {
+      // Swipe sideways for the next card or the one before. The card follows the finger a little and springs back;
+      // a pull past 70 dp, or a flick, turns it.
+      Box {
+        drag: horizontal
+        onDrag: dragX = dragX + dx
+        onDragEnd: {
+          let n = len(cards)
+          if n > 1 && (dragX < -70 || vx < -600) && at < n - 1 {
+            pick = ids[at + 1]
+            haptic()
+          } else if n > 1 && (dragX > 70 || vx > 600) && at > 0 {
+            pick = ids[at - 1]
+            haptic()
+          }
+          dragX = 0
+        }
+        offset: [dragX * 0.6, 0]
+        opacity: 1 - min(0.5, abs(dragX) / 400)
+        animate offset: spring()
+        animate opacity: tween(150ms, "out")
+        Card { c: card }
+      }
+    }
+  }
+}
