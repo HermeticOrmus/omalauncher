@@ -11,6 +11,10 @@ What this fork adds to the release below it; none of it is in the Play build.
 - On upstream 1.5.0 (versionCode 42). Upstream's 1.0 to 1.5 are below; the fork's changes follow upstream's
   new layout (home in `ui/home`, files in `storage`, widgets as full-screen widgets) and keep each space's
   page numbering in layout.toml.
+- The today tile (`80-today.owl` 1.1) no longer says "no meetings through tomorrow" when a
+  calendar could not be read: its header turns red with "a calendar unreadable" (or how many) and
+  the empty line says "meetings may be missing". A copy of the feed older than 20 minutes (Sun
+  away, sg keeps the last one) says how old it is.
 - A Needs you tile beside Mercurio (`31-needs.owl`, page 2; on a page with no room, the first
   free spot). It reads the open Needs you cards from sg's store, the questions Claude sessions
   wait on, newest first, one at a time: the question, its project and host, how old it is. One

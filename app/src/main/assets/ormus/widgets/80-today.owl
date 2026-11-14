@@ -4,7 +4,7 @@ widget "today" {
   size: 6x3
   minSize: 3x2
 
-  meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day. It says when a calendar is unreadable or the copy is old."; version: "1.1"; license: "MIT"; category: "productivity" }
 
   // Built on Sun (ormus-feeds), served as sg's copy from his calendar and the Alqvimia API.
   source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
@@ -14,6 +14,16 @@ widget "today" {
   // Ended meetings drop out between feed runs.
   let events = data != null ? data.events.filter(e => now == null || e.start_unix > now - 3600) : []
   let room = max(1, floor(((tileHeight ?? 204) - 74) / 25))
+  // A calendar the feed could not read (its account's sign-in ran out) leaves its meetings out, so the tile never
+  // says "no meetings" then. The feed runs every 5 m on Sun and sg keeps the last copy while Sun is away: past
+  // 20 m the copy is old, and the tile says how old.
+  let failed = data != null ? keys(data.errors ?? {}).filter(k => startsWith(k, "calendar:")) : []
+  let age = data != null && now != null && data.generated != null ? now - data.generated : 0
+  let old = age > 1200
+  let head = data == null ? (f == null ? "today …" : "today · sg doesn't answer")
+    : len(failed) > 0 ? "today · ${len(events)} ahead · ${len(failed) == 1 ? "a calendar" : "${len(failed)} calendars"} unreadable"
+    : old ? "today · ${len(events)} ahead · as of ${age < 7200 ? "${floor(age / 60)}m" : "${floor(age / 3600)}h"} ago"
+    : "today · ${len(events)} ahead"
 
   component Meeting(e) {
     Row {
@@ -27,9 +37,9 @@ widget "today" {
 
   Column {
     gap: 6
-    Text { text: data == null ? (f == null ? "today …" : "today · sg doesn't answer") : "today · ${len(events)} ahead"; style: muted }
+    Text { text: head; style: muted; color: f != null && (!f.ok || len(failed) > 0) ? red : old ? foreground : muted; maxLines: 1 }
     if data != null && len(events) == 0 {
-      Text { text: "no meetings through tomorrow"; style: body; color: muted }
+      Text { text: len(failed) > 0 ? "meetings may be missing" : old ? "no meetings in this copy" : "no meetings through tomorrow"; style: body; color: muted }
     }
     for e in events.take(room) key "${e.start_unix}:${e.title}" {
       // Handlers take one action, not a choice, so a meeting with no link is its own node.
