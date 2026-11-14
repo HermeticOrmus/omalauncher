@@ -53,7 +53,7 @@ widget "notifications" {
         gap: 8
         weight: 1
         scroll: true
-        for x in shown key x.i.key {
+        for x, k in shown key x.i.key {
           Row {
             gap: 8
             align: top
@@ -63,7 +63,7 @@ widget "notifications" {
               onTap: notification("open", x.i.key)
               Row {
                 Text { text: "${x.i.app} · ${fmtTime(x.i.time, "HH:mm")}"; style: label; maxLines: 1; weight: 1 }
-                Text { text: x.sc == null ? "…" : "${x.sc.score}"; style: label; width: 28; align: end; color: x.sc == null ? muted : x.sc.score >= 80 ? accent : x.sc.score >= 60 ? foreground : muted }
+                Text { text: x.sc == null ? "…" : "${x.sc.score}"; style: label; width: 28; align: end; color: x.sc == null ? muted : k == 0 && x.sc.score >= 80 ? accent : x.sc.score >= 60 ? foreground : muted }
               }
               Text { text: x.i.title; bold: true; maxLines: 1 }
               if x.i.text != "" {

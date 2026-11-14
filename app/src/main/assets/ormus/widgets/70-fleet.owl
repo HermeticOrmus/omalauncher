@@ -24,7 +24,7 @@ widget "fleet" {
     Row {
       align: center
       Text { text: "fleet · ${len(machines) - len(down)}/${len(machines)} up"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || len(failing) > 0 || units > 0 ? red : stale ? foreground : muted; weight: 1; align: end }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: f != null && (!f.ok || len(failing) > 0 || units > 0) ? red : stale ? foreground : muted; weight: 1; align: end }
     }
     Flow {
       gap: 6

@@ -152,7 +152,7 @@ widget "needs" {
       align: center
       Text { text: len(cards) > 0 ? "${len(cards)} need you" : "needs you"; font: serif; fontSize: 20; bold: false; color: len(cards) > 0 ? red : foreground; weight: 1; maxLines: 1 }
       // A list that fails says so first; else how an answer for a card not on screen went.
-      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? foreground : red) : red; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? foreground : red) : f == null ? muted : red; maxLines: 1 }
     }
     if card == null {
       Text { text: listed ? "nobody waits on you" : ""; fontSize: 15; color: accent; maxLines: 1 }
