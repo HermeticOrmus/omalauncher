@@ -26,17 +26,18 @@ widget "sessions-raven" {
   state saidFor = ""
 
   // An agent in herdr-core is steered from the screen's list through sg's agent tool (ormus-feeds bin/agent): its
-  // screen, a stop, a say. One at a time: `act` is the agent being asked ("machine:session:pane"), `actDo` what was
-  // asked, `go` the request ({"n": a number of its own, "body": what sg gets on stdin}), `acted` what came back wrapped
-  // as {"n", "r": the tool's answer}, so two equal answers in a row still count as two. `actLine` is the one quiet line
-  // about it and `actFor` the agent it is about; `peek` is the agent whose screen is open (the whole view of the
-  // screen's list gives way to it), `peekText` the text sg returned and `peekStatus` the agent's status then.
-  // `stopAsk` is the agent whose stop key waits for a second tap, until `tick` has moved six seconds past `stopAt`.
-  // What he says is never kept: the field empties as he submits, and sg never returns it.
-  source tick = clock every 2s
+  // screen, a stop, a say. One request at a time: `act` is the agent being asked ("machine:session:pane"), `actDo` what
+  // was asked, `go` the request ({"n": a number of its own, "body": what sg gets on stdin}) and `actN` that same n, kept:
+  // sg's answer comes back wrapped as {"n", "r": the tool's answer, "x": ssh's exit code}, and an answer whose n is not
+  // `actN` is another request's (a late one) and is dropped, so it never shows under another agent, frees another
+  // request or puts one agent's screen in another's view. `actLine` is the one quiet line about the last request and
+  // `actFor` the agent it is about; `peek` is the agent whose screen is open (the list gives way to it), `peekText` the
+  // text sg returned and `peekStatus` the agent's status then. `stopAsk` is the agent ("machine:pane:term") whose stop
+  // key waits for a second tap, `stopAt` the `time` of the first. `sayText` is what he typed, kept until it went.
   state go = ""
   state act = ""
   state actDo = ""
+  state actN = 0
   state actAt = 0
   state acted = ""
   state actLine = ""
@@ -47,59 +48,52 @@ widget "sessions-raven" {
   state peekStatus = ""
   state stopAsk = ""
   state stopAt = 0
+  state sayText = ""
+  state sayFor = ""
   on go {
     let req = value != null && value != "" ? parseJson(value) : null
     if req != null {
-      acted = run("printf '{\"n\":%s,\"r\":' ${int(req.n)}; printf %s ${sh(toJson(req.body))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg projects/ormus-feeds/bin/agent -; printf '}'")
+      acted = run("r=$(printf %s ${sh(toJson(req.body))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg projects/ormus-feeds/bin/agent -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(req.n)} \"$r\" $x")
     }
   }
   on acted {
     let got = parseJson(value ?? "")
-    let r = got != null ? got.r : null
-    let o = r != null ? (r.outcome ?? "") : ""
-    actFor = act
-    act = ""
-    if actDo == "screen" && o == "screen" {
-      peekText = r.text ?? ""
-      peekStatus = r.status ?? ""
-      actLine = ""
-      actRed = false
-    } else {
-      actLine = r == null ? "no answer: look again" : o == "sent" ? "sent" : o == "stopped" ? "stopped" : o == "held" ? "waits for a draft at the desk" : o == "not waiting" ? "not waiting for a word" : o == "not working" ? "not working now" : o == "changed" ? "the agent moved on: look again" : o == "refused" ? "sg refused it" : "it did not go through"
-      actRed = r == null || o == "refused" || o == "failed" || (o != "sent" && o != "stopped" && o != "held" && o != "not waiting" && o != "not working" && o != "changed")
-      if o == "sent" || o == "stopped" {
-        haptic()
-        refresh()
+    if got != null && act != "" && actN != 0 && got.n == actN {
+      let r = got.r
+      let o = r != null && r.outcome != null ? r.outcome : ""
+      actFor = act
+      act = ""
+      actN = 0
+      if actDo == "screen" && o == "screen" {
+        peekText = r.text ?? ""
+        peekStatus = r.status ?? ""
+        actLine = ""
+        actRed = false
+      } else {
+        actLine = r == null ? "no answer: look again" : o == "sent" ? "sent" : o == "stopped" ? "stopped" : o == "held" ? "waits for a draft at the desk" : o == "not waiting" ? "not waiting for a word" : o == "not working" ? "not working now" : o == "changed" ? "the agent moved on: look again" : o == "refused" ? "sg refused it" : "it did not go through"
+        actRed = r == null || o == "refused" || o == "failed" || (o != "sent" && o != "stopped" && o != "held" && o != "not waiting" && o != "not working" && o != "changed")
+        // His words stay to be mended unless they went (or were held: sg never tries a held say again).
+        if actDo == "say" && (o == "sent" || o == "held") {
+          sayText = ""
+        }
+        if o == "sent" || o == "stopped" {
+          haptic()
+          refresh()
+        }
       }
     }
   }
-  // A request whose answer never comes frees the agent after a while (a say may wait a minute for a draft).
+  // A request whose answer never comes frees the agent, but not early: sg holds a say up to 70 s for a draft, ssh takes
+  // up to 8 to connect, and `now` ticks a minute at a time, so a tap's `actAt` is up to a minute older than the tap. At
+  // 180 s on that clock at least two minutes have passed. It does not say "try again": the words may have been typed.
   on now {
-    if act != "" && now - actAt >= 100 {
+    if act != "" && now - actAt >= 180 {
       actFor = act
       act = ""
-      actLine = "no answer: look again"
+      actN = 0
+      actLine = "no answer: look on the desk before typing again"
       actRed = true
     }
-  }
-  on tick {
-    if stopAsk != "" && value >= stopAt + 6 {
-      stopAsk = ""
-    }
-  }
-  on sent {
-    let got = parseJson(value ?? "")
-    let reply = got != null ? got.r : null
-    saidFor = busy
-    busy = ""
-    dragX = 0
-    if reply != null && reply.ok {
-      haptic()
-      said = "unlocked · ${reply.game.today} today"
-    } else {
-      said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "not confirmed: open the agent" : "it did not go through: open the agent"
-    }
-    refresh()
   }
 
   // What moved, told while the phone sleeps. A widget's own sources run only while its page is on screen, so sg
@@ -155,6 +149,7 @@ widget "sessions-raven" {
   let card = len(cards) > 0 ? cards[at] : null
   let shownQ = card == null ? "" : "${card.machine}:${card.session}:${card.pane}:${card.seq}:${card.ask != null ? card.ask.id : ""}"
   on f {
+    stopAsk = ""
     if pick == "" && len(ids) > 0 {
       pick = ids[0]
     }
@@ -208,10 +203,11 @@ widget "sessions-raven" {
     }
   }
 
-  // What sg's agent tool gets for an agent (the JSON on its stdin): what to do, and the agent as the feed names it.
-  // `term` is the terminal seen: sg answers `changed` when the pane's terminal is another one now.
+  // An agent's own actions on the screen's list. What sg's agent tool gets on stdin is `body`: what to do, and the agent
+  // as the feed names it; `term` is the terminal seen, and sg answers `changed` when the pane's terminal is another one now.
   component AgentActions(a) {
     let k = "${a.machine}:${a.session}:${a.pane}"
+    let sk = "${a.machine}:${a.pane}:${a.term ?? ""}"
     let working = a.status == "working" || a.status == "blocked"
     let waits = a.status == "idle" || a.status == "done"
     Column {
@@ -222,15 +218,18 @@ widget "sessions-raven" {
         align: center
         Box {
           onTap: {
+            stopAsk = ""
             if act == "" {
+              let n = 1 + int(random(1000000000))
               peek = k
               peekText = ""
               peekStatus = ""
               actLine = ""
               act = k
               actDo = "screen"
+              actN = n
               actAt = now ?? 0
-              go = toJson({n: int(random(1000000000)), body: {do: "screen", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
+              go = toJson({n: n, body: {do: "screen", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
             }
           }
           Pill { word: "screen" }
@@ -238,35 +237,60 @@ widget "sessions-raven" {
         if working {
           Box {
             onTap: {
-              if act == "" && stopAsk != k {
-                stopAsk = k
-                stopAt = tick ?? 0
-              } else if act == "" {
+              if act == "" && stopAsk != sk {
+                // The first tap only asks. It is kept by agent and terminal, and spent by the next feed, any other key or back.
+                stopAsk = sk
+                stopAt = time
+              } else if act == "" && time - stopAt >= 0.6 {
+                // A second tap closer than that is one tap landing twice, not a yes.
+                let n = 1 + int(random(1000000000))
                 stopAsk = ""
                 actLine = ""
                 act = k
                 actDo = "stop"
+                actN = n
                 actAt = now ?? 0
-                go = toJson({n: int(random(1000000000)), body: {do: "stop", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
+                go = toJson({n: n, body: {do: "stop", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
               }
             }
-            Pill { word: stopAsk == k ? "tap again to stop" : "stop" }
+            Pill { word: stopAsk == sk ? "tap again to stop" : "stop" }
           }
         }
         Text { text: actFor == k && act == "" ? actLine : act == k ? "…" : ""; fontSize: 12; color: actRed ? red : muted; weight: 1; maxLines: 1 }
       }
       if waits {
+        // His words are kept in `sayText` while this field is the one he typed in, and given back to the field until they
+        // went; a text bin/agent would refuse (over 600 characters, a leading / ! # @ ?, a trailing backslash) is
+        // refused here with a line and never leaves the phone.
         Input {
           placeholder: "say something to ${lower(a.kind)}"
           fontSize: 14
-          clear: true
+          text: sayFor == k ? sayText : ""
+          onChange: {
+            sayFor = k
+            sayText = value
+          }
           onSubmit: {
-            if act == "" && trim(value) != "" {
-              actLine = ""
-              act = k
-              actDo = "say"
-              actAt = now ?? 0
-              go = toJson({n: int(random(1000000000)), body: {do: "say", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? "", text: value}})
+            stopAsk = ""
+            let t = trim(value)
+            if act == "" && t != "" {
+              if len(t) > 600 || startsWith(t, "/") || startsWith(t, "!") || startsWith(t, "#") || startsWith(t, "@") || startsWith(t, "?") || endsWith(t, "\\") {
+                sayFor = k
+                sayText = value
+                actFor = k
+                actLine = len(t) > 600 ? "not sent: 600 characters at most" : "not sent: a word cannot start with / ! # @ ? or end with a backslash"
+                actRed = false
+              } else {
+                let n = 1 + int(random(1000000000))
+                sayFor = k
+                sayText = value
+                actLine = ""
+                act = k
+                actDo = "say"
+                actN = n
+                actAt = now ?? 0
+                go = toJson({n: n, body: {do: "say", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? "", text: value}})
+              }
             }
           }
         }
@@ -545,6 +569,7 @@ widget "sessions-raven" {
           align: center
           Box {
             onTap: {
+              stopAsk = ""
               peek = ""
               actLine = ""
             }
@@ -552,12 +577,15 @@ widget "sessions-raven" {
           }
           Box {
             onTap: {
+              stopAsk = ""
               if act == "" && peeked != null {
+                let n = 1 + int(random(1000000000))
                 actLine = ""
                 act = peek
                 actDo = "screen"
+                actN = n
                 actAt = now ?? 0
-                go = toJson({n: int(random(1000000000)), body: {do: "screen", machine: peeked.machine, session: peeked.session, pane: peeked.pane, term: peeked.term ?? ""}})
+                go = toJson({n: n, body: {do: "screen", machine: peeked.machine, session: peeked.session, pane: peeked.pane, term: peeked.term ?? ""}})
               }
             }
             Pill { word: "refresh" }

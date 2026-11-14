@@ -65,7 +65,10 @@ internal class TileHost(
 
     override fun theme(name: String) = null
 
-    override fun time() = 0.0
+    /** What `time` reads in a handler: the seconds since the tile started drawing, set by the test. */
+    var clock = 0.0
+
+    override fun time() = clock
 
     override fun tile(name: String): Value =
         when {
@@ -138,6 +141,24 @@ internal class TileHost(
                 if (n.kind == "Input" && ((n.props["placeholder"]?.invoke(env) as? Str)?.v ?: "").startsWith(placeholder)) {
                     hit++
                     n.handlers["onSubmit"]!!.run.invoke(env, listOf(Str(value)))
+                }
+            }
+        }
+        return hit
+    }
+
+    /** Types [value] in every Input whose placeholder starts with [placeholder] (its onChange); how many there were. */
+    fun change(
+        nodes: List<WNode>,
+        placeholder: String,
+        value: String,
+    ): Int {
+        var hit = 0
+        budget.run {
+            visit(nodes, Env.root(this)) { n, env ->
+                if (n.kind == "Input" && ((n.props["placeholder"]?.invoke(env) as? Str)?.v ?: "").startsWith(placeholder)) {
+                    hit++
+                    n.handlers["onChange"]!!.run.invoke(env, listOf(Str(value)))
                 }
             }
         }
