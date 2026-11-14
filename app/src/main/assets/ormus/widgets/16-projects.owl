@@ -22,9 +22,9 @@ widget "projects" {
     Row {
       gap: 8
       align: center
-      Text { text: i.source == "github" ? "review" : "linear"; style: small; width: 52; color: i.source == "github" ? green : accent }
+      Text { text: i.source == "github" ? "review" : "linear"; style: small; width: 52; color: i.source == "github" ? foreground : muted }
       Text { text: i.title; style: body; maxLines: 1; weight: 1 }
-            Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : i.age_min < 86400 ? "${floor(i.age_min / 1440)}d" : "${floor(i.age_min / 43200)}mo"; style: small; color: i.age_min > 10080 ? yellow : muted; width: 32; align: end }
+            Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : i.age_min < 86400 ? "${floor(i.age_min / 1440)}d" : "${floor(i.age_min / 43200)}mo"; style: small; color: i.age_min > 10080 ? foreground : muted; width: 32; align: end }
     }
   }
 
@@ -33,10 +33,10 @@ widget "projects" {
     Row {
       align: center
       Text { text: "projects · ${len(items)} waiting"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : ""; style: small; color: !f.ok || stale || len(failed) > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : ""; style: small; color: !f.ok || len(failed) > 0 ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     if data != null && len(items) == 0 {
-      Text { text: "no review or decision waits on you"; style: body; color: green }
+      Text { text: "no review or decision waits on you"; style: body; color: muted }
     }
     for i in items.take(room) key i.url ?? i.title {
       // Handlers take one action, not a choice, so a row with no link is its own node.

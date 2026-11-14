@@ -21,9 +21,9 @@ widget "pipeline" {
       gap: 8
       align: center
       Text { text: d.business; style: body; maxLines: 1; weight: 1 }
-      Text { text: d.stage; style: small; color: d.stage == "new" ? muted : green; width: 70; maxLines: 1 }
+      Text { text: d.stage; style: small; color: d.stage == "new" ? muted : foreground; width: 70; maxLines: 1 }
       Text { text: d.owner ?? ""; style: small; color: muted; width: 56; maxLines: 1 }
-      Text { text: d.days_over == 0 ? "today" : "${d.days_over}d over"; style: small; width: 56; align: end; color: d.days_over > 7 ? yellow : muted }
+      Text { text: d.days_over == 0 ? "today" : "${d.days_over}d over"; style: small; width: 56; align: end; color: d.days_over > 7 ? foreground : muted }
     }
   }
 
@@ -32,13 +32,13 @@ widget "pipeline" {
     Row {
       align: center
       Text { text: pipe != null ? "pipeline · ${pipe.count} leads" : "pipeline"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.pipeline != null ? "leads unreadable" : cold ? "untouched ${floor((now - pipe.as_of) / 86400)}d" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.pipeline != null ? "leads unreadable" : cold ? "untouched ${floor((now - pipe.as_of) / 86400)}d" : ""; style: small; color: f != null && !f.ok ? red : foreground; weight: 1; align: end; maxLines: 1 }
     }
     if pipe != null {
       Flow {
         gap: 6
         for s in pipe.stages key s.stage {
-          Button { text: "${s.stage} ${s.n}"; color: s.stage == "new" ? muted : green }
+          Button { text: "${s.stage} ${s.n}"; color: s.stage == "new" ? muted : foreground }
         }
       }
       Text { text: pipe.follow_ups_total > 0 ? "follow-ups due · ${pipe.follow_ups_total}" : "no follow-up due"; style: small; color: muted }

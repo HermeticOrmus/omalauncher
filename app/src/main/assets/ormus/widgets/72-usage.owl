@@ -4,7 +4,7 @@ widget "ai usage" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. Each account shows its email in place of its name when the phone's own file gives one (text with an @) and the row still has room for its number (the feed holds none). The account with the fullest window has its name in gold, a full window red, from 80% yellow. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.1"; license: "MIT"; category: "system" }
+  meta { owl: 13; description: "How much of each AI plan is used, on every account (Claude, ChatGPT, Grok), and when each limit resets. Each account shows its email in place of its name when the phone's own file gives one (text with an @) and the row still has room for its number (the feed holds none). The account with the fullest window has its name in gold, a full window red, from 80% in full ink. When sg does not answer, its last numbers stay: the header gives their age after 30 min, the screen always. Tap an account for the service's usage page, the tile for every window."; version: "1.1"; license: "MIT"; category: "system" }
 
   // Built on sg (ormus-feeds) every 10 min: a probe reads each account on a machine signed in to it, with that
   // machine's own token, and only usage numbers come back. The feed names the accounts and holds no email.
@@ -91,11 +91,11 @@ widget "ai usage" {
             maxLines: 1
             weight: 1
             align: end
-            color: a.state != "ok" ? yellow : w != null ? foreground : muted
+            color: a.state != "ok" || w != null ? foreground : muted
           }
         }
         if w != null {
-          Progress { value: w.percent; color: full ? red : w.percent >= 80 ? yellow : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
+          Progress { value: w.percent; color: full ? red : w.percent >= 80 ? foreground : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
         }
       }
     }
@@ -118,7 +118,7 @@ widget "ai usage" {
         maxLines: 1
         weight: 1
         align: end
-        color: failed || garbled || off ? red : late || len(problems) > 0 ? yellow : muted
+        color: failed || garbled || off ? red : late || len(problems) > 0 ? foreground : muted
       }
     }
     if data != null && !off && len(accounts) == 0 && len(problems) == 0 {
@@ -135,7 +135,7 @@ widget "ai usage" {
       scroll: true
       gap: 18
       if data == null || off || failed || garbled {
-        Text { text: "${f == null ? "loading…" : failed ? "sg doesn't answer" : garbled ? "sg's answer is not the usage feed" : "the usage feed is off on sg"}${data != null && !off ? "; these are its last numbers" : ""}"; style: body; color: data != null && !off ? yellow : muted }
+        Text { text: "${f == null ? "loading…" : failed ? "sg doesn't answer" : garbled ? "sg's answer is not the usage feed" : "the usage feed is off on sg"}${data != null && !off ? "; these are its last numbers" : ""}"; style: body; color: data != null && !off ? foreground : muted }
       }
       for a in accounts key a.key {
         Column {
@@ -156,7 +156,7 @@ widget "ai usage" {
             Text { text: mail; style: small; color: muted; maxLines: 1 }
           }
           if a.state != "ok" {
-            Text { text: a.state == "stale" ? (read == "" ? "now: ${a.error}" : "as of ${read} · now: ${a.error}") : a.error; style: small; color: yellow }
+            Text { text: a.state == "stale" ? (read == "" ? "now: ${a.error}" : "as of ${read} · now: ${a.error}") : a.error; style: small; color: foreground }
           }
           // The reset column holds "resets Wed 30 23:59": 19 characters of 6.47 dp (measured on the phone).
           for w in a.windows {
@@ -172,7 +172,7 @@ widget "ai usage" {
                 Text { text: w.resets == null ? "" : "${past || w.reset == true ? "reset" : "resets"} ${fmtTime(w.resets, "EEE d HH:mm", null, "en")}"; style: small; color: muted; width: 128; align: end; maxLines: 1 }
               }
               if shown {
-                Progress { value: w.percent; color: w.percent >= 100 || (a.limited && w.percent == a.peak) ? red : w.percent >= 80 ? yellow : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
+                Progress { value: w.percent; color: w.percent >= 100 || (a.limited && w.percent == a.peak) ? red : w.percent >= 80 ? foreground : alpha(foreground, 0.55); track: alpha(foreground, 0.12) }
               }
             }
           }
@@ -184,12 +184,12 @@ widget "ai usage" {
       if data != null && !off {
         Column {
           gap: 4
-          Text { text: "read on sg ${fedAgo == "" ? "…" : fedAgo}, every 10 min"; style: small; color: late ? yellow : muted }
+          Text { text: "read on sg ${fedAgo == "" ? "…" : fedAgo}, every 10 min"; style: small; color: late ? foreground : muted }
           for m in missed {
             Text { text: "${m}: ${get(data.machines, m, "")}"; style: small; color: muted }
           }
           for p in problems {
-            Text { text: p; style: small; color: yellow }
+            Text { text: p; style: small; color: foreground }
           }
           Text { text: "Tap an account for the service's own usage page."; style: small; color: muted }
         }

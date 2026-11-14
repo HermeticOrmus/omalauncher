@@ -125,7 +125,7 @@ widget "sessions-alqvimia" {
       gap: 8
       align: center
       padding: [0, 4]
-      Text { text: a.status == "blocked" ? "needs you" : a.status; fontSize: 12; width: 66; maxLines: 1; bold: a.status == "blocked"; color: a.status == "blocked" ? accent : a.status == "working" ? foreground : a.status == "done" ? green : muted }
+      Text { text: a.status == "blocked" ? "needs you" : a.status; fontSize: 12; width: 66; maxLines: 1; bold: a.status == "blocked"; color: a.status == "blocked" ? red : a.status == "working" ? blue : muted }
       // What it needs when the priorities tool knows; else its title, or its tab when the title says nothing.
       Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); fontSize: 14; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
       Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
@@ -152,8 +152,8 @@ widget "sessions-alqvimia" {
       fill: width
       padding: [14, 12]
       radius: 8 * corners
-      background: alpha(foreground, strong ? 0.16 : 0.09)
-      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+      background: strong ? accent : alpha(foreground, 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2; color: strong ? background : foreground }
     }
   }
 
@@ -204,7 +204,7 @@ widget "sessions-alqvimia" {
     Column {
       gap: 6
       padding: [12, 10]
-      radius: 10 * corners
+      radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: {
         if mercurio != null && get(links, a.machine, null) != null {
@@ -259,7 +259,7 @@ widget "sessions-alqvimia" {
         Row {
           gap: 8
           align: center
-          Text { text: "answered from here"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
+          Text { text: "answered from here"; fontSize: 13; color: foreground; weight: 1; maxLines: 1 }
           OpenAgent { a: a; word: "open" }
         }
       } else if len(answers) > 0 && whole && !pinned {
@@ -287,7 +287,7 @@ widget "sessions-alqvimia" {
         OpenAgent { a: a; word: "open in Mercurio"; fill: width }
       }
       if said != "" && busy == "" && saidFor == q {
-        Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? green : red; maxLines: 2 }
+        Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 2 }
       }
     }
   }
@@ -333,7 +333,7 @@ widget "sessions-alqvimia" {
     }
   }
 
-  // The headline: who needs him is the one thing in gold, with the score of the day beside it (the level and the
+  // The headline: who needs him, in the needs-you red (gold when nobody does), with the score of the day beside it (the level and the
   // streak on the screen), and the other counts under it.
   component Headline(full) {
     Column {
@@ -341,14 +341,14 @@ widget "sessions-alqvimia" {
       Row {
         gap: 8
         align: center
-        Text { text: needs > 0 ? "${needs} need you" : "nobody needs you"; fontSize: 24; bold: true; color: needs > 0 ? accent : green; weight: 1; maxLines: 1 }
+        Text { text: needs > 0 ? "${needs} need you" : "nobody needs you"; font: serif; fontSize: 28; bold: false; color: needs > 0 ? red : accent; weight: 1; maxLines: 1 }
         if game != null {
           Progress { value: game.into; max: game.need; width: 48; height: 4; color: foreground; track: alpha(foreground, 0.2) }
           Text { text: "${game.today} today"; fontSize: 12; color: muted; maxLines: 1 }
         }
       }
       if said != "" && busy == "" && saidFor != shownQ {
-        Text { text: said; fontSize: 12; color: startsWith(said, "unlocked") ? green : red; maxLines: 1 }
+        Text { text: said; fontSize: 12; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 1 }
       } else {
         Text { text: "${working} working · ${done} done${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
       }
@@ -374,9 +374,9 @@ widget "sessions-alqvimia" {
       if only == "" && card == null {
         Row {
           gap: 12
-          // Per workboard: the agents that need him, green; the screen has the agents by board.
+          // Per workboard: the agents that need him, in the needs-you red; the screen has the agents by board.
           for b in live.filter(b => b.agents.blocked > 0).take(5) key b.name {
-            Text { spans: [b.name, " ", {text: "${b.agents.blocked}", color: green, bold: true}]; fontSize: 12; color: muted; bold: false; maxLines: 1 }
+            Text { spans: [b.name, " ", {text: "${b.agents.blocked}", color: red, bold: true}]; fontSize: 12; color: muted; bold: false; maxLines: 1 }
           }
         }
       }
@@ -417,7 +417,7 @@ widget "sessions-alqvimia" {
                 gap: 8
                 align: center
                 padding: [0, 3]
-                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "done" || m.kind == "chat" ? green : m.kind == "needs" ? accent : foreground }
+                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "needs" ? red : m.kind == "done" || m.kind == "chat" ? muted : foreground }
                 Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
                 Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
               }

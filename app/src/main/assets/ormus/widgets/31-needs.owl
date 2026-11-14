@@ -68,8 +68,8 @@ widget "needs" {
       fill: width
       padding: [14, 12]
       radius: 8 * corners
-      background: alpha(foreground, strong ? 0.16 : 0.09)
-      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+      background: strong ? accent : alpha(foreground, 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2; color: strong ? background : foreground }
     }
   }
 
@@ -95,7 +95,7 @@ widget "needs" {
     Column {
       gap: 6
       padding: [12, 10]
-      radius: 10 * corners
+      radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
       Row {
@@ -111,7 +111,7 @@ widget "needs" {
       }
       if sentFor == c.id && answered {
         // The store took the answer; the card leaves with the next list.
-        Text { text: "answered"; fontSize: 13; color: green; maxLines: 1 }
+        Text { text: "answered"; fontSize: 13; color: foreground; maxLines: 1 }
       } else if kind == "page" {
         Box {
           fill: width
@@ -150,12 +150,12 @@ widget "needs" {
     gap: 8
     Row {
       align: center
-      Text { text: len(cards) > 0 ? "${len(cards)} need you" : "needs you"; fontSize: 15; bold: true; color: len(cards) > 0 ? accent : foreground; weight: 1; maxLines: 1 }
+      Text { text: len(cards) > 0 ? "${len(cards)} need you" : "needs you"; font: serif; fontSize: 20; bold: false; color: len(cards) > 0 ? red : foreground; weight: 1; maxLines: 1 }
       // A list that fails says so first; else how an answer for a card not on screen went.
-      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? green : red) : yellow; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? (f.code == 403 ? "this phone may not read the cards" : "sg doesn't answer") : headSaid ? said : ""; fontSize: 12; color: f != null && f.ok && headSaid ? (answered ? foreground : red) : red; maxLines: 1 }
     }
     if card == null {
-      Text { text: listed ? "nobody waits on you" : ""; fontSize: 15; color: green; maxLines: 1 }
+      Text { text: listed ? "nobody waits on you" : ""; fontSize: 15; color: accent; maxLines: 1 }
     } else {
       // Swipe sideways for the next card or the one before. The card follows the finger a little and springs back;
       // a pull past 70 dp, or a flick, turns it.

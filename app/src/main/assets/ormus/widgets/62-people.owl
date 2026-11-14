@@ -19,11 +19,11 @@ widget "people" {
     Row {
       gap: 8
       align: center
-      Text { text: p.name; style: body; width: 112; maxLines: 1; color: p.due >= 1 ? yellow : foreground }
+      Text { text: p.name; style: body; width: 112; maxLines: 1; color: p.due >= 1 ? foreground : muted }
       Text { text: p.why; style: small; color: muted; weight: 1; maxLines: 1 }
-      Text { text: p.owes_text != null ? "owes ${p.owes_text}" : ""; style: small; color: yellow; width: 84; align: end; maxLines: 1 }
-      Text { text: p.last_min == null ? "never" : p.last_min < 60 ? "${p.last_min}m" : p.last_min < 1440 ? "${floor(p.last_min / 60)}h" : "${floor(p.last_min / 1440)}d"; style: small; width: 30; align: end; color: p.due >= 1 ? yellow : muted }
-      Text { text: p.from_me ? "you" : "them"; style: small; color: p.from_me ? muted : green; width: 34; align: end }
+      Text { text: p.owes_text != null ? "owes ${p.owes_text}" : ""; style: small; color: foreground; width: 84; align: end; maxLines: 1 }
+      Text { text: p.last_min == null ? "never" : p.last_min < 60 ? "${p.last_min}m" : p.last_min < 1440 ? "${floor(p.last_min / 60)}h" : "${floor(p.last_min / 1440)}d"; style: small; width: 30; align: end; color: p.due >= 1 ? foreground : muted }
+      Text { text: p.from_me ? "you" : "them"; style: small; color: p.from_me ? muted : foreground; width: 34; align: end }
     }
   }
 
@@ -32,7 +32,7 @@ widget "people" {
     Row {
       align: center
       Text { text: len(due) > 0 ? "people · ${len(due)} to reach" : "people · all in touch"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.people != null ? "WhatsApp unreadable" : "last word"; style: small; color: !f.ok || stale || data.errors.people != null ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.people != null ? "WhatsApp unreadable" : "last word"; style: small; color: !f.ok || data.errors.people != null ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     for p in people.take(room) key p.name {
       if p.url != null {

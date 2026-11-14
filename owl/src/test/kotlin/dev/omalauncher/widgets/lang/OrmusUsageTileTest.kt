@@ -191,7 +191,7 @@ class OrmusUsageTileTest {
                 "bar 73 foreground@0.55",
                 "ChatGPT Raven [foreground]",
                 "week 85% · resets in 5d [foreground]",
-                "bar 85 yellow",
+                "bar 85 foreground",
                 "Grok Ormus [foreground]",
                 "180 credits left [muted]",
                 "Grok Raven [foreground]",
@@ -219,7 +219,7 @@ class OrmusUsageTileTest {
                 "bar 73 foreground@0.55",
                 "ChatGPT first.longest@example.org [foreground]",
                 "week 85% · in 5d [foreground]",
-                "bar 85 yellow",
+                "bar 85 foreground",
                 "Grok grok.user@example.org [foreground]",
                 "180 credits left [muted]",
                 "Grok Raven [foreground]",
@@ -247,20 +247,20 @@ class OrmusUsageTileTest {
                 "bar 73 foreground@0.55",
                 "ChatGPT Raven [foreground]",
                 "week 85% · in 5d [foreground]",
-                "bar 85 yellow",
+                "bar 85 foreground",
                 "Grok Ormus [foreground]",
                 "180 credits left [muted]",
                 "Grok Raven [foreground]",
                 "xAI gives no usage for this plan [muted]",
                 "Claude Corvin [muted]",
-                "73% · 3h ago [yellow]",
+                "73% · 3h ago [foreground]",
                 "bar 73 foreground@0.55",
             ),
             tile(feed(full, half, high, credits, noUsage, staleAna, top = topFull), height = 272, width = 249, mails = withStale),
         )
         // At 6x4 the stale row has room for its email and its whole text.
         assertEquals(
-            listOf("Claude ana@example.org [muted]", "week Fable 73% · as of 3h ago [yellow]"),
+            listOf("Claude ana@example.org [muted]", "week Fable 73% · as of 3h ago [foreground]"),
             tile(feed(staleAna), width = SIX_BY_FOUR, mails = Json.parse("""{"claude-6": "ana@example.org"}""")).subList(2, 4),
         )
     }
@@ -333,7 +333,7 @@ class OrmusUsageTileTest {
         assertEquals(listOf("ai usage [null]", "sg doesn't answer [red]"), tile(Json.parse("""{"ok": false, "code": 502, "out": null}""")))
         assertEquals(listOf("ai usage [null]", "off on sg [red]"), tile(answer("""{"off": "no usage registry on this host"}""")))
         assertEquals(listOf("ai usage [null]", "0 accounts [muted]", "no account listed on sg [muted]"), tile(feed()))
-        assertEquals(listOf("ai usage [null]", "registry not readable [yellow]"), tile(feed(errors = """["registry not readable"]""")))
+        assertEquals(listOf("ai usage [null]", "registry not readable [foreground]"), tile(feed(errors = """["registry not readable"]""")))
         // A page in the feed's place (json gives its text), or JSON that is not the feed: said, never "0 accounts".
         for (out in listOf("\"<html>sign in</html>\"", "null", "[1, 2]", "{\"generated\": 1}")) {
             assertEquals(out, listOf("ai usage [null]", "not the usage feed [red]"), tile(answer(out)))
@@ -342,11 +342,11 @@ class OrmusUsageTileTest {
     }
 
     @Test fun anOldFeedSaysHowOldAndMachinesNotReachedAreNamed() {
-        assertEquals("as of 1h ago [yellow]", tile(feed(half, generated = NOW - 3_600))[1])
+        assertEquals("as of 1h ago [foreground]", tile(feed(half, generated = NOW - 3_600))[1])
         // Under 30 minutes old is one or two missed runs of a 10-minute feed: no word.
         assertEquals("1 account [muted]", tile(feed(half, generated = NOW - 1_700))[1])
         assertEquals("moon, mercury not reached [muted]", tile(feed(half, machines = """{"moon": "no answer", "mercury": "no answer"}"""))[1])
-        assertEquals("state not saved [yellow]", tile(feed(half, machines = """{"moon": "no answer"}""", errors = """["state not saved"]"""))[1])
+        assertEquals("state not saved [foreground]", tile(feed(half, machines = """{"moon": "no answer"}""", errors = """["state not saved"]"""))[1])
     }
 
     @Test fun rowsThatDoNotFitAreCounted() {
@@ -369,12 +369,12 @@ class OrmusUsageTileTest {
         assertEquals(
             listOf(
                 "Claude Corvin [muted]",
-                "week 40% · resets in 3d · as of 3h ago [yellow]",
+                "week 40% · resets in 3d · as of 3h ago [foreground]",
                 "bar 40 foreground@0.55",
                 "Claude Dev [muted]",
-                "token ended [yellow]",
+                "token ended [foreground]",
                 "Claude Old [muted]",
-                "week reset · as of 2d ago [yellow]",
+                "week reset · as of 2d ago [foreground]",
             ),
             tile(feed(stale, unread, reset), width = SIX_BY_FOUR).drop(2),
         )
@@ -398,29 +398,29 @@ class OrmusUsageTileTest {
         assertEquals(listOf("5h [null]", "90% [foreground]"), screen(feed(limited)).subList(2, 4))
         assertEquals("bar 90 red", screen(feed(limited))[5])
         assertEquals("bar 40 foreground@0.55", screen(feed(limited))[9])
-        assertEquals(listOf("bar 85 yellow"), screen(feed(high)).filter { it.startsWith("bar") })
+        assertEquals(listOf("bar 85 foreground"), screen(feed(high)).filter { it.startsWith("bar") })
         assertEquals(listOf("bar 100 red", "bar 17 foreground@0.55"), screen(feed(full, top = topFull)).filter { it.startsWith("bar") })
     }
 
     @Test fun theScreenListsEveryWindowNoteAndWhatWasNotRead() {
         val stale = account("claude-5", "Claude", "Corvin", """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}, {"label": "week Fable", "percent": null, "resets": ${NOW - 60}, "reset": true}]""", "\"Ultra\"", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "40")
         val lines = screen(feed(stale, credits, machines = """{"moon": "no answer"}""", errors = """["state not saved"]""", generated = NOW - 300))
-        assertEquals(listOf("Claude Corvin [foreground]", "Ultra [muted]", "as of 3h ago · now: no answer [yellow]", "week [null]", "40% [foreground]"), lines.take(5))
+        assertEquals(listOf("Claude Corvin [foreground]", "Ultra [muted]", "as of 3h ago · now: no answer [foreground]", "week [null]", "40% [foreground]"), lines.take(5))
         assertEquals("resets ${at(NOW + 3 * DAY)} [muted]", lines[5])
         assertEquals(listOf("bar 40 foreground@0.55", "week Fable [null]", "reset [muted]"), lines.subList(6, 9))
         assertEquals("reset ${at(NOW - 60)} [muted]", lines[9])
         assertEquals(
-            listOf("Grok Ormus [foreground]", " [muted]", "180 credits left [muted]", "read on sg 5m ago, every 10 min [muted]", "moon: no answer [muted]", "state not saved [yellow]", "Tap an account for the service's own usage page. [muted]"),
+            listOf("Grok Ormus [foreground]", " [muted]", "180 credits left [muted]", "read on sg 5m ago, every 10 min [muted]", "moon: no answer [muted]", "state not saved [foreground]", "Tap an account for the service's own usage page. [muted]"),
             lines.drop(10),
         )
         assertEquals(listOf("the usage feed is off on sg [muted]"), screen(answer("""{"off": "no usage registry on this host"}""")))
         assertEquals(listOf("sg doesn't answer [muted]"), screen(Json.parse("""{"ok": false, "code": 502, "out": null}""")))
     }
 
-    @Test fun aFullWindowIsRedAndFromEightyYellowOnTheTileAndTheScreen() {
+    @Test fun aFullWindowIsRedAndFromEightyInFullInkOnTheTileAndTheScreen() {
         fun one(percent: Int) = account("codex-$percent", "ChatGPT", "P$percent", """[{"label": "week", "percent": $percent, "resets": ${NOW + DAY}}]""", peak = "$percent")
-        // Not limited (the service lets it go on), still red at 100; 79 is plain, 80 is yellow.
-        for ((percent, color) in listOf(100 to "red", 80 to "yellow", 79 to "foreground@0.55")) {
+        // Not limited (the service lets it go on), still red at 100; 79 is dim, 80 is full ink.
+        for ((percent, color) in listOf(100 to "red", 80 to "foreground", 79 to "foreground@0.55")) {
             val f = feed(one(percent))
             assertEquals("$percent", "bar $percent $color", tile(f)[4])
             assertEquals("$percent", listOf("bar $percent $color"), screen(f).filter { it.startsWith("bar") })
@@ -434,7 +434,7 @@ class OrmusUsageTileTest {
         val noReset = """{"key": "claude-0", "name": "Claude Ormus", "label": "week", "percent": 100, "resets": null}"""
         assertEquals("Claude Ormus [accent]", tile(feed(full, half, top = noReset))[2])
         val staleFull = full.replace("\"state\": \"ok\"", "\"state\": \"stale\"").replace("\"read\": $NOW", "\"read\": ${NOW - 3 * 3_600}")
-        assertEquals(listOf("Claude Ormus [accent]", "week 100% · resets in 1d · as of 3h ago [yellow]"), tile(feed(staleFull, top = topFull), width = SIX_BY_FOUR).subList(2, 4))
+        assertEquals(listOf("Claude Ormus [accent]", "week 100% · resets in 1d · as of 3h ago [foreground]"), tile(feed(staleFull, top = topFull), width = SIX_BY_FOUR).subList(2, 4))
         assertEquals("Claude Ormus [accent]", screen(feed(staleFull, top = topFull))[0])
     }
 
@@ -458,10 +458,10 @@ class OrmusUsageTileTest {
     @Test fun theFooterSaysHowOldTheFeedIs() {
         assertEquals("read on sg just now, every 10 min [muted]", screen(feed(half)).first { it.startsWith("read on sg") })
         assertEquals("read on sg 29m ago, every 10 min [muted]", screen(feed(half, generated = NOW - 1_740)).first { it.startsWith("read on sg") })
-        assertEquals("read on sg 2h ago, every 10 min [yellow]", screen(feed(half, generated = NOW - 7_200)).first { it.startsWith("read on sg") })
+        assertEquals("read on sg 2h ago, every 10 min [foreground]", screen(feed(half, generated = NOW - 7_200)).first { it.startsWith("read on sg") })
         // 30 min is one late run and no word; one second more is late.
         assertEquals("1 account [muted]", tile(feed(half, generated = NOW - 1_800))[1])
-        assertEquals("as of 30m ago [yellow]", tile(feed(half, generated = NOW - 1_801))[1])
+        assertEquals("as of 30m ago [foreground]", tile(feed(half, generated = NOW - 1_801))[1])
     }
 
     @Test fun beforeTheClockIsReadNoLineSaysNull() {
@@ -474,11 +474,11 @@ class OrmusUsageTileTest {
 
     @Test fun theHeaderCountsHiddenRowsNextToItsMessage() {
         val five = arrayOf(full, half, high, credits, noUsage)
-        assertEquals("+4 · as of 2h ago [yellow]", tile(feed(*five, top = topFull, generated = NOW - 7_200), height = 100)[1])
+        assertEquals("+4 · as of 2h ago [foreground]", tile(feed(*five, top = topFull, generated = NOW - 7_200), height = 100)[1])
         assertEquals("+4 · moon not reached [muted]", tile(feed(*five, top = topFull, machines = """{"moon": "no answer"}"""), height = 100)[1])
-        assertEquals("+4 · state not saved [yellow]", tile(feed(*five, top = topFull, errors = """["state not saved"]"""), height = 100)[1])
+        assertEquals("+4 · state not saved [foreground]", tile(feed(*five, top = topFull, errors = """["state not saved"]"""), height = 100)[1])
         // A late feed is said before its problems, and problems before machines not reached.
-        assertEquals("as of 2h ago [yellow]", tile(feed(half, errors = """["state not saved"]""", machines = """{"moon": "no answer"}""", generated = NOW - 7_200))[1])
+        assertEquals("as of 2h ago [foreground]", tile(feed(half, errors = """["state not saved"]""", machines = """{"moon": "no answer"}""", generated = NOW - 7_200))[1])
         assertEquals("1 account [muted]", tile(feed(half))[1])
         assertEquals("2 accounts [muted]", tile(feed(half, high))[1])
     }
@@ -501,9 +501,9 @@ class OrmusUsageTileTest {
         assertEquals("sg doesn't answer · as of 2h ago [red]", t.lines(program.root)[1])
         assertEquals(rows, t.lines(program.root).drop(2))
         val screen = t.lines(program.screen!!)
-        assertEquals("sg doesn't answer; these are its last numbers [yellow]", screen[0])
+        assertEquals("sg doesn't answer; these are its last numbers [foreground]", screen[0])
         assertEquals("Claude Ormus [accent]", screen[1])
-        assertEquals("read on sg 2h ago, every 10 min [yellow]", screen.first { it.startsWith("read on sg") })
+        assertEquals("read on sg 2h ago, every 10 min [foreground]", screen.first { it.startsWith("read on sg") })
         // A page in the feed's place: the same.
         t.answer(answer("\"<html>sign in</html>\""))
         assertEquals("not the usage feed · as of 2h ago [red]", t.lines(program.root)[1])
@@ -523,9 +523,9 @@ class OrmusUsageTileTest {
 
     @Test fun aWindowWithNoNumberAndNoResetIsUnknownNotReset() {
         val unknown = account("claude-9", "Claude", "Far", """[{"label": "week", "percent": null, "resets": null}]""", state = "stale", read = NOW - 2 * DAY, error = "\"no answer\"")
-        assertEquals(listOf("Claude Far [muted]", "use unknown · as of 2d ago [yellow]"), tile(feed(unknown)).drop(2))
+        assertEquals(listOf("Claude Far [muted]", "use unknown · as of 2d ago [foreground]"), tile(feed(unknown)).drop(2))
         val lines = screen(feed(unknown))
-        assertEquals(listOf("Claude Far [foreground]", " [muted]", "as of 2d ago · now: no answer [yellow]", "week [null]", "unknown [muted]", " [muted]"), lines.take(6))
+        assertEquals(listOf("Claude Far [foreground]", " [muted]", "as of 2d ago · now: no answer [foreground]", "week [null]", "unknown [muted]", " [muted]"), lines.take(6))
     }
 
     @Test fun aStaleAccountWithNothingElseToShowSaysItsAgeWithNoSeparatorInFront() {
@@ -535,11 +535,11 @@ class OrmusUsageTileTest {
         assertEquals(
             listOf(
                 "Grok Bare [muted]",
-                "as of 3h ago [yellow]",
+                "as of 3h ago [foreground]",
                 "Grok Noted [muted]",
-                "180 credits left · as of 3h ago [yellow]",
+                "180 credits left · as of 3h ago [foreground]",
                 "Grok Blank [muted]",
-                " [yellow]",
+                " [foreground]",
             ),
             tile(feed(bare, noted, noTime)).drop(2),
         )
@@ -548,11 +548,11 @@ class OrmusUsageTileTest {
     @Test fun aReadingWithNoTimeOrAheadOfThePhonesClockSaysNoAge() {
         val week = """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}]"""
         val noTime = account("claude-5", "Claude", "Corvin", week, state = "stale", read = null, error = "\"no answer\"", peak = "40")
-        assertEquals("week 40% · resets in 3d [yellow]", tile(feed(noTime))[3])
-        assertEquals("now: no answer [yellow]", screen(feed(noTime))[2])
+        assertEquals("week 40% · resets in 3d [foreground]", tile(feed(noTime))[3])
+        assertEquals("now: no answer [foreground]", screen(feed(noTime))[2])
         val ahead = account("claude-5", "Claude", "Corvin", week, state = "stale", read = NOW + 120, error = "\"no answer\"", peak = "40")
-        assertEquals("week 40% · in 3d · as of just now [yellow]", tile(feed(ahead))[3])
-        assertEquals("as of just now · now: no answer [yellow]", screen(feed(ahead))[2])
+        assertEquals("week 40% · in 3d · as of just now [foreground]", tile(feed(ahead))[3])
+        assertEquals("as of just now · now: no answer [foreground]", screen(feed(ahead))[2])
     }
 
     @Test fun aRowTooLongForTheTilesWidthDropsTheWordResetsThenTheResetTime() {
@@ -616,10 +616,10 @@ class OrmusUsageTileTest {
             400 to "week Fable 73% · in 2d · as of 3h ago",
             401 to "week Fable 73% · resets in 2d · as of 3h ago",
         )) {
-            assertEquals("$width dp", "$text [yellow]", row(ravenStale, width))
+            assertEquals("$width dp", "$text [foreground]", row(ravenStale, width))
         }
         for ((width, text) in listOf(225 to "reset · 2d ago", 226 to "week reset · 2d ago", 264 to "week reset · 2d ago", 265 to "week reset · as of 2d ago")) {
-            assertEquals("$width dp", "$text [yellow]", row(oldReset, width))
+            assertEquals("$width dp", "$text [foreground]", row(oldReset, width))
         }
         // Below "unknown · 2d ago" the cut takes the words of the short text, never the label: the age alone, not "use… · 2d ago".
         for ((width, text) in listOf(
@@ -631,7 +631,7 @@ class OrmusUsageTileTest {
             270 to "use unknown · 2d ago",
             271 to "use unknown · as of 2d ago",
         )) {
-            assertEquals("$width dp", "$text [yellow]", row(farUnknown, width))
+            assertEquals("$width dp", "$text [foreground]", row(farUnknown, width))
         }
         // A note is its own short text: it keeps the whole words that fit and "…", so the age stays whole; with no room
         // for its first word, the age stays alone.
@@ -647,11 +647,11 @@ class OrmusUsageTileTest {
             303 to "180 credits left · 3h ago",
             304 to "180 credits left · as of 3h ago",
         )) {
-            assertEquals("$width dp", "$text [yellow]", row(notedStale, width))
+            assertEquals("$width dp", "$text [foreground]", row(notedStale, width))
         }
         // An age alone: "as of " goes first; with no room for the age either, the renderer cuts it.
         for ((width, text) in listOf(134 to "3h ago", 173 to "3h ago", 180 to "as of 3h ago")) {
-            assertEquals("$width dp", "$text [yellow]", row(bareStale, width))
+            assertEquals("$width dp", "$text [foreground]", row(bareStale, width))
         }
     }
 
@@ -661,7 +661,7 @@ class OrmusUsageTileTest {
         fun noted(note: String) = account("grok-9", "Grok", "Noted", note = note, state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"")
         for (note in listOf("\" 180 credits left\"", "\"180  credits left\"", "\"180\\tcredits\\nleft\"", "\"180 \\t credits  left\"")) {
             for ((width, text) in listOf(186 to "3h ago", 187 to "180… · 3h ago", 238 to "180… · 3h ago", 239 to "180 credits… · 3h ago", 249 to "180 credits… · 3h ago")) {
-                assertEquals("$note at $width dp", "$text [yellow]", row(noted(note), width))
+                assertEquals("$note at $width dp", "$text [foreground]", row(noted(note), width))
             }
         }
     }
@@ -671,10 +671,10 @@ class OrmusUsageTileTest {
         // name for "… · 3h ago", longer than the row, so the phone cut the age.
         fun stale(name: String) =
             account("codex-${name.length}", "ChatGPT", name, """[{"label": "week Fable", "percent": 100, "resets": ${NOW + 2 * DAY}}]""", state = "stale", read = NOW - 3 * 3_600, error = "\"no answer\"", peak = "100")
-        assertEquals("3h ago [yellow]", row(stale("Raven Studios"), 249))
-        assertEquals("3h ago [yellow]", row(stale("Raven Studio Team"), 249))
-        assertEquals("3h ago [yellow]", row(stale("Raven Studios"), 257))
-        assertEquals("100% · 3h ago [yellow]", row(stale("Raven Studios"), 258))
+        assertEquals("3h ago [foreground]", row(stale("Raven Studios"), 249))
+        assertEquals("3h ago [foreground]", row(stale("Raven Studio Team"), 249))
+        assertEquals("3h ago [foreground]", row(stale("Raven Studios"), 257))
+        assertEquals("100% · 3h ago [foreground]", row(stale("Raven Studios"), 258))
         // At every width, a digit is never followed by "…", and the row ends with its whole age.
         for (name in listOf("Raven Studios", "Raven Studio Team")) {
             for (width in 249..420) {
@@ -693,9 +693,9 @@ class OrmusUsageTileTest {
         assertEquals("xAI gives no usage for this plan [muted]", row(noUsage, 249))
         // An unread account says its error, never a reset time, even with a window in the feed.
         val unread = account("claude-12", "Claude", "Dev", """[{"label": "week", "percent": 40, "resets": ${NOW + 3 * DAY}}]""", state = "unread", read = null, error = "\"token ended\"", peak = "40")
-        assertEquals("token ended [yellow]", row(unread, SIX_BY_FOUR))
+        assertEquals("token ended [foreground]", row(unread, SIX_BY_FOUR))
         // Too long for its row (10 characters left at 173 dp), it keeps its error as its short text, never the percent.
-        assertEquals("token ended [yellow]", row(unread, 173))
+        assertEquals("token ended [foreground]", row(unread, 173))
     }
 
     @Test fun everyRowTheTileBuildsFitsFromTheSmallestSizeAtThePhonesMeasuredCharacterWidth() {

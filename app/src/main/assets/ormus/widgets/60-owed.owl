@@ -23,7 +23,7 @@ widget "owed" {
       Text { text: i.client; style: body; maxLines: 1; weight: 1 }
       Text { text: i.number; style: small; color: muted; width: 96; maxLines: 1 }
       Text { text: i.total_text; style: body; width: 64; align: end }
-      Text { text: i.days_late > 0 ? "${i.days_late}d late" : i.days_late == 0 ? "due today" : "in ${-i.days_late}d"; style: small; width: 62; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? yellow : muted }
+      Text { text: i.days_late > 0 ? "${i.days_late}d late" : i.days_late == 0 ? "due today" : "in ${-i.days_late}d"; style: small; width: 62; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? foreground : muted }
     }
   }
 
@@ -32,12 +32,12 @@ widget "owed" {
     Row {
       align: center
       Text { text: "owed to you"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.owed != null ? "invoicer unreadable" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.owed != null ? "invoicer unreadable" : ""; style: small; color: f != null && !f.ok ? red : foreground; weight: 1; align: end; maxLines: 1 }
     }
     if owed != null {
-      Text { text: owed.total_text; fontSize: 30; bold: true; color: accent }
+      Text { text: owed.total_text; font: serif; fontSize: 34; bold: false; color: accent }
       if len(items) == 0 {
-        Text { text: "nothing owed"; style: body; color: green }
+        Text { text: "nothing owed"; style: body; color: muted }
       }
       for i in items.take(room) key i.number {
         // Handlers take one action, not a choice, so a row with no chat is its own node.

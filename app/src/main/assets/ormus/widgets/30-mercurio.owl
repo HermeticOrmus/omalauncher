@@ -51,7 +51,7 @@ widget "mercurio" {
     Row {
       gap: 8
       align: center
-      Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? yellow : a.status == "working" ? accent : a.status == "done" ? green : muted }
+      Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? red : a.status == "working" ? blue : muted }
       Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
       Text { text: "${lower(a.ws)}·${a.host}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
       Text { text: a.ago; style: small; color: muted; width: 28; align: end; maxLines: 1 }
@@ -64,7 +64,7 @@ widget "mercurio" {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
       Text { text: "mercurio · ${len(all)}"; style: muted; weight: 1; maxLines: 1 }
-      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? yellow : muted; weight: 2; align: end; maxLines: 1 }
+      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if len(down) > 0 {
       Text { text: "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red; maxLines: 1 }

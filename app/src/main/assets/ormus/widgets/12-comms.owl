@@ -148,8 +148,8 @@ widget "comms" {
       padding: [14, 12]
       radius: 8 * corners
       opacity: dim ? 0.45 : 1
-      background: alpha(foreground, strong ? 0.16 : 0.09)
-      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2 }
+      background: strong ? accent : alpha(foreground, 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2; color: strong ? background : foreground }
     }
   }
 
@@ -175,7 +175,7 @@ widget "comms" {
       gap: 8
       align: center
       padding: [0, 4]
-      Text { text: c.replied != null ? "replied" : c.waiting ? "chat" : c.mine ? "you" : "quiet"; fontSize: 12; width: 66; maxLines: 1; color: c.waiting ? green : muted }
+      Text { text: c.replied != null ? "replied" : c.waiting ? "chat" : c.mine ? "you" : "quiet"; fontSize: 12; width: 66; maxLines: 1; color: c.waiting ? foreground : muted }
       Text { text: withText && (c.text ?? "") != "" ? "${c.name}: ${c.text}" : c.name; fontSize: 14; maxLines: 1; weight: 1; color: c.waiting ? foreground : muted }
       Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
       Age { m: c.age_min }
@@ -228,7 +228,7 @@ widget "comms" {
     Column {
       gap: 6
       padding: [12, 10]
-      radius: 10 * corners
+      radius: 14 * corners
       background: alpha(foreground, 0.07)
       let cid = "${c.k}|${c.text ?? ""}"
       let answered = said != "" && busy == "" && saidFor == cid
@@ -286,14 +286,14 @@ widget "comms" {
           gap: 8
           align: center
           // Both weighted: a key that fills its width alone would push the words out of the row.
-          Text { text: "replied ${c.replied}m ago"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
+          Text { text: "replied ${c.replied}m ago"; fontSize: 13; color: muted; weight: 1; maxLines: 1 }
           OpenChat { c: c; word: "open"; weight: 1 }
         }
       } else if sentNow {
         Row {
           gap: 8
           align: center
-          Text { text: "sent"; fontSize: 13; color: green; weight: 1; maxLines: 1 }
+          Text { text: "sent"; fontSize: 13; color: muted; weight: 1; maxLines: 1 }
           OpenChat { c: c; word: "open"; weight: 1 }
         }
       } else if len(replies) > 0 && !pinned {
@@ -384,9 +384,9 @@ widget "comms" {
   component Headline(compact) {
     Column {
       gap: 2
-      Text { text: len(cards) > 0 ? "${len(cards)} chat${len(cards) == 1 ? "" : "s"} wait${len(cards) == 1 ? "s" : ""}" : "nobody waits"; fontSize: 24; bold: true; color: len(cards) > 0 ? accent : green; maxLines: 1 }
+      Text { text: len(cards) > 0 ? "${len(cards)} chat${len(cards) == 1 ? "" : "s"} wait${len(cards) == 1 ? "s" : ""}" : "nobody waits"; font: serif; fontSize: 28; bold: false; color: len(cards) > 0 ? foreground : muted; maxLines: 1 }
       if said != "" && busy == "" && !(compact && fold) && saidFor != cardId {
-        Text { text: said; fontSize: 12; color: said == "sent" ? green : red; maxLines: 1 }
+        Text { text: said; fontSize: 12; color: said == "sent" ? muted : red; maxLines: 1 }
       }
     }
   }
