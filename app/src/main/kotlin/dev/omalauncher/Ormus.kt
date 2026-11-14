@@ -5,6 +5,7 @@ import android.util.Log
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.run
 import java.io.File
+import java.security.MessageDigest
 import kotlin.concurrent.thread
 
 /**
@@ -82,15 +83,32 @@ object Ormus {
     /** Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. */
     val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl")
 
-    /** Copies the Ormus themes into the user's themes, each once; a half-copied one never counts, as it's renamed in whole. */
+    /** Beside a seeded theme's colors.toml: the hash of the colors it was seeded from. A dotfile, so Linux never gets it. */
+    const val SEED_STAMP = ".ormus-seed"
+
+    /** The stamp of [colors], the bytes of a bundled theme's colors.toml. */
+    fun stampOf(colors: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(colors).joinToString("") { "%02x".format(it) }
+
+    /**
+     * Whether [dir], a seeded copy of a theme, is out of date with the bundled [colors]: no colors, no stamp, or a stamp of
+     * other colors. A regenerated theme (scripts/ormus-themes.py) reaches an installed phone this way.
+     */
+    fun needsSeed(
+        dir: File,
+        colors: ByteArray,
+    ): Boolean = !File(dir, "colors.toml").isFile || runCatching { File(dir, SEED_STAMP).readText().trim() }.getOrNull() != stampOf(colors)
+
+    /** Copies the Ormus themes into the user's themes, each when it is missing or out of date; a half-copied one never counts, as it's renamed in whole. */
     fun seedTheme(context: Context) {
         val themes = LauncherData.userThemesDir(context)
         for (name in THEMES) {
             val dir = File(themes, name)
-            if (File(dir, "colors.toml").isFile) continue
+            val colors = context.assets.open("ormus/themes/$name/colors.toml").use { it.readBytes() }
+            if (!needsSeed(dir, colors)) continue
             val tmp = File(themes, ".$name.tmp")
             tmp.deleteRecursively()
             copyAssets(context, "ormus/themes/$name", tmp)
+            File(tmp, SEED_STAMP).writeText(stampOf(colors))
             dir.deleteRecursively()
             if (!tmp.renameTo(dir)) Log.w("ormus", "couldn't seed the $name theme")
         }

@@ -7,6 +7,7 @@
 Reads the `planets` group of tokens.json (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn) and writes one
 Omarchy theme per planet, ormus-<planet>/colors.toml, plus a wallpaper tinted from the brand's midnight lacquer
 (needs Pillow; with --no-backgrounds only the colors are written). Ormus-aurum, the older palette, is not touched.
+Type: `font: serif` in a widget is Android's system serif, not Cormorant Garamond (the launcher ships no fonts).
 The brand repo is the source of the colors; edit them there and run this again, never by hand in colors.toml.
 Standard library only, apart from the optional Pillow for the wallpaper.
 
@@ -19,9 +20,10 @@ How the brand's roles map onto the names widgets and Linux read (Palette in ui/T
   muted                 dim        what widgets call `border`; the quietest text
   accent                gold       the planet's one raised voice; cursor is goldBright
   selection             gold washed 28% into deep
-  red                   #e27a72    needs you / error, as in herdr-ormus (BLOCKED)
-  blue                  #6f93cf    working, as in herdr-ormus (WORKING)
-  green cyan orange     the identity accents leaf, teal, ember: terminals need ANSI colors; widgets keep off them
+  red                   needs you and errors (STATES: soft red, #e27a72 on most planets)
+  blue                  working (STATES)
+  green                 profit on the P&L pages (STATES); terminals use it for ANSI green
+  cyan orange           the identity accents teal, ember: terminals need ANSI colors; widgets keep off them
   yellow                Sun goldBright: the same in every planet, so a warning never reads as the accent
   magenta               iris: Android derives the system's secondary color from it (OmarchyWallpaperService)
 """
@@ -30,9 +32,28 @@ import json
 import os
 import sys
 
-# The agent states of the herdr Ormus themes (herdr-ormus/scripts/build.py): the phone and the desk agree.
-NEEDS_YOU = "#e27a72"
-WORKING = "#6f93cf"
+# State hues, per planet: needs-you (red), working (blue) and profit (green, the P&L pages only).
+#
+# The Sun row is the agent-state pair of the herdr Ormus themes (herdr-ormus/scripts/build.py BLOCKED and WORKING), so the
+# desk and the phone agree, plus the brand's leaf green. Errors share the needs-you red on purpose: the brand's danger
+# #d44f4f reads only 3.8 to 4.1:1 on the planet surfaces, below the 4.5:1 text needs, so #e27a72 carries both.
+#
+# On the other planets a hue moves only where it came too close to that planet's accent (CIE76 distance 22 for Mars red,
+# 18 for Moon and Saturn blue, 21 for Venus green) and keeps its name's hue family. The rule, checked on every run and
+# by OrmusThemesTest: each of the three is at least MIN_DELTA_E (CIE76) from the planet's accent and from the other two,
+# and at least 4.5:1 on the planet's surface and ground. 30 is where two colors still read as two different things in a
+# 12 sp word at a glance (about thirteen times the smallest difference an eye sees, 2.3); the closest pair left is 30.
+MIN_DELTA_E = 30
+MIN_CONTRAST = 4.5
+STATES = {
+    "sun": ("#e27a72", "#6f93cf", "#86c272"),
+    "moon": ("#e27a72", "#568be2", "#86c272"),
+    "mercury": ("#e27a72", "#6f93cf", "#86c272"),
+    "venus": ("#e27a72", "#6f93cf", "#94cb69"),
+    "mars": ("#e77b84", "#6f93cf", "#86c272"),
+    "jupiter": ("#e27a72", "#6f93cf", "#86c272"),
+    "saturn": ("#e27a72", "#5392be", "#86c272"),
+}
 PLANETS = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"]
 
 
@@ -45,6 +66,47 @@ def hexa(c):
     return "#%02x%02x%02x" % tuple(max(0, min(255, round(v))) for v in c)
 
 
+def _lin(c):
+    c /= 255
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _xyz(h):
+    r, g, b = (_lin(v) for v in rgb(h))
+    return 0.4124 * r + 0.3576 * g + 0.1805 * b, 0.2126 * r + 0.7152 * g + 0.0722 * b, 0.0193 * r + 0.1192 * g + 0.9505 * b
+
+
+def lab(h):
+    x, y, z = _xyz(h)
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x / 0.95047), f(y), f(z / 1.08883)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def delta_e(a, b):
+    """CIE76: the straight distance between two colors in Lab."""
+    return sum((p - q) ** 2 for p, q in zip(lab(a), lab(b))) ** 0.5
+
+
+def contrast(a, b):
+    hi, lo = sorted((_xyz(a)[1], _xyz(b)[1]), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def check_states(planet_name, planet):
+    red, blue, green = STATES[planet_name]
+    named = {"red": red, "blue": blue, "green": green}
+    for n, c in named.items():
+        for ground in ("midnight", "deep"):
+            if contrast(c, planet[ground]) < MIN_CONTRAST:
+                sys.exit(f"{planet_name}: {n} {c} is under {MIN_CONTRAST}:1 on {ground}")
+        if delta_e(c, planet["gold"]) < MIN_DELTA_E:
+            sys.exit(f"{planet_name}: {n} {c} is within {MIN_DELTA_E} of the accent {planet['gold']}")
+    for (n1, c1), (n2, c2) in ((("red", red), ("blue", blue)), (("red", red), ("green", green)), (("blue", blue), ("green", green))):
+        if delta_e(c1, c2) < MIN_DELTA_E:
+            sys.exit(f"{planet_name}: {n1} and {n2} are within {MIN_DELTA_E} of each other")
+
+
 def mix(a, b, t):
     """t of a, the rest b."""
     x, y = rgb(a), rgb(b)
@@ -52,6 +114,7 @@ def mix(a, b, t):
 
 
 def colors_toml(name, planet, accents, sun):
+    red, blue, green = STATES[name.split("-")[1]]
     c = [
         ("mode", "dark"),
         ("accent", planet["gold"]),
@@ -68,9 +131,9 @@ def colors_toml(name, planet, accents, sun):
         ("light_foreground", planet["ink"]),
         ("bright_foreground", planet["ink"]),
         ("dark_foreground", planet["inkMuted"]),
-        ("red", NEEDS_YOU),
-        ("blue", WORKING),
-        ("green", accents["leaf"]),
+        ("red", red),
+        ("blue", blue),
+        ("green", green),
         ("cyan", accents["teal"]),
         ("orange", accents["ember"]),
         ("yellow", sun["goldBright"]),
@@ -127,6 +190,7 @@ def main():
         d = os.path.join(a.out, name)
         os.makedirs(os.path.join(d, "backgrounds"), exist_ok=True)
         with open(os.path.join(d, "colors.toml"), "w") as f:
+            check_states(p, planets[p])
             f.write(colors_toml(name, planets[p], accents, planets["sun"]))
         with open(os.path.join(d, "icons.theme"), "w") as f:
             f.write("Yaru-dark\n")
