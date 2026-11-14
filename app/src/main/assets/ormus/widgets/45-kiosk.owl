@@ -4,14 +4,26 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, tap the header for the whole list."; version: "1.2"; license: "MIT"; category: "news" }
+  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.3"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
+  requires { pacman: ["openssh"] }
   source f = http("https://sg.tailb43a3a.ts.net/feeds/kiosk.json") every 5m json timeout 20s status
   source now = clock every 1m
+  // A second clock, finer than `now`, so a second tap can be told from the first before the link opens.
+  source tick = clock every 250ms
+  source apps = android.apps every 10m
   state at = 0 persist
   state pull = 0
+  // The link a single tap will open, once `tick` has moved on. A second tap on the same one clears it.
+  state pending = ""
+  state tapped = 0
+  state opening = ""
+  state note = ""
+  // The article a double tap asked to integrate. A fresh `n` so the same article can be asked again.
+  state go = ""
+  state spun = ""
 
   // One list can be missing (its file unreadable on sg: the feed names it in `errors` and the other list still shows).
   let data = f != null && f.ok && f.out != null && (f.out.news != null || f.out.craft != null) ? f.out : null
@@ -25,6 +37,101 @@ widget "kiosk" {
   // The loops stopped or sg is away: say how old the picks are instead of passing them off as fresh.
   let stale = picked != null && now != null && now - picked > 4 * 3600
   let failed = data != null ? keys(data.errors ?? {}) : []
+
+  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
+  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+  // sg as Mercurio's saved host names it, and the names the tailnet uses for that machine.
+  let sgLink = "ssh://ormus@sg.tailb43a3a.ts.net:22"
+  let sgHosts = "sg,sg.tailb43a3a.ts.net,100.66.108.108"
+
+  // Runs on sg. Reads the article as JSON on stdin. Opens a Claude tab in the ORMUS workspace of the ormus
+  // session, asks it to integrate the article into the solar system, and prints {ok, pane} for Mercurio.
+  let script = """
+import json, os, subprocess, sys, time
+
+os.environ["PATH"] = os.path.expanduser("~/.local/bin") + ":" + os.environ.get("PATH", "")
+brief = json.load(sys.stdin)
+
+def herdr(*args):
+    p = subprocess.run(["herdr", "--session", "ormus", *args], capture_output=True, text=True, timeout=70)
+    if p.returncode != 0:
+        err = (p.stderr or p.stdout or "herdr failed").strip()
+        raise RuntimeError(err.splitlines()[-1][:240])
+    return json.loads(p.stdout)
+
+def emit(obj):
+    print(json.dumps(obj, ensure_ascii=False))
+
+pane = None
+try:
+    ws = herdr("workspace", "list")["result"]["workspaces"]
+    home = next((w for w in ws if w.get("label") == "ORMUS"), None)
+    if home is None:
+        emit({"ok": False, "err": "ORMUS workspace is not open on sg"})
+        sys.exit(0)
+    title = (brief.get("title") or "article").replace(chr(10), " ")[:48]
+    tab = herdr("tab", "create", "--workspace", home["workspace_id"], "--cwd", "/home/ormus/projects", "--label", title, "--no-focus")
+    pane = tab["result"]["root_pane"]["pane_id"]
+    name = "kiosk" + str(int(time.time()))
+    herdr("agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", "60000")
+    move = brief.get("move") or ""
+    kind = "news" if brief.get("kind") == "news" else "how others code"
+    lines = [
+        "Integrate this article into Ormus's development solar system: the machines Sun, Mercury, Mars, Moon, Jupiter and sg, and the work already running in this Herdr session.",
+        "",
+        "Kind: " + kind,
+        "Title: " + (brief.get("title") or ""),
+        "Source: " + (brief.get("source") or ""),
+        "Who: " + (brief.get("who") or ""),
+        "Why it matters: " + (brief.get("why") or ""),
+        "The one move: " + move,
+        "Summary: " + (brief.get("summary") or ""),
+        "URL: " + (brief.get("url") or ""),
+        "",
+        "Read the article. Decide which machine and which project should take it. Do that move in the right repo, or start the change and say where it lives. Do not stop at a summary.",
+    ]
+    herdr("agent", "prompt", name, chr(10).join(lines))
+    emit({"ok": True, "pane": pane, "session": "ormus", "title": title})
+except Exception as e:
+    closed = True
+    if pane:
+        c = subprocess.run(["herdr", "--session", "ormus", "pane", "close", pane], capture_output=True)
+        closed = c.returncode == 0
+    msg = str(e).splitlines()[-1][:200]
+    if pane and not closed:
+        msg = msg + " (a tab was left open)"
+    emit({"ok": False, "err": msg})
+"""
+  let remote = 'python3 -c "import base64,sys; exec(base64.b64decode(sys.argv[1]))" ' + replace(toBase64(script), "\n", "")
+
+  // A single tap waits a beat, so a second tap on the same pick can take the session instead of the link.
+  on tick {
+    if pending != "" && value != null && value >= tapped + 0.55 {
+      let u = pending
+      pending = ""
+      url(u)
+    }
+  }
+  on go {
+    if value != null && value != "" {
+      spun = run("printf %s ${sh(value)} | ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg ${sh(remote)}")
+    }
+  }
+  on spun {
+    let got = parseJson(value ?? "")
+    opening = ""
+    if got != null && got.ok && got.pane != null {
+      haptic()
+      if mercurio != null {
+        androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.HERD_PANE": got.pane, "solutions.ormus.logos.extra.HERD_SESSION": "ormus", "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": sgHosts}})
+      } else {
+        terminal("ssh -t sg ${sh("PATH=$HOME/.local/bin:$PATH exec herdr --session ormus agent attach " + got.pane)}", got.title ?? "mercury")
+      }
+    } else {
+      note = got != null && got.err != null && got.err != "" ? got.err : "sg did not open a session"
+      notify("mercury", note)
+    }
+  }
 
   // One pick. `lines` is the room for its texts. `gold` marks the one pick of a view whose move is the gold line:
   // one gold element a view, for the thing to do first.
@@ -46,25 +153,16 @@ widget "kiosk" {
     }
   }
 
-  Column {
-    gap: 8
+  // A pick you can tap. `paging` is the tile: a sideways swipe moves to the next one. The screen lists every pick
+  // and only takes the tap. A second tap within the beat opens a session instead of the link.
+  component Article(item, lines, gold, paging) {
     Box {
-      onTap: screen()
-      Row {
-        align: center
-        Text { text: "mercury"; style: muted; weight: 1 }
-        Text { text: f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+      drag: horizontal
+      onDrag: {
+        if paging { pull = pull + dx }
       }
-    }
-    if data != null && n == 0 {
-      Text { text: "nothing picked yet"; style: body; color: muted }
-    }
-    if i != null {
-      // A swipe moves to the next or the one before; a tap opens the link.
-      Box {
-        drag: horizontal
-        onDrag: pull = pull + dx
-        onDragEnd: {
+      onDragEnd: {
+        if paging {
           if pull < -40 || vx < -400 {
             at = (at + 1) % n
           } else if pull > 40 || vx > 400 {
@@ -72,11 +170,41 @@ widget "kiosk" {
           }
           pull = 0
         }
-        onTap: url(i.url)
-        offset: [pull, 0]
-        animate offset: spring()
-        Pick { i: i; lines: max(2, floor(((tileHeight ?? 270) - 170) / 16)); gold: true }
       }
+      onTap: {
+        let gap = tick != null ? tick - tapped : null
+        if pending == item.url && gap != null && gap >= 0 && gap < 0.7 {
+          pending = ""
+          opening = item.url
+          note = ""
+          haptic()
+          go = toJson({n: random(1000000000), title: item.title ?? "", url: item.url ?? "", source: item.source ?? "", who: item.who ?? "", why: item.why ?? "", summary: item.summary ?? "", kind: item.kind ?? "", move: item.gold ?? item.try ?? ""})
+        } else {
+          pending = item.url ?? ""
+          tapped = tick ?? 0
+        }
+      }
+      offset: [paging ? pull : 0, 0]
+      animate offset: spring()
+      Pick { i: item; lines: lines; gold: gold }
+    }
+  }
+
+  Column {
+    gap: 8
+    Box {
+      onTap: screen()
+      Row {
+        align: center
+        Text { text: "mercury"; style: muted; weight: 1 }
+        Text { text: opening != "" ? "opening a session" : note != "" ? note : f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: opening != "" ? accent : note != "" || data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+      }
+    }
+    if data != null && n == 0 {
+      Text { text: "nothing picked yet"; style: body; color: muted }
+    }
+    if i != null {
+      Article { item: i; lines: max(2, floor(((tileHeight ?? 270) - 170) / 16)); gold: true; paging: true }
     }
   }
 
@@ -86,6 +214,12 @@ widget "kiosk" {
       scroll: true
       gap: 14
       padding: [4, 8]
+      if opening != "" {
+        Text { text: "opening a session…"; style: small; color: accent }
+      }
+      if note != "" {
+        Text { text: note; style: small; color: red }
+      }
       if data == null {
         Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
       } else {
@@ -94,11 +228,11 @@ widget "kiosk" {
         }
         Text { text: "NEWS FOR YOU"; style: label }
         for p, k in news key "news:${k}:${p.url}" {
-          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "news"}); lines: 4; gold: k == 0 } }
+          Article { item: merge(p, {kind: "news"}); lines: 4; gold: k == 0; paging: false }
         }
         Text { text: "HOW OTHERS CODE"; style: label }
         for p, k in craft key "craft:${k}:${p.url}" {
-          Box { onTap: url(p.url); Pick { i: merge(p, {kind: "craft"}); lines: 4; gold: k == 0 && len(news) == 0 } }
+          Article { item: merge(p, {kind: "craft"}); lines: 4; gold: k == 0 && len(news) == 0; paging: false }
         }
         for k in failed {
           Text { text: "${k}: ${data.errors[k]}"; style: small; color: red }
