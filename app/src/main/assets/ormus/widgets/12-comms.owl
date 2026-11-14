@@ -41,7 +41,7 @@ widget "comms" {
     } else {
       // No answer (ssh dropped, or sg printed nothing) is never "nothing was sent": the text may have gone, and a
       // second tap would send it twice. He opens the chat and looks.
-      said = reply == null ? "no answer: open the chat to check" : reply.outcome == "too soon" ? "you just replied: wait a minute" : reply.outcome == "unknown chat" ? "the chat moved on: look again" : reply.outcome == "feed stale" ? "sg's list is old: open the chat" : reply.outcome == "refused" ? "sg refused it: look again" : reply.outcome == "not confirmed" ? "not confirmed: open the chat" : "it did not go through: open the chat"
+      said = reply == null ? "no answer: open the chat to check" : reply.outcome == "too soon" ? "you just replied: wait a minute" : reply.outcome == "unknown chat" || reply.outcome == "changed" ? "the chat moved on: look again" : reply.outcome == "feed stale" ? "sg's list is old: open the chat" : reply.outcome == "refused" ? "sg refused it: look again" : reply.outcome == "not confirmed" ? "not confirmed: open the chat" : "it did not go through: open the chat"
     }
     refresh()
   }
@@ -115,6 +115,9 @@ widget "comms" {
   // sg's answer about the card shown; "sent" retires its keys at once (the next read shows `replied`).
   let cardSaid = said != "" && busy == "" && saidFor == cardId
   let cardSent = cardSaid && said == "sent"
+  // Quiet lines: a sent reply, and a chat that moved on (a newer word came after the keys were drawn; nothing was sent).
+  // Every other outcome is red.
+  let saidQuiet = said == "sent" || said == "the chat moved on: look again"
   let cardKeys = card == null || card.replied != null || cardSent ? [] : (card.replies ?? [])
   let cardPer = max(6, floor(wide / max(1, len(cardKeys))) - 3)
   let cardShort = len(cardKeys) <= 3 && all(cardKeys, o => len(o.label) + 2 <= cardPer)
@@ -212,7 +215,7 @@ widget "comms" {
           busyN = n
           busyAt = now ?? 0
           said = ""
-          sent = run("r=$(printf %s ${sh(toJson({k: c.k, n: n, label: o.label}))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, n: n, label: o.label}, c.sig != null ? {sig: c.sig} : {})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
         }
       }
       Key { word: busy == "${c.k}|${c.text ?? ""}" && busyN == n ? "…" : "${n} ${o.label}"; strong: strong; dim: busy != "" && !(busy == "${c.k}|${c.text ?? ""}" && busyN == n) }
@@ -272,7 +275,7 @@ widget "comms" {
           }
           Text { text: c.name; fontSize: 17; bold: true; maxLines: 1 }
           if folded && answered && !sentNow {
-            Text { text: said; fontSize: 13; color: red; maxLines: 2 }
+            Text { text: said; fontSize: 13; color: saidQuiet ? muted : red; maxLines: 2 }
           } else if (c.text ?? "") != "" {
             Text { text: c.text; fontSize: 14; maxLines: compact ? 2 : 6 }
           }
@@ -332,7 +335,7 @@ widget "comms" {
         OpenChat { c: c; word: "open in WhatsApp"; fill: width }
       }
       if answered && !folded && !sentNow {
-        Text { text: said; fontSize: 13; color: red; maxLines: 2 }
+        Text { text: said; fontSize: 13; color: saidQuiet ? muted : red; maxLines: 2 }
       }
     }
   }
@@ -386,7 +389,7 @@ widget "comms" {
       gap: 2
       Text { text: len(cards) > 0 ? "${len(cards)} chat${len(cards) == 1 ? "" : "s"} wait${len(cards) == 1 ? "s" : ""}" : "nobody waits"; font: serif; fontSize: 28; bold: false; color: len(cards) > 0 ? foreground : muted; maxLines: 1 }
       if said != "" && busy == "" && !(compact && fold) && saidFor != cardId {
-        Text { text: said; fontSize: 12; color: said == "sent" ? muted : red; maxLines: 1 }
+        Text { text: said; fontSize: 12; color: saidQuiet ? muted : red; maxLines: 1 }
       }
     }
   }

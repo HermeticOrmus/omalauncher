@@ -24,6 +24,69 @@ widget "sessions-clients" {
   state said = ""
   // The question `said` is about, so the line shows on that card, or under the headline when another card shows.
   state saidFor = ""
+
+  // An agent in herdr-core is steered from the screen's list through sg's agent tool (ormus-feeds bin/agent): its
+  // screen, a stop, a say. One at a time: `act` is the agent being asked ("machine:session:pane"), `actDo` what was
+  // asked, `go` the request ({"n": a number of its own, "body": what sg gets on stdin}), `acted` what came back wrapped
+  // as {"n", "r": the tool's answer}, so two equal answers in a row still count as two. `actLine` is the one quiet line
+  // about it and `actFor` the agent it is about; `peek` is the agent whose screen is open (the whole view of the
+  // screen's list gives way to it), `peekText` the text sg returned and `peekStatus` the agent's status then.
+  // `stopAsk` is the agent whose stop key waits for a second tap, until `tick` has moved six seconds past `stopAt`.
+  // What he says is never kept: the field empties as he submits, and sg never returns it.
+  source tick = clock every 2s
+  state go = ""
+  state act = ""
+  state actDo = ""
+  state actAt = 0
+  state acted = ""
+  state actLine = ""
+  state actRed = false
+  state actFor = ""
+  state peek = ""
+  state peekText = ""
+  state peekStatus = ""
+  state stopAsk = ""
+  state stopAt = 0
+  on go {
+    let req = value != null && value != "" ? parseJson(value) : null
+    if req != null {
+      acted = run("printf '{\"n\":%s,\"r\":' ${int(req.n)}; printf %s ${sh(toJson(req.body))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg projects/ormus-feeds/bin/agent -; printf '}'")
+    }
+  }
+  on acted {
+    let got = parseJson(value ?? "")
+    let r = got != null ? got.r : null
+    let o = r != null ? (r.outcome ?? "") : ""
+    actFor = act
+    act = ""
+    if actDo == "screen" && o == "screen" {
+      peekText = r.text ?? ""
+      peekStatus = r.status ?? ""
+      actLine = ""
+      actRed = false
+    } else {
+      actLine = r == null ? "no answer: look again" : o == "sent" ? "sent" : o == "stopped" ? "stopped" : o == "held" ? "waits for a draft at the desk" : o == "not waiting" ? "not waiting for a word" : o == "not working" ? "not working now" : o == "changed" ? "the agent moved on: look again" : o == "refused" ? "sg refused it" : "it did not go through"
+      actRed = r == null || o == "refused" || o == "failed" || (o != "sent" && o != "stopped" && o != "held" && o != "not waiting" && o != "not working" && o != "changed")
+      if o == "sent" || o == "stopped" {
+        haptic()
+        refresh()
+      }
+    }
+  }
+  // A request whose answer never comes frees the agent after a while (a say may wait a minute for a draft).
+  on now {
+    if act != "" && now - actAt >= 100 {
+      actFor = act
+      act = ""
+      actLine = "no answer: look again"
+      actRed = true
+    }
+  }
+  on tick {
+    if stopAsk != "" && value >= stopAt + 6 {
+      stopAsk = ""
+    }
+  }
   on sent {
     let got = parseJson(value ?? "")
     let reply = got != null ? got.r : null
@@ -71,6 +134,9 @@ widget "sessions-clients" {
   let game = data != null ? data.game : null
   // Boards with an agent in them; a board with none stays out of the way.
   let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0)
+  // The agent whose screen is open, and its head: its title, else its tab.
+  let peeked = peek == "" ? null : agents.find(a => "${a.machine}:${a.session}:${a.pane}" == peek)
+  let peekHead = peeked == null ? "agent" : peeked.title != "" && peeked.title != "Claude Code" ? peeked.title : peeked.tab != "" ? peeked.tab : peeked.kind
 
   // The cards: every agent that needs him, one at a time: first the ones one tap can answer, then the ones whose
   // question the feed read but cannot answer from here, then the rest. `pick` is the card shown, by the agent's
@@ -129,6 +195,82 @@ widget "sessions-clients" {
       // What it needs when the priorities tool knows; else its title, or its tab when the title says nothing.
       Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); fontSize: 14; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
       Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
+    }
+  }
+
+  // A quiet key for the agent's own actions: never gold, which belongs to the card's lead answer.
+  component Pill(word) {
+    Box {
+      padding: [7, 12]
+      radius: 8 * corners
+      background: alpha(foreground, 0.09)
+      Text { text: word; fontSize: 13; color: foreground; maxLines: 1 }
+    }
+  }
+
+  // What sg's agent tool gets for an agent (the JSON on its stdin): what to do, and the agent as the feed names it.
+  // `term` is the terminal seen: sg answers `changed` when the pane's terminal is another one now.
+  component AgentActions(a) {
+    let k = "${a.machine}:${a.session}:${a.pane}"
+    let working = a.status == "working" || a.status == "blocked"
+    let waits = a.status == "idle" || a.status == "done"
+    Column {
+      gap: 4
+      padding: [0, 4]
+      Row {
+        gap: 8
+        align: center
+        Box {
+          onTap: {
+            if act == "" {
+              peek = k
+              peekText = ""
+              peekStatus = ""
+              actLine = ""
+              act = k
+              actDo = "screen"
+              actAt = now ?? 0
+              go = toJson({n: int(random(1000000000)), body: {do: "screen", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
+            }
+          }
+          Pill { word: "screen" }
+        }
+        if working {
+          Box {
+            onTap: {
+              if act == "" && stopAsk != k {
+                stopAsk = k
+                stopAt = tick ?? 0
+              } else if act == "" {
+                stopAsk = ""
+                actLine = ""
+                act = k
+                actDo = "stop"
+                actAt = now ?? 0
+                go = toJson({n: int(random(1000000000)), body: {do: "stop", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
+              }
+            }
+            Pill { word: stopAsk == k ? "tap again to stop" : "stop" }
+          }
+        }
+        Text { text: actFor == k && act == "" ? actLine : act == k ? "…" : ""; fontSize: 12; color: actRed ? red : muted; weight: 1; maxLines: 1 }
+      }
+      if waits {
+        Input {
+          placeholder: "say something to ${lower(a.kind)}"
+          fontSize: 14
+          clear: true
+          onSubmit: {
+            if act == "" && trim(value) != "" {
+              actLine = ""
+              act = k
+              actDo = "say"
+              actAt = now ?? 0
+              go = toJson({n: int(random(1000000000)), body: {do: "say", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? "", text: value}})
+            }
+          }
+        }
+      }
     }
   }
 
@@ -390,71 +532,119 @@ widget "sessions-clients" {
   }
 
   screen {
-    title: only == "" ? "sessions" : only
-    Column {
-      scroll: true
-      gap: 12
-      padding: [4, 8]
-      if data == null {
-        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
-      } else if only != "" && len(boards) == 0 {
-        Text { text: "no ${only} board in the feed"; style: body; color: red }
-      } else {
-        Headline { full: true }
-        if card != null {
-          Cards { compact: false; wide: floor(((screenWidth ?? 360) - 64) / 7.5) }
-        }
-        if stale || len(down) > 0 {
-          Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }
-        }
-        let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
-        if len(moves) > 0 {
-          Column {
-            gap: 2
-            Text { text: "MOVED LATELY"; style: label }
-            for m in reverse(moves).take(8) key "${m.n}" {
-              Row {
-                gap: 8
-                align: center
-                padding: [0, 3]
-                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "needs" ? red : m.kind == "done" || m.kind == "chat" ? muted : foreground }
-                Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
-                Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
-              }
-            }
-          }
-        }
+    title: peek != "" ? peekHead : only == "" ? "sessions" : only
+    if peek != "" {
+      // One agent's screen, as sg read it: the last lines of its terminal in mono, from the end, with a way back and a
+      // refresh. An outcome that is not the screen (changed, failed) is one line under the keys.
+      Column {
+        gap: 8
+        weight: 1
+        padding: [4, 8]
         Row {
           gap: 8
           align: center
-          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
-          Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
-        }
-        for b in live key b.name {
-          Column {
-            gap: 4
-            Row {
-              align: center
-              Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
-              Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
+          Box {
+            onTap: {
+              peek = ""
+              actLine = ""
             }
-            for p in b.projects.filter(p => len(p.top) > 0) key p.name {
-              Column {
-                gap: 2
-                padding: [0, 2]
-                Text { text: p.name; fontSize: 13; bold: true; color: muted }
-                for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
-                  Item { i: merge(a, {project: p.name}); where: "${a.kind} · ${a.machine}" }
+            Pill { word: "back" }
+          }
+          Box {
+            onTap: {
+              if act == "" && peeked != null {
+                actLine = ""
+                act = peek
+                actDo = "screen"
+                actAt = now ?? 0
+                go = toJson({n: int(random(1000000000)), body: {do: "screen", machine: peeked.machine, session: peeked.session, pane: peeked.pane, term: peeked.term ?? ""}})
+              }
+            }
+            Pill { word: "refresh" }
+          }
+          Text { text: act == peek ? "…" : peekStatus; fontSize: 12; color: muted; weight: 1; align: end; maxLines: 1 }
+        }
+        if actLine != "" && act == "" {
+          Text { text: actLine; fontSize: 13; color: actRed ? red : muted; maxLines: 2 }
+        }
+        Column {
+          lazy: true
+          reverse: true
+          weight: 1
+          for ln, i in reverse(split(peekText, "\n")) key "${i}" {
+            Text { text: ln; font: mono; fontSize: 11; maxLines: 4 }
+          }
+        }
+      }
+    } else {
+      Column {
+        scroll: true
+        gap: 12
+        padding: [4, 8]
+        if data == null {
+          Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+        } else if only != "" && len(boards) == 0 {
+          Text { text: "no ${only} board in the feed"; style: body; color: red }
+        } else {
+          Headline { full: true }
+          if card != null {
+            Cards { compact: false; wide: floor(((screenWidth ?? 360) - 64) / 7.5) }
+          }
+          if stale || len(down) > 0 {
+            Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }
+          }
+          let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
+          if len(moves) > 0 {
+            Column {
+              gap: 2
+              Text { text: "MOVED LATELY"; style: label }
+              for m in reverse(moves).take(8) key "${m.n}" {
+                Row {
+                  gap: 8
+                  align: center
+                  padding: [0, 3]
+                  Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "needs" ? red : m.kind == "done" || m.kind == "chat" ? muted : foreground }
+                  Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
+                  Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
                 }
               }
             }
           }
-        }
-        for n in data.notes ?? [] {
-          Text { text: n; fontSize: 13; color: muted }
-        }
-        for k in failed {
-          Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
+          Row {
+            gap: 8
+            align: center
+            Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
+            Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
+          }
+          for b in live key b.name {
+            Column {
+              gap: 4
+              Row {
+                align: center
+                Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
+                Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
+              }
+              for p in b.projects.filter(p => len(p.top) > 0) key p.name {
+                Column {
+                  gap: 2
+                  padding: [0, 2]
+                  Text { text: p.name; fontSize: 13; bold: true; color: muted }
+                  for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
+                    Item { i: merge(a, {project: p.name}); where: "${a.kind} · ${a.machine}" }
+                    if a.session == "core" {
+                      AgentActions { a: a }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          for n in data.notes ?? [] {
+            Text { text: n; fontSize: 13; color: muted }
+          }
+          for k in failed {
+            Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
+          }
         }
       }
     }
