@@ -114,11 +114,13 @@ except Exception as e:
   }
   on go {
     if value != null && value != "" {
-      spun = run("printf %s ${sh(value)} | ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg ${sh(remote)}")
+      spun = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(value)} | ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg ${sh(remote)}; printf '}'")
     }
   }
   on spun {
-    let got = parseJson(value ?? "")
+    // Wrapped as {"n": a number of its own, "r": sg's answer}, so two equal answers in a row still count as a change.
+    let wrapped = parseJson(value ?? "")
+    let got = wrapped != null ? wrapped.r : null
     opening = ""
     if got != null && got.ok && got.pane != null {
       haptic()
@@ -197,7 +199,7 @@ except Exception as e:
       Row {
         align: center
         Text { text: "mercury"; style: muted; weight: 1 }
-        Text { text: opening != "" ? "opening a session" : note != "" ? note : f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: opening != "" ? accent : note != "" || data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+        Text { text: opening != "" ? "opening a session" : note != "" ? note : f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: opening != "" ? foreground : note != "" || data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
       }
     }
     if data != null && n == 0 {
@@ -215,7 +217,7 @@ except Exception as e:
       gap: 14
       padding: [4, 8]
       if opening != "" {
-        Text { text: "opening a session…"; style: small; color: accent }
+        Text { text: "opening a session…"; style: small; color: foreground }
       }
       if note != "" {
         Text { text: note; style: small; color: red }

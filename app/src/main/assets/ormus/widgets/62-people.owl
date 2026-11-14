@@ -32,7 +32,7 @@ widget "people" {
     Row {
       align: center
       Text { text: len(due) > 0 ? "people · ${len(due)} to reach" : "people · all in touch"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.people != null ? "WhatsApp unreadable" : "last word"; style: small; color: !f.ok || data.errors.people != null ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.people != null ? "WhatsApp unreadable" : "last word"; style: small; color: f != null && (!f.ok || data.errors.people != null) ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     for p in people.take(room) key p.name {
       if p.url != null {

@@ -34,7 +34,7 @@ widget "raven" {
     Row {
       align: center
       Text { text: lin != null ? "raven · ${lin.in_progress} doing · ${lin.in_review} review" : "raven"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null || data.errors.reviews != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: !f.ok || data.errors.linear != null || data.errors.reviews != null ? red : stale ? foreground : muted; width: 120; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : data.errors.linear != null || data.errors.reviews != null ? "Linear unreadable" : lin != null && lin.jtekt > 0 ? "${lin.jtekt} jtekt" : ""; style: small; color: f != null && (!f.ok || data.errors.linear != null || data.errors.reviews != null) ? red : stale ? foreground : muted; width: 120; align: end; maxLines: 1 }
     }
     Row {
       gap: 8

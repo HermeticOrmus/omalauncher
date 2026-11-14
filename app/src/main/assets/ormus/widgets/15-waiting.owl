@@ -36,7 +36,7 @@ widget "communications" {
     Row {
       align: center
       Text { text: "communications · ${len(items)}"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: !f.ok || len(failed) > 0 ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: f != null && (!f.ok || len(failed) > 0) ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     if data != null && len(items) == 0 {
       Text { text: "nobody waits on you"; style: body; color: muted }
