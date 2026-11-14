@@ -28,7 +28,7 @@ class OrmusPrsTileTest {
     private fun feed(
         attention: List<String> = listOf(failing, conflict, changes),
         updated: List<String> = listOf(pr("acme/portal", 11, "green", title = "bump a library"), pr("beta/site", 12, "pending", title = "add a test"), pr("beta/site", 13, "none", title = "rename a file")),
-        counts: String = """{"open": 10, "drafts": 2, "failing": 2, "green": 3, "changes_requested": 1, "conflicts": 3}""",
+        counts: String = """{"open": 10, "drafts": 2, "failing": 2, "green": 3, "changes_requested": 1, "conflicts": 3, "needs": 4}""",
         errors: String = "[]",
         generated: Long = 1_794_166_000,
     ) = Json.parse(
@@ -44,10 +44,27 @@ class OrmusPrsTileTest {
 
     @Test fun theHeadCountsWhatNeedsHimAndTheOpenOnesBesideIt() {
         val lines = tile().lines(program.root)
-        assertTrue("failing 2 + changes requested 1 + conflicts 3: $lines", "6 need you" in lines && "10 open" in lines)
+        assertTrue("the feed's own count, each pull request once: $lines", "4 need you" in lines && "10 open" in lines)
         assertTrue("an owner a muted line, its failing count only when it has some: $lines", "acme · 6 open · 2 failing" in lines && "beta · 4 open" in lines)
         val none = tile(feed(counts = """{"open": 3, "drafts": 0, "failing": 0, "green": 3, "changes_requested": 0, "conflicts": 0}""", attention = emptyList())).lines(program.root)
         assertTrue("$none", "nothing needs you" in none && "3 open" in none)
+    }
+
+    @Test fun anOlderFeedWithoutNeedsIsSummedAsBefore() {
+        val old = tile(feed(counts = """{"open": 10, "drafts": 2, "failing": 2, "green": 3, "changes_requested": 1, "conflicts": 3}""")).lines(program.root)
+        assertTrue("$old", "6 need you" in old)
+    }
+
+    @Test fun theAllClearIsGoldOnlyOnAFeedWithNoErrorsThatIsOnTime() {
+        val clear = """{"open": 3, "drafts": 0, "failing": 0, "green": 3, "changes_requested": 0, "conflicts": 0, "needs": 0}"""
+        val good = tile(feed(counts = clear, attention = emptyList()))
+        val gold = good.colorOfText(program.root, "nothing needs you")
+        val muted = good.colorOfText(program.root, "3 open")
+        assertNotEquals("gold is not the muted color", gold, muted)
+        val broken = tile(feed(counts = clear, attention = emptyList(), errors = """["github: no answer"]"""))
+        assertEquals("a broken feed has nothing to celebrate", muted, broken.colorOfText(program.root, "nothing needs you"))
+        val old = tile(feed(counts = clear, attention = emptyList(), generated = 1_794_166_000 - 1_200))
+        assertEquals("nor an old one", muted, old.colorOfText(program.root, "nothing needs you"))
     }
 
     @Test fun eachRowNamesItsPullRequestAndWhyItIsThereWithAMarkAndAWord() {
@@ -86,7 +103,7 @@ class OrmusPrsTileTest {
         val t = tile(feed(errors = """["gh: not signed in", "github: rate limited"]"""))
         val lines = t.lines(program.root)
         assertTrue("$lines", "gh: not signed in · github: rate limited" in lines)
-        assertTrue("the last rows are still shown: $lines", "6 need you" in lines && "fix the invoice total" in lines)
+        assertTrue("the last rows are still shown: $lines", "4 need you" in lines && "fix the invoice total" in lines)
         assertNotEquals("the line is red", t.colorOfText(program.root, "gh: not signed in · github: rate limited"), t.colorOfText(program.root, "10 open"))
     }
 

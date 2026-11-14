@@ -13,14 +13,18 @@ widget "prs" {
 
   let data = f != null && f.ok && f.out != null && f.out.counts != null ? f.out : null
   let counts = data != null ? data.counts : null
-  // The ones that need him: failing checks, changes requested, a conflict (the feed counts the non-drafts).
-  let needs = counts == null ? 0 : counts.failing + counts.changes_requested + counts.conflicts
+  // The ones that need him: each non-draft pull request that fails its checks, has changes requested or conflicts, once
+  // (`counts.needs`). A feed from before it has the three counts only, and their sum counts a pull request twice when it
+  // is in two of them.
+  let needs = counts == null ? 0 : counts.needs ?? (counts.failing + counts.changes_requested + counts.conflicts)
   let attention = data != null ? (data.attention ?? []) : []
   let updated = data != null ? (data.updated ?? []) : []
   let owners = data != null ? (data.owners ?? []) : []
   let errors = data != null ? (data.errors ?? []) : []
   // The feed runs every minute and asks GitHub every five: older than fifteen minutes is a feed that is down.
   let stale = data != null && now != null && data.generated != null && now - data.generated > 900
+  // The all-clear is gold only on a feed that is whole and on time; else it is muted, not a celebration.
+  let clear = len(errors) == 0 && !stale
   let ownerRows = (tileHeight ?? 260) >= 300 ? 3 : 1
   let room = max(1, floor(((tileHeight ?? 260) - 74 - 18 * min(ownerRows, len(owners)) - (len(errors) > 0 ? 18 : 0)) / 42))
 
@@ -52,12 +56,12 @@ widget "prs" {
     Text { text: "${o.name} · ${o.open} open${o.failing > 0 ? " · ${o.failing} failing" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
   }
 
-  // The head: how many need him, in the needs-you red (gold when none does), with the open count beside it.
+  // The head: how many need him, in the needs-you red (gold when none does and the feed is whole), with the open count beside it.
   component Headline() {
     Row {
       gap: 8
       align: center
-      Text { text: needs > 0 ? "${needs} need you" : "nothing needs you"; font: serif; fontSize: 28; bold: false; color: needs > 0 ? red : accent; weight: 1; maxLines: 1 }
+      Text { text: needs > 0 ? "${needs} need you" : "nothing needs you"; font: serif; fontSize: 28; bold: false; color: needs > 0 ? red : clear ? accent : muted; weight: 1; maxLines: 1 }
       Text { text: "${counts.open} open"; fontSize: 12; color: muted; maxLines: 1 }
     }
   }
