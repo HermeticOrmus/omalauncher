@@ -42,7 +42,7 @@ widget "kiosk" {
   let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
   // sg as Mercurio's saved host names it, and the names the tailnet uses for that machine.
   let sgLink = "ssh://ormus@sg.tailb43a3a.ts.net:22"
-  let sgHosts = "sg,sg.tailb43a3a.ts.net,100.66.108.108"
+  let sgHosts = "sg,sg.tailb43a3a.ts.net,100.66.108.108,fd7a:115c:a1e0::1c31:6c6d"
 
   // Runs on sg. Reads the article as JSON on stdin. Opens a Claude tab in the ORMUS workspace of the ormus
   // session, asks it to integrate the article into the solar system, and prints {ok, pane} for Mercurio.
