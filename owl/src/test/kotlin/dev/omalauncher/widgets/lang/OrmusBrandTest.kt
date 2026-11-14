@@ -44,7 +44,7 @@ class OrmusBrandTest {
 
     // Where red may appear: the widgets with a state to name (a feed that did not answer, an agent or a chat that needs him,
     // an invoice late, a limit full). Not a whole-line cue list, which breaks on every reworded message.
-    private val mayBeRed = setOf("10-sessions", "11-board-", "12-comms", "13-comms-", "15-waiting", "16-projects", "30-mercurio", "31-needs", "45-kiosk", "50-pass", "55-money-face", "60-owed", "62-people", "64-pipeline", "70-fleet", "72-usage", "75-raven", "90-markets")
+    private val mayBeRed = setOf("10-sessions", "11-board-", "12-comms", "13-comms-", "15-waiting", "16-projects", "30-mercurio", "31-needs", "45-kiosk", "50-pass", "55-money-face", "60-owed", "62-people", "64-pipeline", "70-fleet", "72-usage", "75-raven", "77-prs", "90-markets")
 
     @Test fun redOnlyMarksNeedsYouAndErrorsAndBlueOnlyAWorkingAgent() {
         for (file in widgets()) for ((i, line) in code(file).withIndex()) for (value in colorsOf(line)) {

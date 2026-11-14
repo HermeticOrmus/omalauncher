@@ -86,6 +86,7 @@ class OrmusWorkboardsTest {
     }
 
     @Test fun aTileNotNamedStaysWithItsSpaceWhenThatIsStillOneElseGoesToMore() {
+        assertEquals("more", OrmusWorkboards.home(tile("77-prs.owl", 1, 0, 0, 6, 4)))
         assertEquals("now", OrmusWorkboards.home(tile("some-widget.owl", 2, 0, 0, 6, 2)))
         assertEquals("more", OrmusWorkboards.home(tile("some-widget.owl", 102, 0, 0, 6, 2)))
         assertEquals("more", OrmusWorkboards.home(tile("app:x", 301, 0, 0, 1, 1, widget = false)))

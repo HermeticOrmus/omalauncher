@@ -41,7 +41,7 @@ object OrmusWorkboards {
         mapOf(
             "45-kiosk.owl" to "mercury", "40-trainer.owl" to "mercury", "market-kingdompaulo-ai-stars.owl" to "mercury",
             "50-pass.owl" to "more", "70-fleet.owl" to "more", "80-today.owl" to "more", "05-sun.owl" to "more",
-            "75-raven.owl" to "raven", "15-waiting.owl" to "more",
+            "75-raven.owl" to "raven", "15-waiting.owl" to "more", "77-prs.owl" to "more",
         ) + BOARDS.entries.associate { (space, file) -> file to space } + COMMS.entries.associate { (space, file) -> file to space }
 
     /** Widgets that leave the home: money's face, owed, people, pipeline and markets, GitHub trending and the world's. */
