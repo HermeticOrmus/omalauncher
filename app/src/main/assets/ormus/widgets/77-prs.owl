@@ -1,0 +1,134 @@
+widget "prs" {
+  page: 601
+  order: 1
+  size: 6x4
+  minSize: 4x3
+
+  meta { owl: 13; description: "What Ormus's agents' pull requests need from him: how many fail their checks, have changes requested or conflict (drafts are only counted), with the open count beside it; each owner on a muted line; the pull requests that need him, newest update first, each with a mark and a word for why; under them the ones that are fine, quieter. A tap on a pull request opens it; a tap on the head opens the whole list. Read from sg's prs feed (ormus-feeds), which asks GitHub every five minutes."; version: "1.0"; license: "MIT"; category: "productivity" }
+
+  // Built on sg (ormus-feeds prs) with sg's gh; the phone only reads the result over the tailnet. It holds the repository,
+  // number, title and link of each pull request, never a body, a comment or an author.
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/prs.json") every 5m json timeout 20s status
+  source now = clock every 1m
+
+  let data = f != null && f.ok && f.out != null && f.out.counts != null ? f.out : null
+  let counts = data != null ? data.counts : null
+  // The ones that need him: failing checks, changes requested, a conflict (the feed counts the non-drafts).
+  let needs = counts == null ? 0 : counts.failing + counts.changes_requested + counts.conflicts
+  let attention = data != null ? (data.attention ?? []) : []
+  let updated = data != null ? (data.updated ?? []) : []
+  let owners = data != null ? (data.owners ?? []) : []
+  let errors = data != null ? (data.errors ?? []) : []
+  // The feed runs every minute and asks GitHub every five: older than fifteen minutes is a feed that is down.
+  let stale = data != null && now != null && data.generated != null && now - data.generated > 900
+  let ownerRows = (tileHeight ?? 260) >= 300 ? 3 : 1
+  let room = max(1, floor(((tileHeight ?? 260) - 74 - 18 * min(ownerRows, len(owners)) - (len(errors) > 0 ? 18 : 0)) / 42))
+
+  // One pull request: a mark and a word for why it is here (a state is never the color alone), where it is, how old,
+  // then its title. `quiet` is a pull request that needs nothing from him.
+  component Pr(r, quiet) {
+    // `owner/name` as `name`: the owner is on its own line.
+    let parts = split(r.repo, "/")
+    let name = len(parts) > 1 ? parts[1] : r.repo
+    let age = r.age_h == null ? "" : r.age_h < 24 ? "${r.age_h}h" : "${floor(r.age_h / 24)}d"
+    Box {
+      onTap: url(r.url)
+      Column {
+        gap: 0
+        padding: [3, 0]
+        Row {
+          gap: 8
+          align: center
+          Text { text: r.state == "failing" ? "✕ failing" : r.conflict == true ? "≠ conflict" : r.review == "changes_requested" ? "± changes" : r.state == "green" ? "✓ green" : r.state == "pending" ? "… pending" : "· open"; fontSize: 12; bold: !quiet; width: 84; maxLines: 1; color: quiet ? muted : foreground }
+          Text { text: "${name}#${r.number}"; fontSize: 12; color: muted; weight: 1; maxLines: 1 }
+          Text { text: age; fontSize: 12; color: muted; width: 30; align: end; maxLines: 1 }
+        }
+        Text { text: r.title; fontSize: 14; maxLines: 1; color: quiet ? muted : foreground }
+      }
+    }
+  }
+
+  component Owner(o) {
+    Text { text: "${o.name} · ${o.open} open${o.failing > 0 ? " · ${o.failing} failing" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
+  }
+
+  // The head: how many need him, in the needs-you red (gold when none does), with the open count beside it.
+  component Headline() {
+    Row {
+      gap: 8
+      align: center
+      Text { text: needs > 0 ? "${needs} need you" : "nothing needs you"; font: serif; fontSize: 28; bold: false; color: needs > 0 ? red : accent; weight: 1; maxLines: 1 }
+      Text { text: "${counts.open} open"; fontSize: 12; color: muted; maxLines: 1 }
+    }
+  }
+
+  onTap: screen()
+
+  Column {
+    gap: 6
+    Row {
+      align: center
+      Text { text: "pull requests"; style: muted; weight: 1 }
+      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; fontSize: 12; color: f != null && data == null ? red : foreground; weight: 2; align: end; maxLines: 1 }
+    }
+    if data != null {
+      Headline {}
+      for o in owners.take(ownerRows) key o.name {
+        Owner { o: o }
+      }
+      for r in attention.take(room) key r.url {
+        Pr { r: r; quiet: false }
+      }
+      if len(attention) > room {
+        Text { text: "+${len(attention) - room} more · tap for the list"; fontSize: 12; color: muted; maxLines: 1 }
+      }
+      if len(errors) > 0 {
+        Text { text: join(errors, " · "); fontSize: 12; color: red; maxLines: 2 }
+      }
+    }
+  }
+
+  screen {
+    title: "pull requests"
+    Column {
+      scroll: true
+      gap: 10
+      padding: [4, 8]
+      if data == null {
+        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else {
+        Headline {}
+        if stale {
+          Text { text: "as of ${floor((now - data.generated) / 60)}m ago"; fontSize: 13; color: foreground }
+        }
+        if len(errors) > 0 {
+          Text { text: join(errors, " · "); fontSize: 13; color: red; maxLines: 3 }
+        }
+        Column {
+          gap: 2
+          for o in owners key o.name {
+            Owner { o: o }
+          }
+        }
+        if len(attention) > 0 {
+          Column {
+            gap: 2
+            Text { text: "NEED YOU"; style: label }
+            for r in attention key r.url {
+              Pr { r: r; quiet: false }
+            }
+          }
+        }
+        if len(updated) > 0 {
+          Column {
+            gap: 2
+            Text { text: "UPDATED"; style: label }
+            for r in updated key r.url {
+              Pr { r: r; quiet: true }
+            }
+          }
+        }
+      }
+    }
+  }
+}
