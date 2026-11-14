@@ -23,7 +23,7 @@ widget "markets" {
     Row {
       align: center
       Text { text: "markets"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: f != null && !f.ok ? red : foreground; weight: 1; align: end }
     }
     if sal != null {
       Row {
@@ -62,7 +62,7 @@ widget "markets" {
         Row {
           gap: 8
           Text { text: e.market; style: body; weight: 1; maxLines: 1 }
-          Text { text: e.edge == null ? "" : "${e.edge >= 0 ? "+" : ""}${round(e.edge * 100)}pt"; style: small; width: 56; align: end; color: e.edge != null && e.edge > 0 ? accent : muted }
+          Text { text: e.edge == null ? "" : "${e.edge >= 0 ? "+" : ""}${round(e.edge * 100)}pt"; style: small; width: 56; align: end; color: e.edge != null && e.edge > 0 ? foreground : muted }
         }
       }
     }

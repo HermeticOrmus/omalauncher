@@ -24,10 +24,10 @@ widget "communications" {
     Row {
       gap: 8
       align: center
-      Text { text: i.source; style: small; width: 66; color: i.source == "whatsapp" ? green : blue }
+      Text { text: i.source; style: small; width: 66; color: i.source == "whatsapp" ? foreground : muted }
       Text { text: i.title; style: body; maxLines: 1; weight: 1 }
       Text { text: i.who; style: small; color: muted; width: 70; align: end; maxLines: 1 }
-      Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : "${floor(i.age_min / 1440)}d"; style: small; color: i.age_min > 1440 ? yellow : muted; width: 28; align: end }
+      Text { text: i.age_min < 60 ? "${i.age_min}m" : i.age_min < 1440 ? "${floor(i.age_min / 60)}h" : "${floor(i.age_min / 1440)}d"; style: small; color: i.age_min > 1440 ? foreground : muted; width: 28; align: end }
     }
   }
 
@@ -36,10 +36,10 @@ widget "communications" {
     Row {
       align: center
       Text { text: "communications · ${len(items)}"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: !f.ok || stale || len(failed) > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failed) > 0 ? "${join(failed, ", ")} partly unreadable" : older > 0 ? "+${older} older than 30d" : ""; style: small; color: !f.ok || len(failed) > 0 ? red : stale ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     if data != null && len(items) == 0 {
-      Text { text: "nobody waits on you"; style: body; color: green }
+      Text { text: "nobody waits on you"; style: body; color: muted }
     }
     for i in items.take(room) key "${i.source}:${i.title}" {
       // Handlers take one action, not a choice, so a row with no link is its own node.

@@ -77,7 +77,7 @@ widget "now playing" {
       } else {
         // Gradients only fill inside a Canvas, not as a background.
         Canvas {
-          rect(0, 0, width, height, fill: linear(0, 0, width, height, [alpha(accent, 0.55), alpha(magenta, 0.35)]))
+          rect(0, 0, width, height, fill: linear(0, 0, width, height, [alpha(accent, 0.55), alpha(background, 0.35)]))
           text("♪", width / 2, height / 2, size: d * 0.45, align: center, color: alpha(foreground, 0.85))
         }
       }
@@ -92,7 +92,7 @@ widget "now playing" {
       if m.playing == true {
         Bars { }
       }
-      Text { text: lower(m.app ?? ""); style: label; color: m.playing == true ? accent : muted; maxLines: 1; weight: 1 }
+      Text { text: lower(m.app ?? ""); style: label; color: m.playing == true ? foreground : muted; maxLines: 1; weight: 1 }
     }
   }
 

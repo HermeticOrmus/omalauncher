@@ -24,21 +24,21 @@ widget "fleet" {
     Row {
       align: center
       Text { text: "fleet · ${len(machines) - len(down)}/${len(machines)} up"; style: muted; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || stale || len(failing) > 0 ? yellow : green; weight: 1; align: end }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : len(failing) > 0 ? "${len(failing)} loops failing${units > 0 ? " · ${units} units" : ""}" : units > 0 ? "${units} units failed" : "all loops ok"; style: small; color: !f.ok || len(failing) > 0 || units > 0 ? red : stale ? foreground : muted; weight: 1; align: end }
     }
     Flow {
       gap: 6
       for m in machines key m.name {
         // Handlers take one action, not a choice, so a machine the phone can't reach is its own node.
         if m.ssh != null && m.online && any(reach, r => r == m.ssh) {
-          Button { text: m.name; color: accent; onTap: terminal(m.ssh == "sun" ? "mosh sun" : "ssh -t ${m.ssh}", m.name) }
+          Button { text: m.name; color: foreground; onTap: terminal(m.ssh == "sun" ? "mosh sun" : "ssh -t ${m.ssh}", m.name) }
         } else {
           Button { text: m.name; color: m.online ? muted : red }
         }
       }
     }
     if len(failing) > 0 {
-      Text { text: join(failing, " · "); style: small; color: yellow; maxLines: 2 }
+      Text { text: join(failing, " · "); style: small; color: red; maxLines: 2 }
     }
   }
 }

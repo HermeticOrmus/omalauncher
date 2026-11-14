@@ -47,7 +47,7 @@ widget "pass" {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
       Text { text: "the pass"; style: muted; weight: 1 }
-      Text { text: p != null && !p.ok ? "The Pass doesn't answer" : waiting > 0 ? "${waiting} to install" : len(builds) > 0 ? "all current" : "…"; style: small; color: p != null && !p.ok ? red : waiting > 0 ? yellow : muted; weight: 1; align: end; maxLines: 1 }
+      Text { text: p != null && !p.ok ? "The Pass doesn't answer" : waiting > 0 ? "${waiting} to install" : len(builds) > 0 ? "all current" : "…"; style: small; color: p != null && !p.ok ? red : waiting > 0 ? foreground : muted; weight: 1; align: end; maxLines: 1 }
     }
     for r in rows key r.b.slug {
       Row {
@@ -59,7 +59,7 @@ widget "pass" {
         Text { text: r.age == "" ? r.b.version_name : "${r.b.version_name} · ${r.age} ago"; style: small; color: muted; maxLines: 1; weight: 2 }
         // One tap: the launcher gets the APK, checks it against the hash The Pass lists, and Android's installer asks.
         // A build already current or at an unknown version, or one The Pass lists with no hash, opens the page instead.
-        Button { text: r.st; color: r.st == "update" || r.st == "get" ? accent : muted; onTap: { if (r.st == "update" || r.st == "get") && r.b.sha256 != null { install("${page}${r.b.apk}", r.b.sha256) } else { url(page) } } }
+        Button { text: r.st; color: r.st == "update" || r.st == "get" ? foreground : muted; onTap: { if (r.st == "update" || r.st == "get") && r.b.sha256 != null { install("${page}${r.b.apk}", r.b.sha256) } else { url(page) } } }
       }
     }
   }

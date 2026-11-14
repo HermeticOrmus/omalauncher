@@ -21,7 +21,7 @@ widget "today" {
       align: center
       Text { text: fmtTime(e.start_unix, "EEE HH:mm"); style: small; width: 76; color: muted }
       Text { text: e.title; style: body; maxLines: 1; weight: 1 }
-      Text { text: now == null ? "" : e.start_unix <= now ? "now" : e.start_unix - now < 3600 ? "in ${floor((e.start_unix - now) / 60)}m" : e.start_unix - now < 86400 ? "in ${floor((e.start_unix - now) / 3600)}h" : ""; style: small; width: 52; align: end; color: now != null && e.start_unix - now < 900 ? yellow : muted }
+      Text { text: now == null ? "" : e.start_unix <= now ? "now" : e.start_unix - now < 3600 ? "in ${floor((e.start_unix - now) / 60)}m" : e.start_unix - now < 86400 ? "in ${floor((e.start_unix - now) / 3600)}h" : ""; style: small; width: 52; align: end; color: now != null && e.start_unix - now < 900 ? foreground : muted }
     }
   }
 
@@ -29,7 +29,7 @@ widget "today" {
     gap: 6
     Text { text: data == null ? (f == null ? "today …" : "today · sg doesn't answer") : "today · ${len(events)} ahead"; style: muted }
     if data != null && len(events) == 0 {
-      Text { text: "no meetings through tomorrow"; style: body; color: green }
+      Text { text: "no meetings through tomorrow"; style: body; color: muted }
     }
     for e in events.take(room) key "${e.start_unix}:${e.title}" {
       // Handlers take one action, not a choice, so a meeting with no link is its own node.

@@ -40,14 +40,14 @@ widget "notifications" {
         align: center
         Text { text: showAll ? "all notifications · ${len(ranked)}" : "important · ${len(important)}"; style: muted; weight: 1 }
         if failed {
-          Text { text: "mars off · by time"; style: small; color: yellow; width: 130; align: end }
+          Text { text: "mars off · by time"; style: small; color: foreground; width: 130; align: end }
         }
         if quiet > 0 {
           Button { text: showAll ? "important only" : "${quiet} quieter"; color: muted; onTap: showAll = !showAll }
         }
       }
       if len(shown) == 0 {
-        Text { text: len(ranked) == 0 ? "all clear" : "nothing important · ${quiet} quieter"; style: small; color: green }
+        Text { text: len(ranked) == 0 ? "all clear" : "nothing important · ${quiet} quieter"; style: small; color: muted }
       }
       Column {
         gap: 8
@@ -63,7 +63,7 @@ widget "notifications" {
               onTap: notification("open", x.i.key)
               Row {
                 Text { text: "${x.i.app} · ${fmtTime(x.i.time, "HH:mm")}"; style: label; maxLines: 1; weight: 1 }
-                Text { text: x.sc == null ? "…" : "${x.sc.score}"; style: label; width: 28; align: end; color: x.sc == null ? muted : x.sc.score >= 80 ? yellow : x.sc.score >= 60 ? accent : muted }
+                Text { text: x.sc == null ? "…" : "${x.sc.score}"; style: label; width: 28; align: end; color: x.sc == null ? muted : x.sc.score >= 80 ? accent : x.sc.score >= 60 ? foreground : muted }
               }
               Text { text: x.i.title; bold: true; maxLines: 1 }
               if x.i.text != "" {

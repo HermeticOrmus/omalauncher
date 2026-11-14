@@ -37,7 +37,7 @@ face "money" {
       align: center
       Text { text: i.client; style: body; maxLines: 1; weight: 1 }
       Text { text: i.total_text; style: body; width: 72; align: end }
-      Text { text: i.days_late > 0 ? "${i.days_late}d late" : "in ${-i.days_late}d"; style: small; width: 64; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? yellow : muted }
+      Text { text: i.days_late > 0 ? "${i.days_late}d late" : "in ${-i.days_late}d"; style: small; width: 64; align: end; color: i.days_late > 30 ? red : i.days_late > 0 ? foreground : muted }
     }
   }
 
@@ -46,9 +46,9 @@ face "money" {
       gap: 8
       align: center
       Text { text: u.business; style: body; maxLines: 1; weight: 1 }
-      Text { text: u.stage; style: small; color: u.stage == "new" || u.stage == "contacted" ? muted : green; width: 76; maxLines: 1 }
+      Text { text: u.stage; style: small; color: u.stage == "new" || u.stage == "contacted" ? muted : foreground; width: 76; maxLines: 1 }
       Text { text: u.owner ?? ""; style: small; color: muted; width: 60; maxLines: 1 }
-      Text { text: "${u.days_over}d"; style: small; color: u.days_over > 14 ? yellow : muted; width: 36; align: end }
+      Text { text: "${u.days_over}d"; style: small; color: u.days_over > 14 ? foreground : muted; width: 36; align: end }
     }
   }
 
@@ -57,9 +57,9 @@ face "money" {
       gap: 8
       align: center
       Text { text: p.name; style: body; maxLines: 1; width: 120 }
-      Text { text: p.owes_text != null ? "owes ${p.owes_text}" : p.why; style: small; color: p.owes_text != null ? yellow : muted; maxLines: 1; weight: 1 }
-      Text { text: p.last_min == null ? "never" : p.last_min < 1440 ? "${floor(p.last_min / 60)}h" : "${floor(p.last_min / 1440)}d"; style: small; color: p.due > 1.5 ? yellow : muted; width: 36; align: end }
-      Text { text: p.from_me ? "you" : "them"; style: small; color: p.from_me ? muted : green; width: 40; align: end }
+      Text { text: p.owes_text != null ? "owes ${p.owes_text}" : p.why; style: small; color: p.owes_text != null ? foreground : muted; maxLines: 1; weight: 1 }
+      Text { text: p.last_min == null ? "never" : p.last_min < 1440 ? "${floor(p.last_min / 60)}h" : "${floor(p.last_min / 1440)}d"; style: small; color: p.due > 1.5 ? foreground : muted; width: 36; align: end }
+      Text { text: p.from_me ? "you" : "them"; style: small; color: p.from_me ? muted : foreground; width: 40; align: end }
     }
   }
 
@@ -79,7 +79,7 @@ face "money" {
     Row {
       align: center
       Text { text: "money"; style: title; weight: 1 }
-      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: yellow; weight: 1; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : !f.ok ? "sg doesn't answer" : stale ? "as of ${floor((now - data.generated) / 60)}m ago" : ""; style: small; color: f != null && !f.ok ? red : foreground; weight: 1; align: end; maxLines: 1 }
     }
 
     // What's owed: the invoicer's sent invoices, paid status as fresh as its last change.
@@ -93,7 +93,7 @@ face "money" {
       radius: 8 * corners
       Heading { label: "owed to you"; note: owed != null ? "as of the invoicer, ${owed.as_of_text}" : "" }
       if owing {
-        Text { text: owed.total_text; fontSize: 40; bold: true; color: accent }
+        Text { text: owed.total_text; font: serif; fontSize: 44; bold: false; color: accent }
         for i in owed.items.sortBy(i => -i.days_late).take(3) key i.number {
           if i.url != null {
             Box { onTap: url(i.url); Owed { i: i } }
@@ -102,7 +102,7 @@ face "money" {
           }
         }
       } else {
-        Text { text: owed != null ? "nothing owed" : "…"; style: body; color: owed != null ? green : muted }
+        Text { text: owed != null ? "nothing owed" : "…"; style: body; color: muted }
       }
     }
 
@@ -118,7 +118,7 @@ face "money" {
         radius: 8 * corners
         Heading { label: "pipeline"; note: "${pipe.count} leads · untouched ${fmtAgo(pipe.as_of, now)}" }
         Text { text: join(pipe.stages.map(s => "${s.n} ${s.stage}"), " · "); style: small; color: muted; maxLines: 1 }
-        Text { text: "${pipe.follow_ups_total} follow-ups due"; fontSize: owing ? 18 : 30; bold: true; color: owing ? yellow : accent }
+        Text { text: "${pipe.follow_ups_total} follow-ups due"; fontSize: owing ? 18 : 30; bold: true; color: owing ? foreground : accent }
         for u in pipe.follow_ups.take(short ? 4 : 8) key u.business {
           if u.url != null {
             Box { onTap: url(u.url); FollowUp { u: u } }
