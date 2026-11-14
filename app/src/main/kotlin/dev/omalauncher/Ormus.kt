@@ -12,8 +12,14 @@ import kotlin.concurrent.thread
  * Sun. Everything Ormus-only lives here and in assets/ormus, so upstream changes rebase with one-line hooks to fix up.
  */
 object Ormus {
-    /** In assets/ormus/themes, seeded into the user's themes so it shows before Linux and needs no download. */
-    const val THEME = "ormus-aurum"
+    /** The default theme, in assets/ormus/themes: the Sun of the Ormus brand's seven planets (scripts/ormus-themes.py). */
+    const val THEME = "ormus-sun"
+
+    /**
+     * Every theme in assets/ormus/themes, seeded into the user's themes so they show before Linux and need no
+     * download: the seven planets of the brand, and the older aurum palette, which stays available.
+     */
+    val THEMES = listOf("ormus-sun", "ormus-moon", "ormus-mercury", "ormus-venus", "ormus-mars", "ormus-jupiter", "ormus-saturn", "ormus-aurum")
 
     /** The agent setup picks first, which becomes the bar's default. */
     const val AGENT = "grok"
@@ -76,16 +82,18 @@ object Ormus {
     /** Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. */
     val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl")
 
-    /** Copies the Ormus theme into the user's themes once; a half-copied one never counts, as it's renamed in whole. */
+    /** Copies the Ormus themes into the user's themes, each once; a half-copied one never counts, as it's renamed in whole. */
     fun seedTheme(context: Context) {
         val themes = LauncherData.userThemesDir(context)
-        val dir = File(themes, THEME)
-        if (File(dir, "colors.toml").isFile) return
-        val tmp = File(themes, ".$THEME.tmp")
-        tmp.deleteRecursively()
-        copyAssets(context, "ormus/themes/$THEME", tmp)
-        dir.deleteRecursively()
-        if (!tmp.renameTo(dir)) Log.w("ormus", "couldn't seed the $THEME theme")
+        for (name in THEMES) {
+            val dir = File(themes, name)
+            if (File(dir, "colors.toml").isFile) continue
+            val tmp = File(themes, ".$name.tmp")
+            tmp.deleteRecursively()
+            copyAssets(context, "ormus/themes/$name", tmp)
+            dir.deleteRecursively()
+            if (!tmp.renameTo(dir)) Log.w("ormus", "couldn't seed the $name theme")
+        }
     }
 
     private fun copyAssets(
