@@ -28,18 +28,26 @@ widget "comms" {
   state said = ""
   // The card `said` is about, so the line shows on that card, or under the headline when another card shows.
   state saidFor = ""
-  // What he types on a card's screen (`draft`), and the card it is for (`draftFor`, the card's id): it stays in the
-  // field until sg says it went, so a text that did not go is not lost, and another card's field starts empty.
+  // What he types on a card's screen (`draft`), and the chat it is for (`draftFor`, the chat's `k`): it stays in the
+  // field until sg says it went, so a text that did not go is not lost, a newer word in the same chat keeps it, and
+  // another chat's field starts empty.
   state draft = ""
   state draftFor = ""
+  // The card and the kind of the last send (`sentFor`, `sentN`, as `busy` and `busyN`): an answer that comes after the
+  // clock freed the card (30 s) still lands on that card and still empties the field of the text that went.
+  state sentFor = ""
+  state sentN = 0
   on sent {
     let got = parseJson(value ?? "")
     let reply = got != null && got.r != null && got.r.ok != null ? got.r : null
-    // busyN 20 is a typed text (Write), 10 and up a reaction (React), 1 to 9 a quick reply (Reply).
-    if reply != null && reply.ok && busyN == 20 && draftFor == busy {
+    // The card it is for: the one still busy, or, after the clock freed it, the last one sent from. busyN 20 is a
+    // typed text (Write), 10 and up a reaction (React), 1 to 9 a quick reply (Reply).
+    let who = busy != "" ? busy : sentFor
+    let kind = busy != "" ? busyN : sentN
+    if reply != null && reply.ok && kind == 20 && draftFor != "" && startsWith(who, draftFor + "|") {
       draft = ""
     }
-    saidFor = busy
+    saidFor = who
     busy = ""
     busyN = 0
     dragX = 0
@@ -221,9 +229,12 @@ widget "comms" {
     Box {
       fill: width
       onTap: {
-        if busy == "" {
+        // Only on the card he picked: a feed read can put another chat here before the next draw.
+        if busy == "" && pick == "${c.k}|${c.text ?? ""}" {
           busy = "${c.k}|${c.text ?? ""}"
           busyN = n
+          sentFor = busy
+          sentN = n
           busyAt = now ?? 0
           said = ""
           sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, n: n, label: o.label}, c.sig != null ? {sig: c.sig} : {})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
@@ -239,9 +250,12 @@ widget "comms" {
     Box {
       fill: width
       onTap: {
-        if busy == "" {
+        // Only on the card he picked: a feed read can put another chat here before the next draw.
+        if busy == "" && pick == "${c.k}|${c.text ?? ""}" {
           busy = "${c.k}|${c.text ?? ""}"
           busyN = 10 + i
+          sentFor = busy
+          sentN = 10 + i
           busyAt = now ?? 0
           said = ""
           sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, react: emoji}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
@@ -259,19 +273,23 @@ widget "comms" {
       let cid = "${c.k}|${c.text ?? ""}"
       Input {
         placeholder: busy == cid && busyN == 20 ? "sending…" : "write to ${c.name}…"
-        text: draftFor == cid ? draft : ""
+        text: draftFor == c.k ? draft : ""
         fontSize: 15
         lines: 3
         onChange: {
           draft = value
-          draftFor = cid
+          draftFor = c.k
         }
         onSubmit: {
-          if busy == "" && trim(value) != "" {
+          // Only on the card he picked: a feed read can put another chat here before the next draw. `c` is read
+          // now, so the check is on it, not on a value of the frame it was drawn in.
+          if busy == "" && trim(value) != "" && pick == "${c.k}|${c.text ?? ""}" {
             draft = value
-            draftFor = cid
-            busy = cid
+            draftFor = c.k
+            busy = "${c.k}|${c.text ?? ""}"
             busyN = 20
+            sentFor = busy
+            sentN = 20
             busyAt = now ?? 0
             said = ""
             sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, text: value}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
@@ -365,12 +383,13 @@ widget "comms" {
           Text { text: "sent"; fontSize: 13; color: muted; weight: 1; maxLines: 1 }
           OpenChat { c: c; word: "open"; weight: 1 }
         }
-      } else if len(replies) > 0 && !pinned {
-        // The card came in under the thumb, not by his hand: one tap pins it, and its keys show.
+      } else if (len(replies) > 0 || (!compact && (c.send ?? false))) && !pinned {
+        // The card came in under the thumb, not by his hand: one tap pins it, and its keys show (on the screen, a card
+        // with no quick replies yet that takes a text: its field and reactions).
         Box {
           fill: width
           onTap: pick = ids[at]
-          Key { word: "show ${join(range(len(replies)).map(i => "${i + 1}"), " · ")}"; strong: true }
+          Key { word: len(replies) > 0 ? "show ${join(range(len(replies)).map(i => "${i + 1}"), " · ")}" : "write back"; strong: true }
         }
       } else if len(replies) > 0 && lead {
         Row {

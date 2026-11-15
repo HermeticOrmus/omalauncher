@@ -165,6 +165,35 @@ internal class TileHost(
         return hit
     }
 
+    /**
+     * The handler of the element that reads [word] (onTap) or of the Input whose placeholder starts with [word]
+     * (onSubmit, with [value]), found in this frame and run later: as a tap or a send lands after a feed read changed
+     * state but before the tile is drawn again. Returns what it asked for when run.
+     */
+    fun drawnNow(
+        nodes: List<WNode>,
+        word: String,
+        value: String? = null,
+    ): () -> List<String> {
+        var found: (() -> Unit)? = null
+        budget.run {
+            visit(nodes, Env.root(this)) { n, env ->
+                if (found != null) return@visit
+                if (value == null && n.handlers["onTap"] != null && lines(listOf(n), env).joinToString(" ") == word) {
+                    found = { n.handlers["onTap"]!!.run.invoke(env, emptyList()) }
+                } else if (value != null && n.kind == "Input" && ((n.props["placeholder"]?.invoke(env) as? Str)?.v ?: "").startsWith(word)) {
+                    found = { n.handlers["onSubmit"]!!.run.invoke(env, listOf(Str(value))) }
+                }
+            }
+        }
+        val run = found ?: error("nothing reads \"$word\"")
+        return {
+            actions.clear()
+            budget.run { run() }
+            actions.toList()
+        }
+    }
+
     /** How many Inputs the nodes show. */
     fun inputs(nodes: List<WNode>): Int {
         var n = 0

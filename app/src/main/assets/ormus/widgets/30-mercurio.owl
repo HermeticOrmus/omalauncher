@@ -20,9 +20,13 @@ widget "mercurio" {
   // A machine the feed could not read: its agents are missing, not quiet.
   let down = data == null ? [] : keys(data.machines ?? {}).filter(m => data.machines[m] != "ok")
   let stale = data != null && now != null && now - data.generated > 180
-  let waiting = count(all, a => a.status == "blocked")
-  let working = count(all, a => a.status == "working")
-  let done = count(all, a => a.status == "done")
+  // The counts are the feed's own totals: a project lists 8 agents at most (the feed's TOP_PER_PROJECT), and the feed
+  // counts a `done` agent of long ago as idle.
+  let totals = data != null && data.agents != null ? data.agents : {}
+  let waiting = totals.blocked ?? 0
+  let working = totals.working ?? 0
+  let done = totals.done ?? 0
+  let total = waiting + working + done + (totals.idle ?? 0)
   // A herdr-core agent's `seq` is when its state last changed, in ms since 1970: newest first in each group.
   // Whoever waits on Ormus first, then the ones at work, then the finished ones, newest first in each; idle ones
   // fill what room is left, most recently active first.
@@ -54,7 +58,7 @@ widget "mercurio" {
     Row {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
-      Text { text: "mercurio · ${len(all)}"; style: muted; weight: 1; maxLines: 1 }
+      Text { text: "mercurio · ${total}"; style: muted; weight: 1; maxLines: 1 }
       Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 || data == null ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if len(down) > 0 {

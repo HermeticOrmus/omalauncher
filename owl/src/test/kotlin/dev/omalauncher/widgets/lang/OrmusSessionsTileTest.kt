@@ -217,7 +217,9 @@ class OrmusSessionsTileTest {
             assertTrue("$part in $sent", sent.contains(part))
         }
         assertFalse("a dialog's answer carries no reply text: $sent", sent.contains("\"label\""))
-        assertTrue("the card's own tap opens the agent in Mercurio", t.taps(program.root).any { it.startsWith("androidIntent") && it.contains("HERD_SESSION") })
+        // An agent of no herdr-core session (the old herdr TUI is gone): Mercurio itself, never its TUI path.
+        assertTrue("the card's own tap opens Mercurio", t.taps(program.root).any { it.startsWith("androidApp solutions.ormus.logos") })
+        assertFalse("no intent that would start a TUI session", t.taps(program.root).any { it.contains("HERD_SESSION") })
     }
 
     @Test fun aPinnedPromptCardSendsTheNumberAndTheLabelOfTheReplyTapped() {

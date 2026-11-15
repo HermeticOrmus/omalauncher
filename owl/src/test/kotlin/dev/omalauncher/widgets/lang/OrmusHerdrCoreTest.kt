@@ -24,12 +24,13 @@ class OrmusHerdrCoreTest {
     private fun feed(
         vararg agents: String,
         machines: String = """{"sg": "ok", "sun": "ok", "mars": "ok"}""",
+        totals: String? = null,
     ): Value {
         // The counts by state, as the feed writes them beside the agents.
         val counts = listOf("blocked", "working", "done", "idle").joinToString(", ") { s -> "\"$s\": ${agents.count { it.contains("\"status\": \"$s\"") }}" }
         return Json.parse(
             """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": $machines, "errors": {}, "needs": 0,
-            "agents": {$counts}, "waiting": 0, "unsorted": [],
+            "agents": ${totals ?: "{$counts}"}, "waiting": 0, "unsorted": [],
             "links": {"sg": "ssh://ormus@sg:22#sg"}, "hosts": {"sg": ["sg"]}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
             "boards": [{"name": "raven", "agents": {$counts}, "waiting": 0,
               "projects": [{"name": "PORTALS", "agents": {$counts}, "chats": [], "top": [${agents.joinToString(",")}]}]}]}}""",
@@ -48,6 +49,9 @@ class OrmusHerdrCoreTest {
         val tui = Regex("""herdr (--session|agent |workspace |tab |pane |session )|\["herdr", |exec herdr""")
         val hits = dir.listFiles()!!.filter { it.extension == "owl" }.filter { tui.containsMatchIn(it.readText()) }.map { it.name }
         assertEquals("tiles that still call the herdr TUI", emptyList<String>(), hits)
+        // Mercurio's Herdr path (a session name on its intent) attaches the TUI: no tile takes it.
+        val herd = dir.listFiles()!!.filter { it.extension == "owl" && it.readText().contains("HERD_SESSION") }.map { it.name }
+        assertEquals("tiles that open Mercurio's Herdr path", emptyList<String>(), herd)
     }
 
     @Test fun aHerdrCoreAgentsRowOnTheSessionsScreenAttachesWithHc() {
@@ -69,6 +73,13 @@ class OrmusHerdrCoreTest {
         assertTrue("project and machine: $lines", "portals·mars" in lines)
         assertTrue("how long ago, from the agent's state time: $lines", "5m" in lines)
         assertTrue(attaches(t.tap(program.root, "waiting needs you portals·mars 5m"), "mars", "t9"))
+    }
+
+    @Test fun theMercurioTilesCountsAreTheFeedsTotalsNotTheShortLists() {
+        val program = compile("30-mercurio.owl")
+        val f = feed(agent("blocked", "t9"), totals = """{"blocked": 12, "working": 3, "done": 1, "idle": 40}""")
+        val lines = TileHost(program, f).lines(program.root)
+        assertTrue("a project lists 8 at most; the counts are the feed's: $lines", "mercurio · 56" in lines && "12 waiting · 3 working · 1 done" in lines)
     }
 
     @Test fun theMercurioTileNamesAMachineTheFeedCouldNotReadAndAFeedThatIsDown() {

@@ -99,6 +99,58 @@ class OrmusCommsScreenTest {
         assertFalse(noReact.hasKey(screen, "👍"))
     }
 
+    private fun two(xenaText: String = "can you look?") =
+        feed(
+            """{"name": "Yara", "group": false, "waiting": true, "mine": false, "age_min": 3, "text": "are you there?", "open": {"url": "https://wa.me/5550003"},
+            "k": "bbbbbbbbbbbb", "send": true, "react": ["👍"], "sig": "yyyy"}""" + "," +
+                chat().replace("\"Ana\"", "\"Xena\"").replace("can you look?", xenaText),
+        )
+
+    @Test fun aSendDrawnForOneChatNeverGoesToTheChatAFeedReadPutInItsPlace() {
+        val t = TileHost(program, two())
+        t.set("pick", Str(card))  // Xena, the second card, picked by his hand
+        val write = t.drawnNow(screen, "write to Xena", "the words for Xena")
+        val react = t.drawnNow(screen, "👍")
+        val quick = t.drawnNow(screen, "1 On it.")
+        // A feed read: Xena wrote again, so the pick is old and Yara's card is in the place before the next draw.
+        t.set("f", two(xenaText = "and now?"))
+        assertEquals("the typed text does not go to Yara", emptyList<String>(), write())
+        assertEquals("nor the reaction", emptyList<String>(), react())
+        assertEquals("nor a quick reply", emptyList<String>(), quick())
+        assertEquals("", t.text("busy"))
+    }
+
+    @Test fun aNewCardWithNoQuickRepliesYetGetsAKeyThatPinsItAndThenItsField() {
+        val t = TileHost(program, feed(chat(""", "send": true, "react": ["👍"], "sig": "3f9a1c2b"""").replace(""", "replies": $replies""", "")))
+        t.set("pick", Str("an older card|gone"))
+        assertEquals(0, t.inputs(screen))
+        t.tap(screen, "write back")
+        assertEquals(card, t.text("pick"))
+        assertEquals(1, t.inputs(screen))
+        assertTrue(t.hasKey(screen, "👍"))
+    }
+
+    @Test fun aHalfTypedTextStaysWithItsChatWhenTheyWriteAgain() {
+        val t = pinned()
+        t.change(screen, "write to Ana", "half of a th")
+        t.set("f", feed(chat().replace("can you look?", "hello?")))
+        t.set("pick", Str("aaaaaaaaaaaa|hello?"))
+        assertEquals("half of a th", t.text("draft"))
+        assertEquals("aaaaaaaaaaaa", t.text("draftFor"))
+    }
+
+    @Test fun anAnswerThatComesAfterTheClockFreedTheCardStillLandsOnIt() {
+        val t = pinned()
+        t.change(screen, "write to Ana", "on my way")
+        t.submit(screen, "write to Ana", "on my way")
+        t.set("busy", Str(""))  // the clock freed the card (30 s) and said to look
+        t.set("said", Str("no answer: open the chat to check"))
+        t.fire("sent", Str("""{"n": 3, "r": {"ok": true, "outcome": "sent"}}"""))
+        assertEquals("sent", t.text("said"))
+        assertEquals("on the card it was for", card, t.text("saidFor"))
+        assertEquals("and the text that went leaves the field", "", t.text("draft"))
+    }
+
     @Test fun anEmojiReplyFromTheModelIsAKeyLikeAnyOther() {
         val t = pinned(chat(""", "send": true""").replace(replies, """[{"n": 1, "label": "Dale 👍"}, {"n": 2, "label": "😂"}]"""))
         assertTrue(t.lines(screen).toString(), t.hasKey(screen, "1 Dale 👍") && t.hasKey(screen, "2 😂"))
