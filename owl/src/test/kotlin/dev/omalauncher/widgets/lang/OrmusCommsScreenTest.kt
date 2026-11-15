@@ -211,6 +211,13 @@ class OrmusCommsScreenTest {
         tall.set("pick", Str("aaaaaaaaaaaa|$text"))
         assertTrue(tall.lines(program.root).toString(), "you: dime" in tall.lines(program.root))
         assertTrue((tall.let("cardHeight") as Num).v <= (tall.let("below") as Num).v)
+        // A 6x6 tile (384 dp) with three stacked keys and sg's answer under the card: the answer's line counts too.
+        val square = TileHost(program, feed(chat().replace(replies, long).replace("can you look?", text)), height = 384)
+        square.set("pick", Str("aaaaaaaaaaaa|$text"))
+        square.set("said", Str("sg refused it: look again"))
+        square.set("saidFor", Str("aaaaaaaaaaaa|$text"))
+        val used = (square.let("cardHeight") as Num).v + (square.let("saidRows") as Num).v
+        assertTrue("card and answer fit: $used of ${square.let("below")}", used <= (square.let("below") as Num).v)
     }
 
     @Test fun aPickedChatWithQuickRepliesButNoTextHasTheWhatsAppKeyOnTheScreen() {

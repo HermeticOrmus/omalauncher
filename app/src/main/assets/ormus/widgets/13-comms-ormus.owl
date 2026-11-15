@@ -156,14 +156,15 @@ widget "comms-ormus" {
   let keyRows = fold && len(cardKeys) > 0 && (cardLead ? len(cardKeys[0].label) + 2 > leadPer : !cardShort) ? 2 : 1
   // Their last line wraps once at most on the tile (14 sp mono, about 8.5 dp a character, inside the card's padding).
   let cardTextRows = card == null ? 0 : len(card.text ?? "") > floor(((tileWidth ?? 360) - 44) / 8.5) ? 2 : 1
-  let cardBase = card == null ? 0 : 151 - (fold ? 21 : 0) + (cardStack ? 48 * (len(cardKeys) - 1) : 0) + 20 * (keyRows - 1) + 17 * (cardTextRows - 1)
-  // The one message before their last one on the tile's card: a line of 13 sp with the card's gap, 21 dp as the meta
-  // line measures. Only when the card still fits under the head with it, so no key label is cut.
-  let tileContext = card != null && len(card.context ?? []) > 0 && below - cardBase >= 21
-  let cardHeight = cardBase + (tileContext ? 21 : 0)
   // sg's answer takes a line under the card (23 dp) or under the headline (18); not on a folded card, where it takes
   // the place of their last line, and not when "sent" is the keys' row.
   let saidRows = fold || said == "" || busy != "" ? 0 : cardSaid ? (cardSent ? 0 : 23) : 18
+  let cardBase = card == null ? 0 : 151 - (fold ? 21 : 0) + (cardStack ? 48 * (len(cardKeys) - 1) : 0) + 20 * (keyRows - 1) + 17 * (cardTextRows - 1)
+  // The one message before their last one on the tile's card: a line of 13 sp with the card's gap, 21 dp as the meta
+  // line measures. Only when the card still fits under the head with it, so no key label is cut.
+  // saidRows (sg's answer under the card or the headline) reads no card height, so it counts here too.
+  let tileContext = card != null && len(card.context ?? []) > 0 && below - cardBase - saidRows >= 21
+  let cardHeight = cardBase + (tileContext ? 21 : 0)
   let dots = len(cards) > 1 && below - cardHeight - saidRows >= 40
   // Rows of the other waiting chats under the card; the last slot goes to the "+N more" line when they do not all fit.
   let slots = max(0, floor((below - cardHeight - saidRows - (dots ? 40 : 0)) / 28))
