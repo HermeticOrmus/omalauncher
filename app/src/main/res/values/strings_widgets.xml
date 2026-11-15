@@ -6,14 +6,14 @@
     <string name="widgets_copied">copied</string>
     <!-- Name of the notification channel for notifications widgets post, shown in Android's notification settings. -->
     <string name="widgets_notify_channel">Widgets</string>
-    <!-- Omalauncher Ormus: install(url, sha256) toasts. A second install while one downloads. -->
-    <string name="widgets_install_busy">an app is already on its way</string>
+    <!-- Omalauncher Ormus: install(url, sha256) toasts, English only (translatable="false": the fork has no translators). A second install while one downloads. -->
+    <string name="widgets_install_busy" translatable="false">an app is already on its way</string>
     <!-- %1$s is the APK's file name. -->
-    <string name="widgets_install_getting">getting %1$s</string>
+    <string name="widgets_install_getting" translatable="false">getting %1$s</string>
     <!-- %1$s is why: the hash did not match, the download was cut short, the host did not answer. -->
-    <string name="widgets_install_failed">not installed: %1$s</string>
+    <string name="widgets_install_failed" translatable="false">not installed: %1$s</string>
     <!-- %1$s is the APK's file name. -->
-    <string name="widgets_install_no_installer">no installer opens %1$s</string>
-    <string name="widgets_install_refused">Android doesn\'t let the launcher open the installer</string>
-    <string name="widgets_install_unshareable">the file could not be shared</string>
+    <string name="widgets_install_no_installer" translatable="false">no installer opens %1$s</string>
+    <string name="widgets_install_refused" translatable="false">Android doesn\'t let the launcher open the installer</string>
+    <string name="widgets_install_unshareable" translatable="false">the file could not be shared</string>
 </resources>
