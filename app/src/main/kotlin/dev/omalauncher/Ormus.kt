@@ -34,6 +34,14 @@ object Ormus {
     const val UPSTREAM_NEWS = false
 
     /**
+     * The phone's calendars are the today tile's, not the Linux guest's: the calendar permission is the whole app's, so
+     * once allowed every guest process (an agent too) could read them all with `omalauncher calendar`. Off here, that
+     * command answers "not allowed" (Ormus, 2026-11-14, after the review of the today tile 2.0). OrmusGuestCalendarTest
+     * pins the guard.
+     */
+    const val GUEST_CALENDAR = false
+
+    /**
      * Swiping up on home until the gesture settings say otherwise (style.toml's gestures.swipe-up): the letter rail
      * opens apps, so up and down move through spaces, and the drawer opens from the bar.
      */

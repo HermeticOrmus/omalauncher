@@ -180,8 +180,11 @@ class OrmusTodayTileTest {
     }
 
     @Test fun withoutThePhonesListEveryCalendarShows() {
-        val lines = tile(calendar(event("family", NOW + HOUR, "Dinner", calendar = "Family")), shown = Null).lines()
-        assertEquals("today · 1 ahead [muted]", lines[0])
+        // The launcher reads a missing file as "" (docs/declarations.md); null is the source before its first read.
+        for (missing in listOf(Str(""), Null, Json.parse("[]"), Json.parse("{}"))) {
+            val lines = tile(calendar(event("family", NOW + HOUR, "Dinner", calendar = "Family")), shown = missing).lines()
+            assertEquals("shown = $missing", "today · 1 ahead [muted]", lines[0])
+        }
     }
 
     @Test fun aMeetingOnNowSaysNowAndAnUntitledOneSaysSo() {
@@ -192,6 +195,38 @@ class OrmusTodayTileTest {
     @Test fun aTapJoinsALinkPlaceAndOpensAnyOtherInTheCalendarApp() {
         val t = tile(calendar(event("zoom", NOW + HOUR, location = "https://zoom.us/j/1"), event("room", NOW + 2 * HOUR, location = "Room 4")))
         assertEquals(listOf("calendar open", "url https://zoom.us/j/1", "calendar open, event room"), t.taps())
+    }
+
+    @Test fun onlyTheMeetingLinkItselfOpensNotTheTextAroundIt() {
+        val t =
+            tile(
+                calendar(
+                    event("pass", NOW + HOUR, location = "https://us02web.zoom.us/j/1?pwd=x Passcode: 42"),
+                    event("teams", NOW + 2 * HOUR, location = "Join: https://teams.microsoft.com/l/meetup-join/19 (Teams)"),
+                ),
+            )
+        assertEquals(listOf("calendar open", "url https://us02web.zoom.us/j/1?pwd=x", "url https://teams.microsoft.com/l/meetup-join/19"), t.taps())
+    }
+
+    @Test fun anInvitationsOtherAddressesOpenTheCalendarAppNotTheAddress() {
+        // Anyone who sends an invitation sets its place: only a meeting service's own host joins.
+        val t =
+            tile(
+                calendar(
+                    event("query", NOW + HOUR, location = "https://evil.example/?x=zoom.us"),
+                    event("suffix", NOW + 2 * HOUR, location = "https://zoom.us.evil.example/j/1"),
+                    event("plain", NOW + 3 * HOUR, location = "https://example.org/agenda"),
+                ),
+            )
+        assertEquals(listOf("calendar open", "calendar open, event query", "calendar open, event suffix", "calendar open, event plain"), t.taps())
+    }
+
+    @Test fun theWindowEndsAtTheMidnightAfterTomorrowOnThePhonesClock() {
+        val zone = java.time.ZoneId.systemDefault()
+        val until = java.time.Instant.ofEpochSecond(NOW).atZone(zone).toLocalDate().plusDays(2).atStartOfDay(zone).toEpochSecond()
+        val lines = tile(calendar(event("last", until - 60, "Last"), event("next", until, "Next day"))).lines()
+        assertEquals("today · 1 ahead [muted]", lines[0])
+        assertTrue(lines.toString(), lines.contains("Last [null]") && lines.none { it.startsWith("Next day") })
     }
 
     @Test fun thePracticeComesFromTheFeedAndAFeedThatIsDownIsNoError() {

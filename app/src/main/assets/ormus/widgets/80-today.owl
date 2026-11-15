@@ -6,22 +6,25 @@ widget "today" {
 
   meta { owl: 18; description: "Ormus's next meetings today and tomorrow from the phone's own calendars, with a countdown and a tap to open each, and the Alqvimia practice of the day."; version: "2.0"; license: "MIT"; category: "productivity" }
 
-  // The meetings come from the phone's calendars (the accounts Android syncs), read on the phone: no network, no
-  // sign-in on another machine, and no meeting leaves the phone. Which calendars: the phone's own file, a JSON list
-  // of calendar names (an account's main calendar carries its address as its name), so the addresses stay out of
-  // this file, which is public. Without that file every calendar shows. All-day events are not meetings.
+  // The meetings come from the phone's calendars (the accounts Android syncs), read on the phone: no network and no
+  // sign-in on another machine; this tile sends no meeting anywhere. The Linux guest cannot read them in this build
+  // (Ormus.GUEST_CALENDAR). Which calendars: the phone's own file, a JSON list of calendar names (an account's main
+  // calendar carries its address as its name), so the addresses stay out of this file, which is public. Without that
+  // file, or with an empty one, every calendar shows. All-day events are not meetings.
   source cal = android.calendar
   source shown = file("~/.config/omalauncher/today-calendars.json") json optional
   // The practice of the day: sg's copy of the today feed (ormus-feeds, built on Sun from the Alqvimia API).
   source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 15m json timeout 20s status
   source now = clock every 1m
 
+  // A missing file reads as "" (docs/declarations.md), and an empty list names no calendar: both show every one.
+  let names = shown != null && shown != "" && len(shown) > 0 ? shown : null
   let practice = f != null && f.ok && f.out != null ? f.out.practice : null
   let granted = cal != null && cal.granted
   // Today and tomorrow, as the phone's clock counts days: from now to the midnight after tomorrow.
   let midnight = now == null ? null : parseTime(fmtTime(now, "yyyy-MM-dd"), "yyyy-MM-dd")
   let until = midnight == null ? null : midnight + 2 * 86400
-  let events = granted ? cal.events.filter(e => !e.allDay && (until == null || e.start < until) && (shown == null || contains(shown, e.calendar))) : []
+  let events = granted ? cal.events.filter(e => !e.allDay && (until == null || e.start < until) && (names == null || contains(names, e.calendar))) : []
   let room = max(1, floor(((tileHeight ?? 204) - 74) / 25))
   let head = cal == null ? "today …" : !granted ? "today · tap to read the calendar" : "today · ${len(events)} ahead"
 
@@ -48,10 +51,12 @@ widget "today" {
       Text { text: "no meetings through tomorrow"; style: body; color: muted }
     }
     for e in events.take(room) key e.id {
-      // A meeting whose place is a link (Zoom, Teams, Meet) joins on a tap; any other opens in the calendar app,
-      // which has the join button. Handlers take one action, not a choice, so each is its own node.
-      if startsWith(e.location, "https://") {
-        Box { onTap: url(e.location); Meeting { e: e } }
+      // A meeting whose place holds a Zoom, Teams, Meet or Webex link joins on a tap, to that link alone (an invitation
+      // from anyone sets the place, so no other address opens); any other opens in the calendar app, which has the
+      // join button. Handlers take one action, not a choice, so each is its own node.
+      let join = match(e.location, "https://(?:[a-z0-9-]+\\.)*(?:zoom\\.us|teams\\.microsoft\\.com|teams\\.live\\.com|meet\\.google\\.com|webex\\.com)(?:[/?#][^\\s<>]*)?(?=[\\s<>]|$)")
+      if join != null {
+        Box { onTap: url(join); Meeting { e: e } }
       } else {
         Box { onTap: calendar("open", e); Meeting { e: e } }
       }

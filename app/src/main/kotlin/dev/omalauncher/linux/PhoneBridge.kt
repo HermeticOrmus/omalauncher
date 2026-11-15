@@ -1,5 +1,6 @@
 package dev.omalauncher.linux
 
+import dev.omalauncher.Ormus
 import android.content.Context
 import android.os.FileObserver
 import android.util.Log
@@ -142,6 +143,7 @@ class PhoneBridge(
     }
 
     private suspend fun calendar(days: String?): Answer {
+        if (!Ormus.GUEST_CALENDAR) return Answer.Denied(NOT_ALLOWED.format("calendar"))
         val n = if (days.isNullOrEmpty()) DAYS else days.toIntOrNull()?.takeIf { it in 1..MAX_DAYS } ?: return Answer.Usage("days: 1 to $MAX_DAYS")
         val events = calendar.read(n, MAX_EVENTS) ?: return Answer.Denied(NOT_ALLOWED.format("calendar"))
         return Answer.Ok(Lst(events))
