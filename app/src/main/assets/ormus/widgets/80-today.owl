@@ -4,54 +4,61 @@ widget "today" {
   size: 6x3
   minSize: 3x2
 
-  meta { owl: 8; description: "Ormus's next meetings today and tomorrow, with a countdown and a tap to join, and the Alqvimia practice of the day. It says when a calendar is unreadable or the copy is old."; version: "1.1"; license: "MIT"; category: "productivity" }
+  meta { owl: 18; description: "Ormus's next meetings today and tomorrow from the phone's own calendars, with a countdown and a tap to open each, and the Alqvimia practice of the day."; version: "2.0"; license: "MIT"; category: "productivity" }
 
-  // Built on Sun (ormus-feeds), served as sg's copy from his calendar and the Alqvimia API.
-  source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 5m json timeout 20s status
+  // The meetings come from the phone's calendars (the accounts Android syncs), read on the phone: no network, no
+  // sign-in on another machine, and no meeting leaves the phone. Which calendars: the phone's own file, a JSON list
+  // of calendar names (an account's main calendar carries its address as its name), so the addresses stay out of
+  // this file, which is public. Without that file every calendar shows. All-day events are not meetings.
+  source cal = android.calendar
+  source shown = file("~/.config/omalauncher/today-calendars.json") json optional
+  // The practice of the day: sg's copy of the today feed (ormus-feeds, built on Sun from the Alqvimia API).
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 15m json timeout 20s status
   source now = clock every 1m
 
-  let data = f != null && f.ok ? f.out : null
-  // Ended meetings drop out between feed runs.
-  let events = data != null ? data.events.filter(e => now == null || e.start_unix > now - 3600) : []
+  let practice = f != null && f.ok && f.out != null ? f.out.practice : null
+  let granted = cal != null && cal.granted
+  // Today and tomorrow, as the phone's clock counts days: from now to the midnight after tomorrow.
+  let midnight = now == null ? null : parseTime(fmtTime(now, "yyyy-MM-dd"), "yyyy-MM-dd")
+  let until = midnight == null ? null : midnight + 2 * 86400
+  let events = granted ? cal.events.filter(e => !e.allDay && (until == null || e.start < until) && (shown == null || contains(shown, e.calendar))) : []
   let room = max(1, floor(((tileHeight ?? 204) - 74) / 25))
-  // A calendar the feed could not read (its account's sign-in ran out) leaves its meetings out, so the tile never
-  // says "no meetings" then. The feed runs every 5 m on Sun and sg keeps the last copy while Sun is away: past
-  // 20 m the copy is old, and the tile says how old.
-  let failed = data != null ? keys(data.errors ?? {}).filter(k => startsWith(k, "calendar:")) : []
-  let age = data != null && now != null && data.generated != null ? now - data.generated : 0
-  let old = age > 1200
-  let head = data == null ? (f == null ? "today …" : "today · sg doesn't answer")
-    : len(failed) > 0 ? "today · ${len(events)} ahead · ${len(failed) == 1 ? "a calendar" : "${len(failed)} calendars"} unreadable"
-    : old ? "today · ${len(events)} ahead · as of ${age < 7200 ? "${floor(age / 60)}m" : "${floor(age / 3600)}h"} ago"
-    : "today · ${len(events)} ahead"
+  let head = cal == null ? "today …" : !granted ? "today · tap to read the calendar" : "today · ${len(events)} ahead"
 
   component Meeting(e) {
     Row {
       gap: 8
       align: center
-      Text { text: fmtTime(e.start_unix, "EEE HH:mm"); style: small; width: 76; color: muted }
-      Text { text: e.title; style: body; maxLines: 1; weight: 1 }
-      Text { text: now == null ? "" : e.start_unix <= now ? "now" : e.start_unix - now < 3600 ? "in ${floor((e.start_unix - now) / 60)}m" : e.start_unix - now < 86400 ? "in ${floor((e.start_unix - now) / 3600)}h" : ""; style: small; width: 52; align: end; color: now != null && e.start_unix - now < 900 ? foreground : muted }
+      Text { text: fmtTime(e.start, "EEE HH:mm"); style: small; width: 76; color: muted }
+      Text { text: e.title != "" ? e.title : "(no title)"; style: body; maxLines: 1; weight: 1 }
+      Text { text: now == null ? "" : e.start <= now ? "now" : e.start - now < 3600 ? "in ${floor((e.start - now) / 60)}m" : e.start - now < 86400 ? "in ${floor((e.start - now) / 3600)}h" : ""; style: small; width: 52; align: end; color: now != null && e.start - now < 900 ? foreground : muted }
     }
   }
 
   Column {
     gap: 6
-    Text { text: head; style: muted; color: f != null && (!f.ok || len(failed) > 0) ? red : old ? foreground : muted; maxLines: 1 }
-    if data != null && len(events) == 0 {
-      Text { text: len(failed) > 0 ? "meetings may be missing" : old ? "no meetings in this copy" : "no meetings through tomorrow"; style: body; color: muted }
+    if cal != null && !granted {
+      // Only a tap asks Android; after two refusals it opens the launcher's page in Android's settings.
+      Text { text: head; style: muted; color: foreground; maxLines: 1; onTap: calendar("request") }
+    } else {
+      // The calendar app on today.
+      Text { text: head; style: muted; color: muted; maxLines: 1; onTap: calendar("open") }
     }
-    for e in events.take(room) key "${e.start_unix}:${e.title}" {
-      // Handlers take one action, not a choice, so a meeting with no link is its own node.
-      if e.join_url != null {
-        Box { onTap: url(e.join_url); Meeting { e: e } }
+    if granted && len(events) == 0 {
+      Text { text: "no meetings through tomorrow"; style: body; color: muted }
+    }
+    for e in events.take(room) key e.id {
+      // A meeting whose place is a link (Zoom, Teams, Meet) joins on a tap; any other opens in the calendar app,
+      // which has the join button. Handlers take one action, not a choice, so each is its own node.
+      if startsWith(e.location, "https://") {
+        Box { onTap: url(e.location); Meeting { e: e } }
       } else {
-        Meeting { e: e }
+        Box { onTap: calendar("open", e); Meeting { e: e } }
       }
     }
     Spacer { weight: 1 }
-    if data != null && data.practice != null {
-      Text { text: "practice · ${data.practice.title}"; style: small; color: accent; maxLines: 1 }
+    if practice != null {
+      Text { text: "practice · ${practice.title}"; style: small; color: accent; maxLines: 1 }
     }
   }
 }
