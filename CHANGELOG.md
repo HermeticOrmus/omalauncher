@@ -8,6 +8,18 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The today tile 2.0 (`80-today.owl`, owl 18) reads the meetings from the phone's own calendars
+  (`android.calendar`): every account Android syncs, read on the phone, with no sign-in on another
+  machine and no meeting sent over the network. The phone's
+  `~/.config/omalauncher/today-calendars.json` (a JSON list of calendar names) says which calendars
+  show; without it every calendar does. All-day events are left out. Until the calendar is allowed,
+  the header says "tap to read the calendar"; a tap asks Android. A meeting whose place is a link
+  joins on a tap; any other opens in the calendar app. The practice of the day still comes from the
+  today feed.
+- The full screens of sessions (and each board), comms (and each copy), usage, pull requests and the
+  kiosk refresh when their list is pulled down (`onPull`, owl 17).
+- The money and markets tiles (money's face, owed, people, pipeline, markets) left the bundle: their
+  feeds are off, so a new install no longer seeds tiles that read nothing.
 - On upstream 1.5.0 (versionCode 42). Upstream's 1.0 to 1.5 are below; the fork's changes follow upstream's
   new layout (home in `ui/home`, files in `storage`, widgets as full-screen widgets) and keep each space's
   page numbering in layout.toml.
