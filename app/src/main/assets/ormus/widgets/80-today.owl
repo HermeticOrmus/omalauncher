@@ -8,7 +8,7 @@ widget "today" {
 
   // The meetings come from the phone's calendars (the accounts Android syncs), read on the phone: no network and no
   // sign-in on another machine; this tile sends no meeting anywhere. In this build only this file, exactly as the
-  // launcher ships it, gets the calendars (Ormus.calendarGate), and the Linux guest's command gets none
+  // launcher ships it, gets the calendars (Ormus.calendarOk), and the Linux guest's command gets none
   // (Ormus.GUEST_CALENDAR). Which calendars: the phone's own file, a JSON list of calendar names (an account's main
   // calendar carries its address as its name), so the addresses stay out of this file, which is public. Without that
   // file, or with an empty one, every calendar shows. All-day events are not meetings.
@@ -29,7 +29,9 @@ widget "today" {
   let until = midnight == null ? null : midnight + 2 * 86400
   let events = granted ? cal.events.filter(e => !e.allDay && (until == null || e.start < until) && (names == null || contains(names, e.calendar))) : []
   let room = max(1, floor(((tileHeight ?? 204) - 74) / 25))
-  let head = cal == null ? "today …" : !granted ? "today · tap to read the calendar" : "today · ${len(events)} ahead"
+  // A copy of this file changed on the phone reads no calendar in this build (`gated`): a tap cannot change that.
+  let gated = cal != null && cal.gated == true
+  let head = cal == null ? "today …" : gated ? "today · only the shipped tile reads the calendar" : !granted ? "today · tap to read the calendar" : "today · ${len(events)} ahead"
 
   component Meeting(e) {
     Row {
@@ -43,7 +45,7 @@ widget "today" {
 
   Column {
     gap: 6
-    if cal != null && !granted {
+    if cal != null && !granted && !gated {
       // Only a tap asks Android; after two refusals it opens the launcher's page in Android's settings.
       Text { text: head; style: muted; color: foreground; maxLines: 1; onTap: calendar("request") }
     } else {

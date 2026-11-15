@@ -56,9 +56,32 @@ class OrmusCalendarGateTest {
         assertEquals(events, first(Ormus.gate(services, allowed = true).androidUpdates("calendar")))
     }
 
-    @Test fun everyWidgetInstanceIsMadeThroughTheGate() {
+    @Test fun everyWidgetInstanceIsMadeThroughTheGateAndAdoptsOnlyWhereItMay() {
+        val calls =
+            File("src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.flatMap { f ->
+                Regex("""(?<!class )\bWidgetInstance\(""").findAll(f.readText()).map { f.name }
+            }.toList()
+        assertEquals("one WidgetInstance( in the app, in WidgetEngine.kt", listOf("WidgetEngine.kt"), calls)
         val engine = File("src/main/kotlin/dev/omalauncher/widgets/WidgetEngine.kt").readText()
-        assertEquals("one WidgetInstance(", 1, Regex("""\bWidgetInstance\(""").findAll(engine).count())
-        assertTrue(engine.contains("WidgetInstance(\n                    program,\n                    Ormus.calendarGate(context, services, name, hashes[name]),"))
+        assertTrue(engine.contains("val calendarOk = Ormus.calendarOk(context, name, hashes[name])\n            val inst =\n                WidgetInstance(\n                    program,\n                    Ormus.gate(services, calendarOk),"))
+        assertTrue(engine.contains("prev?.takeIf { Ormus.mayAdopt(it.program, calendarOk) }?.let(inst::adopt)"))
+        assertFalse("no adopt that skips the check", engine.contains("prev?.let(inst::adopt)"))
+        assertTrue("no picture of a calendar tile", engine.contains("Ormus.readsCalendar(program) -> Ormus.NO_CALENDAR_PREVIEW"))
+        assertTrue("no theme pictures of a calendar tile", engine.contains("if (spec.program?.let(Ormus::readsCalendar) == true) return"))
+    }
+
+    private val today = dev.omalauncher.widgets.lang.Compiler.compile(String(shippedBytes))
+    private val other = dev.omalauncher.widgets.lang.Compiler.compile("widget \"x\" {\n  meta { owl: 12 }\n  source b = android.battery\n  Text { text: \"x\" }\n}\n")
+
+    @Test fun aGatedInstanceNeverTakesTheValuesOfOneThatReadTheCalendar() {
+        assertTrue(Ormus.readsCalendar(today))
+        assertFalse(Ormus.readsCalendar(other))
+        assertFalse("the shipped tile's events into a changed tile", Ormus.mayAdopt(today, calendarOk = false))
+        assertTrue("the shipped tile into itself again", Ormus.mayAdopt(today, calendarOk = true))
+        assertTrue("a widget with no calendar keeps its values", Ormus.mayAdopt(other, calendarOk = false))
+    }
+
+    @Test fun theGatedValueSaysItIsGated() {
+        assertEquals(Json.parse("""{"granted": false, "gated": true, "events": []}"""), Ormus.NO_CALENDAR)
     }
 }

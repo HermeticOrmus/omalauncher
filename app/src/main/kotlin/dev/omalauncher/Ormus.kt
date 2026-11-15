@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.storage.LauncherData
+import dev.omalauncher.widgets.lang.Global
 import dev.omalauncher.widgets.lang.Json
+import dev.omalauncher.widgets.lang.Program
 import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.sha256Hex
 import dev.omalauncher.widgets.runtime.Services
@@ -54,8 +56,11 @@ object Ormus {
      */
     const val CALENDAR_WIDGET = "80-today.owl"
 
-    /** The calendar as a widget sees it when it may not read it: not granted, no events. */
-    val NO_CALENDAR: Value = Json.parse("""{"granted": false, "events": []}""")
+    /** The calendar as a widget sees it when it may not read it: not granted, no events, and `gated`, so it can say why. */
+    val NO_CALENDAR: Value = Json.parse("""{"granted": false, "gated": true, "events": []}""")
+
+    /** Why owl-check gets no picture of a tile that reads the calendar: the picture would show the meetings in the guest's folder. */
+    const val NO_CALENDAR_PREVIEW = "it reads the phone's calendar, and its picture would show the meetings"
 
     /** Whether the widget file [name], whose compiled text hashes to [hash], may read the calendars; [shipped] is the bundled today tile's hash. */
     fun calendarAllowed(
@@ -70,13 +75,24 @@ object Ormus {
     private fun shippedTodayHash(context: Context): String? =
         shippedToday ?: runCatching { context.assets.open("ormus/widgets/$CALENDAR_WIDGET").use { sha256Hex(it.readBytes()) } }.getOrNull()?.also { shippedToday = it }
 
-    /** [services] for one widget file: android.calendar reads as [NO_CALENDAR] unless [calendarAllowed]. */
-    fun calendarGate(
+    /** [calendarAllowed] for one widget file, against the bundled today tile. */
+    fun calendarOk(
         context: Context,
-        services: Services,
         name: String,
         hash: String?,
-    ): Services = gate(services, calendarAllowed(name, hash, shippedTodayHash(context)))
+    ): Boolean = calendarAllowed(name, hash, shippedTodayHash(context))
+
+    /** Whether [program] has an android.calendar source. */
+    fun readsCalendar(program: Program): Boolean = program.globals.any { it is Global.Source && it.kind == "android.calendar" }
+
+    /**
+     * Whether a widget's new instance may take the values of the one it replaces (WidgetInstance.adopt copies sources by
+     * name): never into one that may not read the calendar from one that read it, or a changed tile keeps the meetings.
+     */
+    fun mayAdopt(
+        previous: Program,
+        calendarOk: Boolean,
+    ): Boolean = calendarOk || !readsCalendar(previous)
 
     /** [services] as they are when [allowed], else with android.calendar replaced by [NO_CALENDAR]. */
     fun gate(

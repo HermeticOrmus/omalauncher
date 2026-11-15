@@ -143,6 +143,12 @@ class OrmusTodayTileTest {
         assertEquals(listOf("calendar request"), t.taps())
     }
 
+    @Test fun aChangedCopyThatTheLauncherGatesSaysSoAndOffersNoTap() {
+        val t = tile(Json.parse("""{"granted": false, "gated": true, "events": []}"""))
+        assertEquals(listOf("today · only the shipped tile reads the calendar [muted]"), t.lines())
+        assertEquals(listOf("calendar open"), t.taps())
+    }
+
     @Test fun whileTheCalendarLoadsTheTileIsQuiet() {
         assertEquals(listOf("today … [muted]"), tile(Null).lines())
     }

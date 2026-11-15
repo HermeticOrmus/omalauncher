@@ -758,10 +758,11 @@ class WidgetEngine(
             }
             prev?.stop()
             val name = spec.file.name
+            val calendarOk = Ormus.calendarOk(context, name, hashes[name])
             val inst =
                 WidgetInstance(
                     program,
-                    Ormus.calendarGate(context, services, name, hashes[name]),
+                    Ormus.gate(services, calendarOk),
                     { message -> writeError(spec.file, message, append = true) },
                     File(stateDir, "$name.json"),
                     File(stateDir, "$name.secret"),
@@ -776,7 +777,7 @@ class WidgetEngine(
                     linux = { linux },
                     foreground = { (shownApps[name] ?: 0) > 0 || openScreen == name || name in shownPanels },
                 )
-            prev?.let(inst::adopt)
+            prev?.takeIf { Ormus.mayAdopt(it.program, calendarOk) }?.let(inst::adopt)
             instances[spec.file.name] = inst
             // The spec as it is now, not as loaded: a move to another page (placeOnPage) replaces it without a reload.
             inst.start(scope) { isLive(specs.firstOrNull { it.file.name == name } ?: spec) }
@@ -863,6 +864,7 @@ class WidgetEngine(
             when {
                 program.terminal -> "Terminal tiles aren't previewed"
                 program.browser -> "Browser tiles aren't previewed"
+                Ormus.readsCalendar(program) -> Ormus.NO_CALENDAR_PREVIEW
                 waitsForLinux(spec) -> "it needs Linux, which isn't installed"
                 !missing[name].isNullOrEmpty() -> "it needs ${missing[name]!!.joinToString(" ")}; install with pacman -S --needed"
                 instance(spec) == null -> "it isn't running"
@@ -954,6 +956,7 @@ class WidgetEngine(
         screens: List<String> = emptyList(),
     ) {
         val spec = specs.firstOrNull { it.file.name == name } ?: return
+        if (spec.program?.let(Ormus::readsCalendar) == true) return
         val inst = instance(spec) ?: return
         val cells = tileCells(spec)
         val (w, h) = if (spec.isFace) layout.pagePx(context.resources.displayMetrics) else layout.tilePx(cells, context.resources.displayMetrics)

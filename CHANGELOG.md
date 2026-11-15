@@ -20,7 +20,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   and the widgets folder is in the Linux guest's home, so `android.calendar` reads as not allowed in
   every other widget file and in a changed today tile (`Ormus.calendarGate`: the file's name and its
   SHA-256 must match the bundled tile), and the guest's `omalauncher calendar` answers that Linux
-  can't read it (`Ormus.GUEST_CALENDAR`).
+  can't read it (`Ormus.GUEST_CALENDAR`). A changed tile never takes the shipped tile's values
+  when it replaces it (`Ormus.mayAdopt`), says "only the shipped tile reads the calendar", and no
+  owl-check picture is drawn of a tile that reads the calendar.
 - The full screens of sessions (and each board), comms (and each copy), usage, pull requests and the
   kiosk refresh when their list is pulled down (`onPull`, owl 17).
 - The money and markets tiles (money's face, owed, people, pipeline, markets) left the bundle: their
