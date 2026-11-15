@@ -143,7 +143,7 @@ class PhoneBridge(
     }
 
     private suspend fun calendar(days: String?): Answer {
-        if (!Ormus.GUEST_CALENDAR) return Answer.Denied(NOT_ALLOWED.format("calendar"))
+        if (!Ormus.GUEST_CALENDAR) return Answer.Denied(GUEST_NO_CALENDAR)
         val n = if (days.isNullOrEmpty()) DAYS else days.toIntOrNull()?.takeIf { it in 1..MAX_DAYS } ?: return Answer.Usage("days: 1 to $MAX_DAYS")
         val events = calendar.read(n, MAX_EVENTS) ?: return Answer.Denied(NOT_ALLOWED.format("calendar"))
         return Answer.Ok(Lst(events))
@@ -340,6 +340,8 @@ class PhoneBridge(
         const val NOTIFY_CHANNEL = "linux"
         const val NO_NOTIFICATIONS = "the launcher may not post notifications; turn them on in its settings (permissions), or the \"agents and scripts\" ones in Android's"
         const val NOT_ALLOWED = "the launcher isn't allowed the %s; a widget that shows it asks, or Android's settings for the app"
+        /** Omalauncher Ormus: the calendars are the today tile's alone (Ormus.GUEST_CALENDAR), whatever Android allows. */
+        const val GUEST_NO_CALENDAR = "Omalauncher Ormus keeps the phone's calendar for its today tile; Linux can't read it"
         const val LOCATION_MS = 10_000L
         const val AIRPODS_MS = 12_000L
         const val CONTROL_MS = 2_000L

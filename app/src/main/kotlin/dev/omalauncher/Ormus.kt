@@ -4,6 +4,12 @@ import android.content.Context
 import android.util.Log
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.storage.LauncherData
+import dev.omalauncher.widgets.lang.Json
+import dev.omalauncher.widgets.lang.Value
+import dev.omalauncher.widgets.lang.sha256Hex
+import dev.omalauncher.widgets.runtime.Services
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import dev.omalauncher.linux.run
 import java.io.File
 import java.security.MessageDigest
@@ -40,6 +46,50 @@ object Ormus {
      * pins the guard.
      */
     const val GUEST_CALENDAR = false
+
+    /**
+     * The one widget that may read the phone's calendars: the today tile exactly as this build ships it. The widgets
+     * folder is in the Linux guest's home, so a widget the guest writes (an agent) could otherwise read every calendar
+     * once the app holds the permission; a changed today tile gets none either (review of the today tile 2.0).
+     */
+    const val CALENDAR_WIDGET = "80-today.owl"
+
+    /** The calendar as a widget sees it when it may not read it: not granted, no events. */
+    val NO_CALENDAR: Value = Json.parse("""{"granted": false, "events": []}""")
+
+    /** Whether the widget file [name], whose compiled text hashes to [hash], may read the calendars; [shipped] is the bundled today tile's hash. */
+    fun calendarAllowed(
+        name: String,
+        hash: String?,
+        shipped: String?,
+    ): Boolean = name == CALENDAR_WIDGET && hash != null && shipped != null && hash == shipped
+
+    /** The bundled today tile's SHA-256, read once; null when the build has none. */
+    @Volatile private var shippedToday: String? = null
+
+    private fun shippedTodayHash(context: Context): String? =
+        shippedToday ?: runCatching { context.assets.open("ormus/widgets/$CALENDAR_WIDGET").use { sha256Hex(it.readBytes()) } }.getOrNull()?.also { shippedToday = it }
+
+    /** [services] for one widget file: android.calendar reads as [NO_CALENDAR] unless [calendarAllowed]. */
+    fun calendarGate(
+        context: Context,
+        services: Services,
+        name: String,
+        hash: String?,
+    ): Services = gate(services, calendarAllowed(name, hash, shippedTodayHash(context)))
+
+    /** [services] as they are when [allowed], else with android.calendar replaced by [NO_CALENDAR]. */
+    fun gate(
+        services: Services,
+        allowed: Boolean,
+    ): Services =
+        if (allowed) {
+            services
+        } else {
+            object : Services by services {
+                override fun androidUpdates(name: String): Flow<Value>? = if (name == "calendar") flowOf(NO_CALENDAR) else services.androidUpdates(name)
+            }
+        }
 
     /**
      * Swiping up on home until the gesture settings say otherwise (style.toml's gestures.swipe-up): the letter rail

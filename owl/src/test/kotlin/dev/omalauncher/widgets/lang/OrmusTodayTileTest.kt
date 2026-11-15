@@ -181,7 +181,7 @@ class OrmusTodayTileTest {
 
     @Test fun withoutThePhonesListEveryCalendarShows() {
         // The launcher reads a missing file as "" (docs/declarations.md); null is the source before its first read.
-        for (missing in listOf(Str(""), Null, Json.parse("[]"), Json.parse("{}"))) {
+        for (missing in listOf(Str(""), Null, Json.parse("[]"), Json.parse("{}"), Str("hello"), Num(3.0))) {
             val lines = tile(calendar(event("family", NOW + HOUR, "Dinner", calendar = "Family")), shown = missing).lines()
             assertEquals("shown = $missing", "today · 1 ahead [muted]", lines[0])
         }
@@ -203,9 +203,13 @@ class OrmusTodayTileTest {
                 calendar(
                     event("pass", NOW + HOUR, location = "https://us02web.zoom.us/j/1?pwd=x Passcode: 42"),
                     event("teams", NOW + 2 * HOUR, location = "Join: https://teams.microsoft.com/l/meetup-join/19 (Teams)"),
+                    event("bracket", NOW + 3 * HOUR, location = "Zoom (https://zoom.us/j/7)"),
                 ),
             )
-        assertEquals(listOf("calendar open", "url https://us02web.zoom.us/j/1?pwd=x", "url https://teams.microsoft.com/l/meetup-join/19"), t.taps())
+        assertEquals(
+            listOf("calendar open", "url https://us02web.zoom.us/j/1?pwd=x", "url https://teams.microsoft.com/l/meetup-join/19", "url https://zoom.us/j/7"),
+            t.taps(),
+        )
     }
 
     @Test fun anInvitationsOtherAddressesOpenTheCalendarAppNotTheAddress() {

@@ -761,7 +761,7 @@ class WidgetEngine(
             val inst =
                 WidgetInstance(
                     program,
-                    services,
+                    Ormus.calendarGate(context, services, name, hashes[name]),
                     { message -> writeError(spec.file, message, append = true) },
                     File(stateDir, "$name.json"),
                     File(stateDir, "$name.secret"),

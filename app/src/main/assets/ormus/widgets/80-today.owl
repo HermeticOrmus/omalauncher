@@ -7,7 +7,8 @@ widget "today" {
   meta { owl: 18; description: "Ormus's next meetings today and tomorrow from the phone's own calendars, with a countdown and a tap to open each, and the Alqvimia practice of the day."; version: "2.0"; license: "MIT"; category: "productivity" }
 
   // The meetings come from the phone's calendars (the accounts Android syncs), read on the phone: no network and no
-  // sign-in on another machine; this tile sends no meeting anywhere. The Linux guest cannot read them in this build
+  // sign-in on another machine; this tile sends no meeting anywhere. In this build only this file, exactly as the
+  // launcher ships it, gets the calendars (Ormus.calendarGate), and the Linux guest's command gets none
   // (Ormus.GUEST_CALENDAR). Which calendars: the phone's own file, a JSON list of calendar names (an account's main
   // calendar carries its address as its name), so the addresses stay out of this file, which is public. Without that
   // file, or with an empty one, every calendar shows. All-day events are not meetings.
@@ -17,8 +18,10 @@ widget "today" {
   source f = http("https://sg.tailb43a3a.ts.net/feeds/today.json") every 15m json timeout 20s status
   source now = clock every 1m
 
-  // A missing file reads as "" (docs/declarations.md), and an empty list names no calendar: both show every one.
-  let names = shown != null && shown != "" && len(shown) > 0 ? shown : null
+  // A missing file reads as "" (docs/declarations.md); a file that is not a JSON list reads as its text, which
+  // unique() makes a list of one: those, and an empty list, name no calendar, so every one shows.
+  let listed = shown != null && shown != "" && unique(shown) != [shown] ? unique(shown) : []
+  let names = len(listed) > 0 ? listed : null
   let practice = f != null && f.ok && f.out != null ? f.out.practice : null
   let granted = cal != null && cal.granted
   // Today and tomorrow, as the phone's clock counts days: from now to the midnight after tomorrow.
@@ -54,7 +57,7 @@ widget "today" {
       // A meeting whose place holds a Zoom, Teams, Meet or Webex link joins on a tap, to that link alone (an invitation
       // from anyone sets the place, so no other address opens); any other opens in the calendar app, which has the
       // join button. Handlers take one action, not a choice, so each is its own node.
-      let join = match(e.location, "https://(?:[a-z0-9-]+\\.)*(?:zoom\\.us|teams\\.microsoft\\.com|teams\\.live\\.com|meet\\.google\\.com|webex\\.com)(?:[/?#][^\\s<>]*)?(?=[\\s<>]|$)")
+      let join = match(e.location, "https://(?:[a-z0-9-]+\\.)*(?:zoom\\.us|teams\\.microsoft\\.com|teams\\.live\\.com|meet\\.google\\.com|webex\\.com)(?:[/?#][^\\s<>()\\[\\]]*)?(?=[\\s<>()\\[\\]]|$)")
       if join != null {
         Box { onTap: url(join); Meeting { e: e } }
       } else {

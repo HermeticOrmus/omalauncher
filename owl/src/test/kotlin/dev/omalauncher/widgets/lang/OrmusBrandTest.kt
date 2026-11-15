@@ -13,7 +13,8 @@ class OrmusBrandTest {
     private val dir = java.io.File("../app/src/main/assets/ormus/widgets")
 
     // Profit and loss is the brand's page-scoped exception: data that needs a semantic pair, with its sign beside it.
-    private val semantic = setOf("55-money-face.owl", "90-markets.owl")
+    // No Ormus widget has such a page since the money face and markets left the bundle, so none may use green.
+    private val semantic = emptySet<String>()
 
     /** Every property that takes a color, up to its `;` or the closing brace. */
     private val colorProp = Regex("""\b(color|background|fill|track|stroke|border|tint)\s*:\s*([^;}]*)""")

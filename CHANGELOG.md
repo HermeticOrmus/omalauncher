@@ -16,9 +16,11 @@ What this fork adds to the release below it; none of it is in the Play build.
   calendar is allowed, the header says "tap to read the calendar"; a tap asks Android. A meeting whose
   place holds a Zoom, Teams, Meet or Webex link joins that link alone on a tap; any other opens in the
   calendar app. The practice of the day still comes from the today feed.
-- The Linux guest no longer reads the calendar (`Ormus.GUEST_CALENDAR`): Android's calendar
-  permission is the whole app's, so `omalauncher calendar` answers "not allowed" and the calendars
-  stay the today tile's.
+- Only the today tile reads the phone's calendars. Android's calendar permission is the whole app's,
+  and the widgets folder is in the Linux guest's home, so `android.calendar` reads as not allowed in
+  every other widget file and in a changed today tile (`Ormus.calendarGate`: the file's name and its
+  SHA-256 must match the bundled tile), and the guest's `omalauncher calendar` answers that Linux
+  can't read it (`Ormus.GUEST_CALENDAR`).
 - The full screens of sessions (and each board), comms (and each copy), usage, pull requests and the
   kiosk refresh when their list is pulled down (`onPull`, owl 17).
 - The money and markets tiles (money's face, owed, people, pipeline, markets) left the bundle: their
