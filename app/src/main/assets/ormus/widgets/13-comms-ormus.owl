@@ -37,29 +37,36 @@ widget "comms-ormus" {
   // clock freed the card (30 s) still lands on that card and still empties the field of the text that went.
   state sentFor = ""
   state sentN = 0
+  // The number the last send carries (`n` in what comes back): an answer of an older send that comes late is not
+  // taken for the last one's.
+  state sentMark = 0
   on sent {
     let got = parseJson(value ?? "")
-    let reply = got != null && got.r != null && got.r.ok != null ? got.r : null
-    // The card it is for: the one still busy, or, after the clock freed it, the last one sent from. busyN 20 is a
-    // typed text (Write), 10 and up a reaction (React), 1 to 9 a quick reply (Reply).
-    let who = busy != "" ? busy : sentFor
-    let kind = busy != "" ? busyN : sentN
-    if reply != null && reply.ok && kind == 20 && draftFor != "" && startsWith(who, draftFor + "|") {
-      draft = ""
+    // Another send's answer, late: the last send's own answer is still to come, so this one changes nothing.
+    let late = sentMark > 0 && got != null && got.n != null && got.n != sentMark
+    let reply = !late && got != null && got.r != null && got.r.ok != null ? got.r : null
+    if !late {
+      // The card it is for: the one still busy, or, after the clock freed it, the last one sent from. busyN 20 is a
+      // typed text (Write), 10 and up a reaction (React), 1 to 9 a quick reply (Reply).
+      let who = busy != "" ? busy : sentFor
+      let kind = busy != "" ? busyN : sentN
+      if reply != null && reply.ok && kind == 20 && draftFor != "" && startsWith(who, draftFor + "|") {
+        draft = ""
+      }
+      saidFor = who
+      busy = ""
+      busyN = 0
+      dragX = 0
+      if reply != null && reply.ok {
+        haptic()
+        said = "sent"
+      } else {
+        // No answer (ssh dropped, or sg printed nothing) is never "nothing was sent": the text may have gone, and a
+        // second tap would send it twice. He opens the chat and looks.
+        said = reply == null ? "no answer: open the chat to check" : reply.outcome == "too soon" ? "you just replied: wait a minute" : reply.outcome == "unknown chat" || reply.outcome == "changed" ? "the chat moved on: look again" : reply.outcome == "feed stale" ? "sg's list is old: open the chat" : reply.outcome == "refused" ? "sg refused it: look again" : reply.outcome == "not confirmed" ? "not confirmed: open the chat" : "it did not go through: open the chat"
+      }
+      refresh()
     }
-    saidFor = who
-    busy = ""
-    busyN = 0
-    dragX = 0
-    if reply != null && reply.ok {
-      haptic()
-      said = "sent"
-    } else {
-      // No answer (ssh dropped, or sg printed nothing) is never "nothing was sent": the text may have gone, and a
-      // second tap would send it twice. He opens the chat and looks.
-      said = reply == null ? "no answer: open the chat to check" : reply.outcome == "too soon" ? "you just replied: wait a minute" : reply.outcome == "unknown chat" || reply.outcome == "changed" ? "the chat moved on: look again" : reply.outcome == "feed stale" ? "sg's list is old: open the chat" : reply.outcome == "refused" ? "sg refused it: look again" : reply.outcome == "not confirmed" ? "not confirmed: open the chat" : "it did not go through: open the chat"
-    }
-    refresh()
   }
   // A reply whose answer never comes (the shell died, the run timed out without a word) would keep every key dead:
   // after half a minute the next tick of the clock frees the card and says to check the chat.
@@ -235,9 +242,10 @@ widget "comms-ormus" {
           busyN = n
           sentFor = busy
           sentN = n
+          sentMark = 1 + int(random(1000000000))
           busyAt = now ?? 0
           said = ""
-          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, n: n, label: o.label}, c.sig != null ? {sig: c.sig} : {})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, n: n, label: o.label}, c.sig != null ? {sig: c.sig} : {})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${sentMark} \"$r\" $x")
         }
       }
       Key { word: busy == "${c.k}|${c.text ?? ""}" && busyN == n ? "…" : "${n} ${o.label}"; strong: strong; dim: busy != "" && !(busy == "${c.k}|${c.text ?? ""}" && busyN == n) }
@@ -256,9 +264,10 @@ widget "comms-ormus" {
           busyN = 10 + i
           sentFor = busy
           sentN = 10 + i
+          sentMark = 1 + int(random(1000000000))
           busyAt = now ?? 0
           said = ""
-          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, react: emoji}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, react: emoji}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${sentMark} \"$r\" $x")
         }
       }
       Key { word: busy == "${c.k}|${c.text ?? ""}" && busyN == 10 + i ? "…" : emoji; dim: busy != "" && !(busy == "${c.k}|${c.text ?? ""}" && busyN == 10 + i) }
@@ -277,8 +286,12 @@ widget "comms-ormus" {
         fontSize: 15
         lines: 3
         onChange: {
-          draft = value
-          draftFor = c.k
+          // Only on the card he picked, as a send: a key in the frame after a feed read would put his words on the
+          // chat that came into the card's place.
+          if pick == "${c.k}|${c.text ?? ""}" {
+            draft = value
+            draftFor = c.k
+          }
         }
         onSubmit: {
           // Only on the card he picked: a feed read can put another chat here before the next draw. `c` is read
@@ -290,9 +303,10 @@ widget "comms-ormus" {
             busyN = 20
             sentFor = busy
             sentN = 20
+            sentMark = 1 + int(random(1000000000))
             busyAt = now ?? 0
             said = ""
-            sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, text: value}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+            sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, text: value}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${sentMark} \"$r\" $x")
           }
         }
       }

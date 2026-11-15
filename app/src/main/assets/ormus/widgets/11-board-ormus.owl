@@ -4,7 +4,7 @@ widget "sessions-ormus" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card attaches to the agent's herdr-core terminal; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -293,7 +293,7 @@ widget "sessions-ormus" {
     }
   }
 
-  // One row that opens the agent's chat in Mercurio.
+  // One row that attaches to the agent's herdr-core terminal.
   component Item(i, where) {
     Box {
       onTap: {
@@ -322,7 +322,7 @@ widget "sessions-ormus" {
     }
   }
 
-  // Open an agent's chat in Mercurio, or Mercurio itself when the feed has no link for its machine.
+  // Attach to an agent's herdr-core terminal, or open Mercurio itself for an agent of any other kind.
   component OpenAgent(a, word) {
     Box {
       fill: width
@@ -364,7 +364,7 @@ widget "sessions-ormus" {
   // `summary`: the dialog's heading and the agent's line about the command, a pick list's question, what the agent
   // needs at a free prompt), under it where it is; then numbered keys that move it forward: on the tile (`compact`:
   // little room) up to three (`choices`: the dialog's answers, or his replies at a free prompt), on the screen every
-  // answer the dialog offers. A tap anywhere else on the card opens the agent in Mercurio. The tile's card shows
+  // answer the dialog offers. A tap anywhere else on the card attaches to the agent's terminal. The tile's card shows
   // no command, but the first line of one whose summary is the agent's own line about it; the screen also shows
   // the question, what a yes would run and why, and the whole command (`wide` is the characters one line holds).
   // A command the screen did not show whole, or too long to carry, has no keys anywhere, whatever the feed says:
@@ -457,7 +457,7 @@ widget "sessions-ormus" {
           }
         }
       } else {
-        OpenAgent { a: a; word: "open in Mercurio"; fill: width }
+        OpenAgent { a: a; word: a.session == "core" ? "attach" : "open in Mercurio"; fill: width }
       }
       if said != "" && busy == "" && saidFor == q {
         Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 2 }

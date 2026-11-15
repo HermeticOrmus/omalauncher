@@ -33,6 +33,9 @@ class OrmusCommsScreenTest {
 
     private val screen get() = program.screen!!
 
+    /** The number the last send carries, as sg's answer gives it back. */
+    private fun TileHost.mark() = (let("sentMark") as Num).v.toLong()
+
     @Test fun theScreenCardShowsTheMessagesBeforeTheirLastOneAndTheTileDoesNot() {
         val t = pinned()
         val lines = t.lines(screen)
@@ -65,13 +68,13 @@ class OrmusCommsScreenTest {
         assertTrue("the JSON is {k, text, sig}: $sent", sent.contains("""'{"k":"aaaaaaaaaaaa","text":"mañana a las 3 👍","sig":"3f9a1c2b"}'"""))
         assertEquals(Num(20.0), t.let("busyN"))
         // A text that did not go stays in the field.
-        t.fire("sent", Str("""{"n": 1, "r": {"ok": false, "outcome": "not confirmed"}}"""))
+        t.fire("sent", Str("""{"n": ${t.mark()}, "r": {"ok": false, "outcome": "not confirmed"}}"""))
         assertEquals("mañana a las 3 👍", t.text("draft"))
         assertEquals("not confirmed: open the chat", t.text("said"))
         // One that went leaves it empty.
         t.set("said", Str(""))
         t.submit(screen, "write to Ana", "mañana a las 3 👍")
-        t.fire("sent", Str("""{"n": 2, "r": {"ok": true, "outcome": "sent"}}"""))
+        t.fire("sent", Str("""{"n": ${t.mark()}, "r": {"ok": true, "outcome": "sent"}}"""))
         assertEquals("", t.text("draft"))
         assertEquals("sent", t.text("said"))
     }
@@ -145,10 +148,36 @@ class OrmusCommsScreenTest {
         t.submit(screen, "write to Ana", "on my way")
         t.set("busy", Str(""))  // the clock freed the card (30 s) and said to look
         t.set("said", Str("no answer: open the chat to check"))
-        t.fire("sent", Str("""{"n": 3, "r": {"ok": true, "outcome": "sent"}}"""))
+        t.fire("sent", Str("""{"n": ${t.mark()}, "r": {"ok": true, "outcome": "sent"}}"""))
         assertEquals("sent", t.text("said"))
         assertEquals("on the card it was for", card, t.text("saidFor"))
         assertEquals("and the text that went leaves the field", "", t.text("draft"))
+    }
+
+    @Test fun aKeyTypedAfterAFeedReadPutInAnotherChatLeavesTheDraftAlone() {
+        val t = TileHost(program, two())
+        t.set("pick", Str(card))
+        t.change(screen, "write to Xena", "the number is 555")
+        val key = t.drawnChange(screen, "write to Xena", "the number is 5550")
+        t.set("f", two(xenaText = "and now?"))  // Xena wrote again: Yara's card is in the place before the next draw
+        key()
+        assertEquals("his words stay with Xena", "aaaaaaaaaaaa", t.text("draftFor"))
+        assertEquals("the number is 555", t.text("draft"))
+    }
+
+    @Test fun aLateAnswerOfAnOlderSendIsNotTakenForTheLastOnes() {
+        val t = pinned()
+        t.submit(screen, "write to Ana", "first")
+        val first = t.mark()
+        t.set("busy", Str(""))  // the clock freed the card
+        t.set("pick", Str(card))
+        t.submit(screen, "write to Ana", "second")
+        t.fire("sent", Str("""{"n": $first, "r": {"ok": true, "outcome": "sent"}}"""))
+        assertEquals("the second send still waits for its own answer", card, t.text("busy"))
+        assertEquals("second", t.text("draft"))
+        t.fire("sent", Str("""{"n": ${t.mark()}, "r": {"ok": false, "outcome": "not confirmed"}}"""))
+        assertEquals("not confirmed: open the chat", t.text("said"))
+        assertEquals("and the text is still there to look at", "second", t.text("draft"))
     }
 
     @Test fun anEmojiReplyFromTheModelIsAKeyLikeAnyOther() {

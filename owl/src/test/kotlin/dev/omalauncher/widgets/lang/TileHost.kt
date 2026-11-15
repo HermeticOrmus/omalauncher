@@ -194,6 +194,24 @@ internal class TileHost(
         }
     }
 
+    /** The onChange of the Input whose placeholder starts with [placeholder], found in this frame and run later with [value]. */
+    fun drawnChange(
+        nodes: List<WNode>,
+        placeholder: String,
+        value: String,
+    ): () -> Unit {
+        var found: (() -> Unit)? = null
+        budget.run {
+            visit(nodes, Env.root(this)) { n, env ->
+                if (found == null && n.kind == "Input" && ((n.props["placeholder"]?.invoke(env) as? Str)?.v ?: "").startsWith(placeholder)) {
+                    found = { n.handlers["onChange"]!!.run.invoke(env, listOf(Str(value))) }
+                }
+            }
+        }
+        val run = found ?: error("no field asks \"$placeholder\"")
+        return { budget.run { run() } }
+    }
+
     /** How many Inputs the nodes show. */
     fun inputs(nodes: List<WNode>): Int {
         var n = 0
