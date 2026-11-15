@@ -1,4 +1,4 @@
-package dev.omalauncher.ui
+package dev.omalauncher.ui.home
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import dev.omalauncher.AndroidApp
+import dev.omalauncher.apps.AndroidApp
 import dev.omalauncher.Runtime
 import kotlin.math.exp
 import kotlin.math.roundToInt
@@ -52,6 +52,11 @@ import androidx.compose.ui.unit.Dp
 import dev.omalauncher.theme.Style
 import dev.omalauncher.widgets.WidgetLayout
 import kotlinx.coroutines.delay
+import dev.omalauncher.ui.EdgeGap
+import dev.omalauncher.ui.LauncherStyle
+import dev.omalauncher.ui.Mono
+import dev.omalauncher.ui.Palette
+import dev.omalauncher.ui.TextSize
 
 /** The home screen's right strip the rail takes; Home leaves it free of tiles in portrait. */
 internal val HomeRailWidth = 22.dp

@@ -1,7 +1,7 @@
 package dev.omalauncher.widgets
 
 import com.sun.net.httpserver.HttpServer
-import dev.omalauncher.sha256Hex
+import dev.omalauncher.widgets.lang.sha256Hex
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

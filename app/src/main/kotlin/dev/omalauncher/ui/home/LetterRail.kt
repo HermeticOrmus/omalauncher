@@ -1,4 +1,4 @@
-package dev.omalauncher.ui
+package dev.omalauncher.ui.home
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,6 +36,10 @@ import java.text.Normalizer
 import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import dev.omalauncher.ui.LauncherStyle
+import dev.omalauncher.ui.Mono
+import dev.omalauncher.ui.Palette
+import dev.omalauncher.ui.TextSize
 
 /** The drawer's end edge the letters take; the grid leaves it free while the full list shows. */
 internal val RailWidth = 24.dp

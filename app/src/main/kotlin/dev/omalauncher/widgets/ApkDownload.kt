@@ -1,7 +1,7 @@
 package dev.omalauncher.widgets
 
-import dev.omalauncher.hex
-import dev.omalauncher.openHttp
+import dev.omalauncher.widgets.lang.hex
+import dev.omalauncher.net.openHttp
 import dev.omalauncher.widgets.lang.Compiler
 import java.io.EOFException
 import java.io.File

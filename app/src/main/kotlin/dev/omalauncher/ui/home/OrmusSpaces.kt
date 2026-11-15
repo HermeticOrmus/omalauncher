@@ -1,4 +1,4 @@
-package dev.omalauncher.ui
+package dev.omalauncher.ui.home
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -40,6 +40,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
+import dev.omalauncher.ui.LauncherStyle
+import dev.omalauncher.ui.Mono
+import dev.omalauncher.ui.Palette
+import dev.omalauncher.ui.TextSize
 
 /**
  * Omalauncher Ormus: runs [up] or [down] once for a vertical swipe of 72 dp or a quick fling, for gestures that do

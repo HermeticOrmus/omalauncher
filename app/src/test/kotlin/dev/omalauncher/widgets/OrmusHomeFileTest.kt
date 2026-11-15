@@ -69,4 +69,15 @@ class OrmusHomeFileTest {
         assertEquals(listOf(1, 2), HomeFile.numbers(decoded.layout.pages))
         assertEquals(1, decoded.problems.size)
     }
+
+    /** Upstream 1.x writes a foldable's cover screen as [[cover.page]] beside the main pages: its pages keep their spaces too. */
+    @Test fun aScreenSectionKeepsTheSpacesAndLeavesTheMainPagesAlone() {
+        val cover = layout.copy(pages = layout.pages.drop(2))
+        val text = Toml.write(HomeFile.encode(emptyMap(), layout, mapOf(Screen.COVER to cover)), HomeFile.HEADER)
+        val decoded = HomeFile.decode(Toml.parse(text), 6)
+        assertEquals(emptyList<String>(), decoded.problems)
+        assertEquals(layout, decoded.layout)
+        assertEquals(cover, decoded.screens.getValue(Screen.COVER))
+        assertEquals(listOf(101, 102, 201), HomeFile.numbers(decoded.screens.getValue(Screen.COVER).pages))
+    }
 }

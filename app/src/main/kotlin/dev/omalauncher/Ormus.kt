@@ -3,6 +3,7 @@ package dev.omalauncher
 import android.content.Context
 import android.util.Log
 import dev.omalauncher.linux.Proot
+import dev.omalauncher.storage.LauncherData
 import dev.omalauncher.linux.run
 import java.io.File
 import java.security.MessageDigest

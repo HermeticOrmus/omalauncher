@@ -51,7 +51,6 @@ import kotlin.coroutines.resume
 import kotlin.concurrent.thread
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.suspendCancellableCoroutine
 import dev.omalauncher.net.WebSocket
 import dev.omalauncher.net.LocalNetwork
@@ -1073,14 +1072,14 @@ class WidgetServices(
         sha256: String?,
     ) {
         if (!installing.compareAndSet(false, true)) {
-            Toast.makeText(context, "an app is already on its way", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.widgets_install_busy, Toast.LENGTH_SHORT).show()
             return
         }
         val name = ApkDownload.apkName(url)
         val host = runCatching { URL(url).host }.getOrNull().orEmpty()
         val job =
             scope.launch(Dispatchers.Main) {
-                Toast.makeText(context, "getting $name", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.widgets_install_getting, name), Toast.LENGTH_SHORT).show()
                     val dir = File(context.cacheDir, "apks")
                     val file = File(dir, name)
                     val got =
@@ -1093,7 +1092,7 @@ class WidgetServices(
                         }
                     got.onFailure {
                         Log.w("widgets", "install $url: ${it.message ?: it.javaClass.simpleName}")
-                        Toast.makeText(context, "not installed: ${ApkDownload.whyNot(it, host)}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.widgets_install_failed, ApkDownload.whyNot(it, host)), Toast.LENGTH_LONG).show()
                     }
                     got.onSuccess {
                         try {
@@ -1101,11 +1100,11 @@ class WidgetServices(
                             val sheet = Intent(Intent.ACTION_VIEW).setDataAndType(uri, APK_MIME).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(sheet)
                         } catch (e: ActivityNotFoundException) {
-                            Toast.makeText(context, "no installer opens $name", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.widgets_install_no_installer, name), Toast.LENGTH_SHORT).show()
                         } catch (e: SecurityException) {
-                            Toast.makeText(context, "Android doesn't let the launcher open the installer", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, R.string.widgets_install_refused, Toast.LENGTH_LONG).show()
                         } catch (e: IllegalArgumentException) {
-                            Toast.makeText(context, "not installed: ${e.message ?: "the file could not be shared"}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.widgets_install_failed, e.message ?: context.getString(R.string.widgets_install_unshareable)), Toast.LENGTH_LONG).show()
                         }
                     }
             }

@@ -93,6 +93,7 @@ class OrmusNeedsTileTest {
             headers: Map<String, String>,
             slot: Int?,
             method: String,
+            pin: String?,
         ) {
             actions += "post $url ${Json.write(body, 10_000)}"
         }

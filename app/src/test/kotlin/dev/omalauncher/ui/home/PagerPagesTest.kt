@@ -41,4 +41,10 @@ class PagerPagesTest {
         assertEquals(2, homePageIn(listOf(1, 2), 9))
         assertEquals(0, homePageIn(listOf(-1, 0), 1))
     }
+
+    /** Omalauncher Ormus: the empty page waiting for a face is left of the space's own first page, not of page 1. */
+    @Test fun aSpaceWaitsForItsFaceLeftOfItsOwnFirstPage() {
+        assertEquals(listOf(100, 101, 102), pagerPages(listOf(101), lastEmpty = false, emptyPageLeft = true, emptyPageRight = true, firstPage = 101))
+        assertEquals(listOf(98, 99, 100, 101, 102), pagerPages(listOf(99, 100, 101), lastEmpty = false, emptyPageLeft = true, emptyPageRight = true, firstPage = 101))
+    }
 }

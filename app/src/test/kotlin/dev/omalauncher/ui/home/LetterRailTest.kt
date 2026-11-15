@@ -1,4 +1,4 @@
-package dev.omalauncher.ui
+package dev.omalauncher.ui.home
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
