@@ -156,9 +156,11 @@ widget "comms-clients" {
   let keyRows = fold && len(cardKeys) > 0 && (cardLead ? len(cardKeys[0].label) + 2 > leadPer : !cardShort) ? 2 : 1
   // Their last line wraps once at most on the tile (14 sp mono, about 8.5 dp a character, inside the card's padding).
   let cardTextRows = card == null ? 0 : len(card.text ?? "") > floor(((tileWidth ?? 360) - 44) / 8.5) ? 2 : 1
-  // The one message before their last one on the tile's card: a line of 13 sp, about 17 dp with its gap.
-  let cardContext = card != null && len(card.context ?? []) > 0 ? 17 : 0
-  let cardHeight = card == null ? 0 : 151 - (fold ? 21 : 0) + (cardStack ? 48 * (len(cardKeys) - 1) : 0) + 20 * (keyRows - 1) + 17 * (cardTextRows - 1) + cardContext
+  let cardBase = card == null ? 0 : 151 - (fold ? 21 : 0) + (cardStack ? 48 * (len(cardKeys) - 1) : 0) + 20 * (keyRows - 1) + 17 * (cardTextRows - 1)
+  // The one message before their last one on the tile's card: a line of 13 sp with the card's gap, 21 dp as the meta
+  // line measures. Only when the card still fits under the head with it, so no key label is cut.
+  let tileContext = card != null && len(card.context ?? []) > 0 && below - cardBase >= 21
+  let cardHeight = cardBase + (tileContext ? 21 : 0)
   // sg's answer takes a line under the card (23 dp) or under the headline (18); not on a folded card, where it takes
   // the place of their last line, and not when "sent" is the keys' row.
   let saidRows = fold || said == "" || busy != "" ? 0 : cardSaid ? (cardSent ? 0 : 23) : 18
@@ -378,7 +380,7 @@ widget "comms-clients" {
             for l, i in (c.context ?? []) key "ctx${i}" {
               Text { text: "${l.me ? "you" : c.group ? "them" : c.name}: ${l.text}"; fontSize: 13; color: l.me ? muted : alpha(foreground, 0.8); maxLines: 3 }
             }
-          } else if len(c.context ?? []) > 0 {
+          } else if tileContext {
             // On the tile, the one message before their last one, so their line reads in its place.
             let l = c.context[len(c.context) - 1]
             Text { text: "${l.me ? "you" : c.group ? "them" : c.name}: ${l.text}"; fontSize: 13; color: muted; maxLines: 1 }
@@ -456,10 +458,11 @@ widget "comms-clients" {
           }
         }
         Write { c: c }
-        // WhatsApp itself, from the screen: the keys above have no open key when the card has quick replies.
-        if len(replies) > 0 {
-          OpenChat { c: c; word: "open in WhatsApp"; fill: width }
-        }
+      }
+      // WhatsApp itself, from the screen, for a picked card with quick replies (with none, the keys above end with
+      // an open key already).
+      if !compact && pinned && c.replied == null && !sentNow && len(replies) > 0 {
+        OpenChat { c: c; word: "open in WhatsApp"; fill: width }
       }
       if answered && !folded && !sentNow {
         Text { text: said; fontSize: 13; color: saidQuiet ? muted : red; maxLines: 2 }

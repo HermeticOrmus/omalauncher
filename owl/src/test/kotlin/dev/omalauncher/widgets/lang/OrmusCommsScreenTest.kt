@@ -191,9 +191,32 @@ class OrmusCommsScreenTest {
         val tapped = t.tap(program.root, cardWords(t))
         assertTrue("the card opens its screen: $tapped", tapped.any { it.startsWith("screen") })
         assertFalse("not WhatsApp: $tapped", tapped.any { it.contains("com.whatsapp") })
+        assertFalse("and it sends nothing: $tapped", tapped.any { it.startsWith("run ") })
         assertEquals("and the card is picked", card, t.text("pick"))
         assertEquals("one field on the screen once picked", 1, t.inputs(screen))
         assertTrue("and WhatsApp from a key there", t.hasKey(screen, "open in WhatsApp"))
+    }
+
+    @Test fun theTilesEarlierLineShowsOnlyWhenTheCardStillFits() {
+        // A 6x4 tile (254 dp): their text wraps once and three keys wrap, so the card alone takes 167 of the 174 dp.
+        val long = """[{"n": 1, "label": "On it, give me an hour or so"}, {"n": 2, "label": "Yes, go ahead with that plan"}, {"n": 3, "label": "Later today, after the long call"}]"""
+        val text = "can you look at the invoice for the portal before the meeting this afternoon please?"
+        val t = TileHost(program, feed(chat().replace(replies, long).replace("can you look?", text)), height = 254)
+        t.set("pick", Str("aaaaaaaaaaaa|$text"))
+        val below = (t.let("below") as Num).v
+        assertTrue("the card fits: ${t.let("cardHeight")} of $below", (t.let("cardHeight") as Num).v <= below)
+        assertFalse("so the earlier line waits for the screen", "you: dime" in t.lines(program.root))
+        // A tall tile has the room.
+        val tall = TileHost(program, feed(chat().replace(replies, long).replace("can you look?", text)), height = 400)
+        tall.set("pick", Str("aaaaaaaaaaaa|$text"))
+        assertTrue(tall.lines(program.root).toString(), "you: dime" in tall.lines(program.root))
+        assertTrue((tall.let("cardHeight") as Num).v <= (tall.let("below") as Num).v)
+    }
+
+    @Test fun aPickedChatWithQuickRepliesButNoTextHasTheWhatsAppKeyOnTheScreen() {
+        val t = pinned(chat(""", "context": $context"""))
+        assertTrue(t.hasKey(screen, "open in WhatsApp"))
+        assertEquals(0, t.inputs(screen))
     }
 
     /** What the tile's card body reads, as one tap's words: its header, the name, the earlier line and their line. */

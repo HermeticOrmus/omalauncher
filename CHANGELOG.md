@@ -9,7 +9,8 @@ Dates are when the build was uploaded to Play.
 What this fork adds to the release below it; none of it is in the Play build.
 
 - On the comms tiles, a tap on the card opens its screen, picked, with the earlier messages, the reactions and
-  the field to write back; WhatsApp opens from a key there. The tile's card shows the one message before their last.
+  the field to write back; WhatsApp opens from a key there (or from the card's body). The tile's card shows the one
+  message before their last when it still fits.
 - The comms tiles' screen card shows the messages before their last one (the feed's `context`), a row of
   reactions on their last message (👍 ❤️ 🙏 😂) and a field to write back without opening WhatsApp; each goes
   through sg's reply tool (ormus-feeds `bin/reply`), on the chats the feed says take them (`send`, `react`). A text
