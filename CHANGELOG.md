@@ -8,6 +8,9 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- On upstream 1.5.0 (versionCode 42). Upstream's 1.0 to 1.5 are below; the fork's changes follow upstream's
+  new layout (home in `ui/home`, files in `storage`, widgets as full-screen widgets) and keep each space's
+  page numbering in layout.toml.
 - A Needs you tile beside Mercurio (`31-needs.owl`, page 2; on a page with no room, the first
   free spot). It reads the open Needs you cards from sg's store, the questions Claude sessions
   wait on, newest first, one at a time: the question, its project and host, how old it is. One
