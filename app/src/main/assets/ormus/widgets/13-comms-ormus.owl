@@ -5,7 +5,7 @@ widget "comms-ormus" {
   // The folded card alone needs 230 dp of height: a 4x3 tile (about 190) cannot hold it.
   minSize: 6x4
 
-  meta { owl: 13; description: "The WhatsApp chats that wait on Ormus, one card at a time: who, their last line, how long ago, and his own quick replies as numbered keys that send through sg; a tap on the card opens the chat in WhatsApp; swipe for the next. Under it, the other chats that wait; the tile's screen lists every project's chats and the ones with no project."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "The WhatsApp chats that wait on Ormus, one card at a time: who, their last line, how long ago, and his own quick replies as numbered keys that send through sg; a tap on the card opens the chat in WhatsApp; swipe for the next. Under it, the other chats that wait; the tile's screen lists every project's chats and the ones with no project."; version: "1.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where the chat registry, his reply texts and the Periskope key live. The phone only
   // reads the result over the tailnet and names a chat by `k` (the feed's short hash) and a reply by its number.
@@ -424,6 +424,8 @@ widget "comms-ormus" {
     title: only == "" ? "comms" : "${only} chats"
     Column {
       scroll: true
+      // Pulled down past its top: every source asks again now, not at its next interval.
+      onPull: refresh()
       gap: 12
       padding: [4, 8]
       if data == null {

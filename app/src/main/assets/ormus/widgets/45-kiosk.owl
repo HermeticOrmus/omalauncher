@@ -4,7 +4,7 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.3"; license: "MIT"; category: "news" }
+  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.3"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
@@ -214,6 +214,8 @@ except Exception as e:
     title: "mercury"
     Column {
       scroll: true
+      // Pulled down past its top: every source asks again now, not at its next interval.
+      onPull: refresh()
       gap: 14
       padding: [4, 8]
       if opening != "" {

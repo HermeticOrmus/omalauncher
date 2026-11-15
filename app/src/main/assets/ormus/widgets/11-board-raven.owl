@@ -4,7 +4,7 @@ widget "sessions-raven" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 13; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -607,6 +607,8 @@ widget "sessions-raven" {
     } else {
       Column {
         scroll: true
+        // Pulled down past its top: every source asks again now, not at its next interval.
+        onPull: refresh()
         gap: 12
         padding: [4, 8]
         if data == null {

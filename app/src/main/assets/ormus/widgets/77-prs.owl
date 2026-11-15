@@ -4,7 +4,7 @@ widget "prs" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 13; description: "What Ormus's agents' pull requests need from him: how many fail their checks, have changes requested or conflict (drafts are only counted), with the open count beside it; each owner on a muted line; the pull requests that need him, newest update first, each with a mark and a word for why; under them the ones that are fine, quieter. A tap on a pull request opens it; a tap on the head opens the whole list. Read from sg's prs feed (ormus-feeds), which asks GitHub every five minutes."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "What Ormus's agents' pull requests need from him: how many fail their checks, have changes requested or conflict (drafts are only counted), with the open count beside it; each owner on a muted line; the pull requests that need him, newest update first, each with a mark and a word for why; under them the ones that are fine, quieter. A tap on a pull request opens it; a tap on the head opens the whole list. Read from sg's prs feed (ormus-feeds), which asks GitHub every five minutes."; version: "1.0"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds prs) with sg's gh; the phone only reads the result over the tailnet. It holds the repository,
   // number, title and link of each pull request, never a body, a comment or an author.
@@ -96,6 +96,8 @@ widget "prs" {
     title: "pull requests"
     Column {
       scroll: true
+      // Pulled down past its top: every source asks again now, not at its next interval.
+      onPull: refresh()
       gap: 10
       padding: [4, 8]
       if data == null {
