@@ -48,6 +48,7 @@ class LauncherUpdates(
 
     /** Asks GitHub unless it was asked within the hour; [force] asks anyway. */
     fun check(force: Boolean = false) {
+        if (!Ormus.UPSTREAM_NEWS) return
         if (fromFdroid || checking) return
         if (!force && System.currentTimeMillis() - checkedAt < CHECK_EVERY) return
         checking = true

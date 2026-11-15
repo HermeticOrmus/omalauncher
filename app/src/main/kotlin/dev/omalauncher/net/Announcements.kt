@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.omalauncher.BuildConfig
+import dev.omalauncher.Ormus
 import dev.omalauncher.widgets.Market
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -61,6 +62,7 @@ class Announcements(
 
     /** Loads the file unless it was loaded within [CHECK_EVERY] or messages are off. Never throws. */
     fun check() {
+        if (!Ormus.UPSTREAM_NEWS) return
         if (off() || checking) return
         val test = BuildConfig.DEBUG && testFile().isFile
         if (!test && System.currentTimeMillis() - checkedAt < CHECK_EVERY) {

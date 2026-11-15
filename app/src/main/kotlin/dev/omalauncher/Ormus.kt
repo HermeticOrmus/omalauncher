@@ -27,6 +27,13 @@ object Ormus {
     const val AGENT = "grok"
 
     /**
+     * Upstream's news: settings ask GitHub for upstream's releases (LauncherUpdates, foss) and fetch its developer's
+     * announcements. This build updates through The Pass, and upstream's "update" points at its own app, another
+     * package, so both ask nothing (Ormus, 2026-11-14: "Switch both off"). OrmusUpstreamNewsTest pins both guards.
+     */
+    const val UPSTREAM_NEWS = false
+
+    /**
      * Swiping up on home until the gesture settings say otherwise (style.toml's gestures.swipe-up): the letter rail
      * opens apps, so up and down move through spaces, and the drawer opens from the bar.
      */
