@@ -42,7 +42,9 @@ class OrmusCommsScreenTest {
         val before = lines.indexOf("Ana: hola, una pregunta")
         assertTrue("theirs by name, oldest first: $lines", before >= 0 && lines[before + 1] == "you: dime")
         assertTrue("their last line comes after them: $lines", lines.indexOf("can you look?") > before + 1)
-        assertFalse("the tile keeps its one line: ${t.lines(program.root)}", "you: dime" in t.lines(program.root))
+        val tile = t.lines(program.root)
+        assertTrue("the tile shows the one before their last: $tile", "you: dime" in tile)
+        assertFalse("and not the older ones: $tile", "Ana: hola, una pregunta" in tile)
         val group = pinned(chat(""", "group": true, "context": [{"me": false, "text": "quién va?"}], "send": true""").replace(""""group": false, """, ""))
         assertTrue("in a group the sender is not known: ${group.lines(screen)}", "them: quién va?" in group.lines(screen))
     }
@@ -178,6 +180,27 @@ class OrmusCommsScreenTest {
         t.fire("sent", Str("""{"n": ${t.mark()}, "r": {"ok": false, "outcome": "not confirmed"}}"""))
         assertEquals("not confirmed: open the chat", t.text("said"))
         assertEquals("and the text is still there to look at", "second", t.text("draft"))
+    }
+
+    @Test fun onTheTileTheCardOpensItsScreenPickedAndShowsTheMessageBeforeTheirLastOne() {
+        val t = TileHost(program, feed(chat()), height = 254)
+        t.set("pick", Str("an older card|gone"))
+        val lines = t.lines(program.root)
+        assertTrue("the message before their last one, on one line: $lines", "you: dime" in lines && "can you look?" in lines)
+        assertFalse("not the older ones: $lines", "Ana: hola, una pregunta" in lines)
+        val tapped = t.tap(program.root, cardWords(t))
+        assertTrue("the card opens its screen: $tapped", tapped.any { it.startsWith("screen") })
+        assertFalse("not WhatsApp: $tapped", tapped.any { it.contains("com.whatsapp") })
+        assertEquals("and the card is picked", card, t.text("pick"))
+        assertEquals("one field on the screen once picked", 1, t.inputs(screen))
+        assertTrue("and WhatsApp from a key there", t.hasKey(screen, "open in WhatsApp"))
+    }
+
+    /** What the tile's card body reads, as one tap's words: its header, the name, the earlier line and their line. */
+    private fun cardWords(t: TileHost): String {
+        val lines = t.lines(program.root)
+        val name = lines.indexOf("Ana")
+        return lines.subList(name - 2, name + 3).joinToString(" ")
     }
 
     @Test fun anEmojiReplyFromTheModelIsAKeyLikeAnyOther() {

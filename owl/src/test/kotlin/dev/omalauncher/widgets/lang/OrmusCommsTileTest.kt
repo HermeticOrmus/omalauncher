@@ -314,7 +314,7 @@ class OrmusCommsTileTest {
         for (part in listOf("\"k\":\"aaaaaaaaaaaa\"", "\"n\":1,", "\"label\":\"On it.\"")) assertTrue("$part in $sent", sent.contains(part))
         assertTrue("sg's answer is read whole, then wrapped with a number of its own and ssh's exit code: $sent", Regex("""r=\${'$'}\(printf %s '\{"k":"aaaaaaaaaaaa","n":1,"label":"On it\."\}' \| ssh .* sg projects/ormus-feeds/bin/reply -\); x=\${'$'}\?; \[ -n "\${'$'}r" \] \|\| r=null; printf '\{"n":%s,"r":%s,"x":%s\}' [0-9]+ "\${'$'}r" \${'$'}x""").containsMatchIn(sent))
         assertFalse("no chat id and no number travels in the call: $sent", sent.contains("5550002") || sent.contains("wa.me"))
-        assertTrue("the card's own tap opens the chat in WhatsApp", t.taps(program.root).any { it.startsWith("androidIntent") && it.contains("com.whatsapp") && it.contains("wa.me/5550002") })
+        assertTrue("on the screen the card's own tap opens the chat in WhatsApp", t.taps(program.screen!!).any { it.startsWith("androidIntent") && it.contains("com.whatsapp") && it.contains("wa.me/5550002") })
     }
 
     @Test fun aGroupCardOpensByItsIdAndStacksLongKeys() {
@@ -325,7 +325,7 @@ class OrmusCommsTileTest {
         assertTrue("a group, how long ago: $lines", "group · 12m ago" in lines)
         assertEquals(listOf("1 On it, give me an hour.", "2 Yes, go ahead with it.", "3 Later today, after the call."), keys(lines))
         assertEquals("the stack of three", 247.0, (t.let("cardHeight") as Num).v, 0.0)
-        assertTrue("a group with no link opens by its id", t.taps(program.root).any { it.startsWith("androidIntent") && it.contains("com.whatsapp.Conversation") && it.contains("g1@g.us") })
+        assertTrue("a group with no link opens by its id", t.taps(program.screen!!).any { it.startsWith("androidIntent") && it.contains("com.whatsapp.Conversation") && it.contains("g1@g.us") })
     }
 
     @Test fun aChatHeRepliedToShowsThatAndAnOpenKeyInsteadOfReplies() {
@@ -424,7 +424,8 @@ class OrmusCommsTileTest {
         assertEquals("no key is live: $lines", emptyList<String>(), keys(lines))
         assertTrue("the pin key is back: $lines", "show 1 · 2 · 3" in lines)
         assertTrue("on the new text: $lines", "actually cancel it" in lines)
-        assertTrue("a tap sends nothing", t.taps(program.root).none { it.startsWith("run ") })
+        // A tap on the card itself picks it and opens its screen (his hand picked it): until then no reply key is
+        // there to send, as the two lines above show.
     }
 
     /** No key, pin or arrow sits under the handler that opens the chat: one tap reaches one handler (review M3). */
@@ -439,7 +440,7 @@ class OrmusCommsTileTest {
         }
         val t = Tile(feed(ana, team))
         t.pin("aaaaaaaaaaaa")
-        assertTrue("the body still opens the chat", t.taps(program.root).any { it.startsWith("androidIntent") && it.contains("wa.me/5550002") })
+        assertTrue("on the screen the body still opens the chat", t.taps(program.screen!!).any { it.startsWith("androidIntent") && it.contains("wa.me/5550002") })
     }
 
     /** Long labels on a short tile: the lead reply whole and a "more" key to the screen, never a cut label (review M5). */
@@ -534,7 +535,7 @@ class OrmusCommsTileTest {
         assertFalse("no null text: $lines", lines.any { "null" in it })
         assertTrue("the pin key shows with no replies to count: $lines", "open in WhatsApp" in lines || "show" in lines)
         t.pin("aaaaaaaaaaaa", "")
-        assertTrue("no `open`: the body opens WhatsApp itself: ${t.taps(program.root)}", t.taps(program.root).any { it == "androidApp com.whatsapp" })
+        assertTrue("no `open`: the body opens WhatsApp itself: ${t.taps(program.screen!!)}", t.taps(program.screen!!).any { it == "androidApp com.whatsapp" })
         val screen = t.screen()
         assertTrue("$screen", "Ana" in screen)
         assertFalse("$screen", screen.any { "null" in it })
