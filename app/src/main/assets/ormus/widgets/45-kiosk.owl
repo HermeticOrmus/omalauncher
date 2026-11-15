@@ -13,7 +13,6 @@ widget "kiosk" {
   source now = clock every 1m
   // A second clock, finer than `now`, so a second tap can be told from the first before the link opens.
   source tick = clock every 250ms
-  source apps = android.apps every 10m
   state at = 0 persist
   state pull = 0
   // The link a single tap will open, once `tick` has moved on. A second tap on the same one clears it.
@@ -38,46 +37,26 @@ widget "kiosk" {
   let stale = picked != null && now != null && now - picked > 4 * 3600
   let failed = data != null ? keys(data.errors ?? {}) : []
 
-  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
-  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
-  // sg as Mercurio's saved host names it, and the names the tailnet uses for that machine.
-  let sgLink = "ssh://ormus@sg.tailb43a3a.ts.net:22"
-  let sgHosts = "sg,sg.tailb43a3a.ts.net,100.66.108.108,fd7a:115c:a1e0::1c31:6c6d"
 
-  // Runs on sg. Reads the article as JSON on stdin. Opens a Claude tab in the ORMUS workspace of the ormus
-  // session, asks it to integrate the article into the solar system, and prints {ok, pane} for Mercurio.
+  // Runs on sg. Reads the article as JSON on stdin. Starts a Claude agent in herdr-core (`hc run`), asks it to
+  // integrate the article into the solar system, and prints {ok, pane} with the agent's terminal for the phone to
+  // attach to. The old herdr TUI is gone (Ormus, 2026-11-15); before, this opened a tab of TUI session "ormus".
   let script = """
 import json, os, subprocess, sys, time
 
 os.environ["PATH"] = os.path.expanduser("~/.local/bin") + ":" + os.environ.get("PATH", "")
 brief = json.load(sys.stdin)
 
-def herdr(*args):
-    p = subprocess.run(["herdr", "--session", "ormus", *args], capture_output=True, text=True, timeout=70)
-    if p.returncode != 0:
-        err = (p.stderr or p.stdout or "herdr failed").strip()
-        raise RuntimeError(err.splitlines()[-1][:240])
-    return json.loads(p.stdout)
-
 def emit(obj):
     print(json.dumps(obj, ensure_ascii=False))
 
-pane = None
 try:
-    ws = herdr("workspace", "list")["result"]["workspaces"]
-    home = next((w for w in ws if w.get("label") == "ORMUS"), None)
-    if home is None:
-        emit({"ok": False, "err": "ORMUS workspace is not open on sg"})
-        sys.exit(0)
     title = (brief.get("title") or "article").replace(chr(10), " ")[:48]
-    tab = herdr("tab", "create", "--workspace", home["workspace_id"], "--cwd", "/home/ormus/projects", "--label", title, "--no-focus")
-    pane = tab["result"]["root_pane"]["pane_id"]
     name = "kiosk" + str(int(time.time()))
-    herdr("agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", "60000")
     move = brief.get("move") or ""
     kind = "news" if brief.get("kind") == "news" else "how others code"
     lines = [
-        "Integrate this article into Ormus's development solar system: the machines Sun, Mercury, Mars, Moon, Jupiter and sg, and the work already running in this Herdr session.",
+        "Integrate this article into Ormus's development solar system: the machines Sun, Mercury, Mars, Moon, Jupiter and sg, and the work already running in herdr-core (hc ls).",
         "",
         "Kind: " + kind,
         "Title: " + (brief.get("title") or ""),
@@ -90,17 +69,17 @@ try:
         "",
         "Read the article. Decide which machine and which project should take it. Do that move in the right repo, or start the change and say where it lives. Do not stop at a summary.",
     ]
-    herdr("agent", "prompt", name, chr(10).join(lines))
-    emit({"ok": True, "pane": pane, "session": "ormus", "title": title})
+    # A login shell, as the Herdr app starts an agent, so claude is on its PATH; the prompt is its first argument.
+    p = subprocess.run(["hc", "run", "--bg", "--json", "--no-parent", "--outlive-parent", "--keep", "--name", name,
+                        "--cwd", "/home/ormus/projects", "--label", "where=ormus · KIOSK / " + title, "--label", "ormus.title=" + title,
+                        "bash", "-lc", 'exec claude --allow-dangerously-skip-permissions "$1"', "kiosk", chr(10).join(lines)],
+                       capture_output=True, text=True, timeout=60)
+    if p.returncode != 0:
+        raise RuntimeError((p.stderr or p.stdout or "hc run failed").strip().splitlines()[-1][:240])
+    address = json.loads(p.stdout)["address"]
+    emit({"ok": True, "pane": address, "session": "core", "title": title})
 except Exception as e:
-    closed = True
-    if pane:
-        c = subprocess.run(["herdr", "--session", "ormus", "pane", "close", pane], capture_output=True)
-        closed = c.returncode == 0
-    msg = str(e).splitlines()[-1][:200]
-    if pane and not closed:
-        msg = msg + " (a tab was left open)"
-    emit({"ok": False, "err": msg})
+    emit({"ok": False, "err": (str(e).splitlines() or ["hc run failed"])[-1][:200]})
 """
   let remote = 'python3 -c "import base64,sys; exec(base64.b64decode(sys.argv[1]))" ' + replace(toBase64(script), "\n", "")
 
@@ -124,11 +103,8 @@ except Exception as e:
     opening = ""
     if got != null && got.ok && got.pane != null {
       haptic()
-      if mercurio != null {
-        androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.HERD_PANE": got.pane, "solutions.ormus.logos.extra.HERD_SESSION": "ormus", "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": sgHosts}})
-      } else {
-        terminal("ssh -t sg ${sh("PATH=$HOME/.local/bin:$PATH exec herdr --session ormus agent attach " + got.pane)}", got.title ?? "mercury")
-      }
+      // The launcher's own terminal attaches to the new agent (Mercurio opens no herdr-core terminal from a tap yet).
+      terminal("ssh -t sg ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + got.pane)}", got.title ?? "mercury")
     } else {
       note = got != null && got.err != null && got.err != "" ? got.err : "sg did not open a session"
       notify("mercury", note)

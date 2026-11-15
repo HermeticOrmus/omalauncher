@@ -5,7 +5,7 @@ widget "comms-ormus" {
   // The folded card alone needs 230 dp of height: a 4x3 tile (about 190) cannot hold it.
   minSize: 6x4
 
-  meta { owl: 17; description: "The WhatsApp chats that wait on Ormus, one card at a time: who, their last line, how long ago, and his own quick replies as numbered keys that send through sg; a tap on the card opens the chat in WhatsApp; swipe for the next. Under it, the other chats that wait; the tile's screen lists every project's chats and the ones with no project."; version: "1.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 18; description: "The WhatsApp chats that wait on Ormus, one card at a time: who, their last line, how long ago, and his own quick replies as numbered keys that send through sg; a tap on the card opens the chat in WhatsApp; swipe for the next. Under it, the other chats that wait; the tile's screen lists every project's chats and the ones with no project, and its card shows the messages before their last one, reactions on it and a field to write back without opening WhatsApp."; version: "1.1"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where the chat registry, his reply texts and the Periskope key live. The phone only
   // reads the result over the tailnet and names a chat by `k` (the feed's short hash) and a reply by its number.
@@ -28,9 +28,17 @@ widget "comms-ormus" {
   state said = ""
   // The card `said` is about, so the line shows on that card, or under the headline when another card shows.
   state saidFor = ""
+  // What he types on a card's screen (`draft`), and the card it is for (`draftFor`, the card's id): it stays in the
+  // field until sg says it went, so a text that did not go is not lost, and another card's field starts empty.
+  state draft = ""
+  state draftFor = ""
   on sent {
     let got = parseJson(value ?? "")
     let reply = got != null && got.r != null && got.r.ok != null ? got.r : null
+    // busyN 20 is a typed text (Write), 10 and up a reaction (React), 1 to 9 a quick reply (Reply).
+    if reply != null && reply.ok && busyN == 20 && draftFor == busy {
+      draft = ""
+    }
     saidFor = busy
     busy = ""
     busyN = 0
@@ -55,6 +63,9 @@ widget "comms-ormus" {
       said = "no answer: open the chat to check"
     }
   }
+
+  // sg's reply tool over SSH: a quick reply, a typed text and a reaction all go through it, as JSON on stdin.
+  let replySsh = "ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/reply -"
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
   let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
@@ -222,6 +233,54 @@ widget "comms-ormus" {
     }
   }
 
+  // One reaction on their last message: the emoji goes to sg's reply tool as `react`, with the chat's `k` and the
+  // `sig` of the word the card shows; sg takes only the feed's own emojis, on the message it names (`last_id`).
+  component React(c, emoji, i) {
+    Box {
+      fill: width
+      onTap: {
+        if busy == "" {
+          busy = "${c.k}|${c.text ?? ""}"
+          busyN = 10 + i
+          busyAt = now ?? 0
+          said = ""
+          sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, react: emoji}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+        }
+      }
+      Key { word: busy == "${c.k}|${c.text ?? ""}" && busyN == 10 + i ? "…" : emoji; dim: busy != "" && !(busy == "${c.k}|${c.text ?? ""}" && busyN == 10 + i) }
+    }
+  }
+
+  // A text he types, sent as he typed it (Ormus, 2026-11-15: "type and send without going into whatsapp"): sg's reply
+  // tool takes it as `text`, for a chat the feed offers, and the same text once a minute (the send key pressed twice).
+  // The field keeps it until sg says it went.
+  component Write(c) {
+    Column {
+      let cid = "${c.k}|${c.text ?? ""}"
+      Input {
+        placeholder: busy == cid && busyN == 20 ? "sending…" : "write to ${c.name}…"
+        text: draftFor == cid ? draft : ""
+        fontSize: 15
+        lines: 3
+        onChange: {
+          draft = value
+          draftFor = cid
+        }
+        onSubmit: {
+          if busy == "" && trim(value) != "" {
+            draft = value
+            draftFor = cid
+            busy = cid
+            busyN = 20
+            busyAt = now ?? 0
+            said = ""
+            sent = run("r=$(printf %s ${sh(toJson(merge({k: c.k, text: value}, c.sig != null ? {sig: c.sig} : {})))} | ${replySsh}); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(random(1000000000))} \"$r\" $x")
+          }
+        }
+      }
+    }
+  }
+
   // The one chat that waits on him now (`card`): who, their last line, how long ago; then his replies as numbered
   // keys. A chat he replied to from here (`replied`) shows that and an open key instead (sg takes one reply a chat
   // a minute, and the next read shows his word). A chat the feed offers no reply on (a big group) has the open key
@@ -274,6 +333,13 @@ widget "comms-ormus" {
             Text { text: len(cards) > 1 ? "${at + 1} of ${len(cards)}" : ""; fontSize: 12; color: muted; maxLines: 1 }
           }
           Text { text: c.name; fontSize: 17; bold: true; maxLines: 1 }
+          // On the screen, the messages before their last one (the feed's `context`, oldest first): his in the quiet
+          // color, theirs as they are, so their last line below reads as the newest.
+          if !compact {
+            for l, i in (c.context ?? []) key "ctx${i}" {
+              Text { text: "${l.me ? "you" : c.group ? "them" : c.name}: ${l.text}"; fontSize: 13; color: l.me ? muted : alpha(foreground, 0.8); maxLines: 3 }
+            }
+          }
           if folded && answered && !sentNow {
             Text { text: said; fontSize: 13; color: saidQuiet ? muted : red; maxLines: 2 }
           } else if (c.text ?? "") != "" {
@@ -333,6 +399,19 @@ widget "comms-ormus" {
         }
       } else {
         OpenChat { c: c; word: "open in WhatsApp"; fill: width }
+      }
+      // On the screen: a reaction on their last message and a text of his own, on a card he picked, while the chat
+      // waits and takes them (`send`, `react`: the feed says so for the chats sg's reply tool takes them on).
+      if !compact && pinned && c.replied == null && !sentNow && (c.send ?? false) {
+        if len(c.react ?? []) > 0 {
+          Row {
+            gap: 8
+            for e, i in c.react key "react${i}" {
+              React { c: c; emoji: e; i: i; weight: 1 }
+            }
+          }
+        }
+        Write { c: c }
       }
       if answered && !folded && !sentNow {
         Text { text: said; fontSize: 13; color: saidQuiet ? muted : red; maxLines: 2 }

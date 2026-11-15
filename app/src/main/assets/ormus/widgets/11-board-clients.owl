@@ -302,7 +302,12 @@ widget "sessions-clients" {
   component Item(i, where) {
     Box {
       onTap: {
-        if mercurio != null && get(links, i.machine, null) != null {
+        if i.session == "core" {
+          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
+          // saved host's id), and its Herdr path would start an old herdr TUI session named "core". So the
+          // launcher's own terminal attaches to it with hc, over the guest's ssh to that machine.
+          terminal("ssh -t ${sh(i.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + i.pane)}", i.title != "" ? i.title : "agent")
+        } else if mercurio != null && get(links, i.machine, null) != null {
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": i.pane, "solutions.ormus.logos.extra.HERD_SESSION": i.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
         } else {
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
@@ -328,7 +333,12 @@ widget "sessions-clients" {
     Box {
       fill: width
       onTap: {
-        if mercurio != null && get(links, a.machine, null) != null {
+        if a.session == "core" {
+          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
+          // saved host's id), and its Herdr path would start an old herdr TUI session named "core". So the
+          // launcher's own terminal attaches to it with hc, over the guest's ssh to that machine.
+          terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        } else if mercurio != null && get(links, a.machine, null) != null {
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pane, "solutions.ormus.logos.extra.HERD_SESSION": a.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
@@ -373,7 +383,12 @@ widget "sessions-clients" {
       radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: {
-        if mercurio != null && get(links, a.machine, null) != null {
+        if a.session == "core" {
+          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
+          // saved host's id), and its Herdr path would start an old herdr TUI session named "core". So the
+          // launcher's own terminal attaches to it with hc, over the guest's ssh to that machine.
+          terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        } else if mercurio != null && get(links, a.machine, null) != null {
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pane, "solutions.ormus.logos.extra.HERD_SESSION": a.session, "solutions.ormus.logos.extra.HERD_VIEW": "chat", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")

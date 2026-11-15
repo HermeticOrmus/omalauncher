@@ -4,35 +4,30 @@ widget "mercurio" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 8; description: "Ormus's herdr agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with workspace, machine and how long ago. Tap one to land in its pane."; version: "2.1"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Ormus's herdr-core agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with project, machine and how long ago. Tap one to attach to its terminal."; version: "3.0"; license: "MIT"; category: "productivity" }
 
-  // Every machine at once, each through jq into one list. herdr's sort_key is the agent's last activity in minutes
-  // since 1970 on every machine, so the lists merge by real time; per-machine counters don't compare. A machine
-  // that doesn't answer comes back as null and is named in "down" instead of silently shrinking the list.
-  source h = cmd("""
-    now=$(( $(date +%s) / 60 ))
-    # A folder per run: the launcher and an owl-check preview may run this at once.
-    D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
-    for m in sun sg mars; do
-      # ~/.local/bin first: a non-interactive login otherwise finds an older system herdr (Sun has pacman's 0.8.2,
-      # which the running 0.9 server turns away with protocol_mismatch).
-      ( ssh -o BatchMode=yes -o ConnectTimeout=5 "$m" 'PATH="$HOME/.local/bin:$PATH"; herdr workspace list; herdr agent list' 2>/dev/null \
-        | jq -cs --arg m "$m" --argjson now "$now" 'map(.result) | (.[0].workspaces | map({key: .workspace_id, value: .label}) | from_entries) as $ws | .[1].agents | map(((.tokens.sort_key // "0") | tonumber) as $k | {host: $m, status: .agent_status, title: .terminal_title_stripped, ws: ($ws[.workspace_id] // ""), k: $k, pane: ($m + ":" + .pane_id), pid: .pane_id, ago: (if $k == 0 then "" else ($now - $k) as $d | if $d < 60 then "\($d)m" elif $d < 1440 then "\($d / 60 | floor)h" else "\($d / 1440 | floor)d" end end)})' > "$D/$m.json" \
-        || echo null > "$D/$m.json" ) &
-    done
-    wait
-    jq -cs '{down: [["sun", "sg", "mars"][] as $m | $m], got: .} | {down: [range(0; 3) as $i | select(.got[$i] == null) | .down[$i]], agents: (.got | map(. // []) | add | sort_by(-.k))}' "$D/sun.json" "$D/sg.json" "$D/mars.json"
-  """) every 60s json timeout 25s status
+  // Every machine's agents from sg's sessions feed (ormus-feeds), which reads herdr-core (`hc`) on Sun, sg and Mars
+  // each minute. The old herdr TUI is gone (Ormus, 2026-11-15: "make sure that mercurio and all widgets are connected
+  // properly to herdr core"); before, this tile asked each machine's TUI itself over ssh.
+  source f = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 60s json timeout 20s status
+  source now = clock every 1m
 
-  let all = h != null && h.ok && h.out != null ? h.out.agents : []
-  let down = h != null && h.ok && h.out != null ? h.out.down : []
+  let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
+  // Each project's agents, with the project's name; one agent counts once even when two boards list it.
+  let listed = data == null ? [] : flatten(data.boards.map(b => flatten((b.projects ?? []).map(p => (p.top ?? []).map(a => merge(a, {ws: p.name}))))))
+  let ids = listed.map(a => "${a.machine}:${a.pane}")
+  let all = listed.filter((a, i) => indexOf(ids, "${a.machine}:${a.pane}") == i)
+  // A machine the feed could not read: its agents are missing, not quiet.
+  let down = data == null ? [] : keys(data.machines ?? {}).filter(m => data.machines[m] != "ok")
+  let stale = data != null && now != null && now - data.generated > 180
   let waiting = count(all, a => a.status == "blocked")
   let working = count(all, a => a.status == "working")
   let done = count(all, a => a.status == "done")
+  // A herdr-core agent's `seq` is when its state last changed, in ms since 1970: newest first in each group.
   // Whoever waits on Ormus first, then the ones at work, then the finished ones, newest first in each; idle ones
   // fill what room is left, most recently active first.
-  let busy = all.filter(a => a.status != "idle").sortBy(a => (a.status == "blocked" ? 0 : a.status == "working" ? 1 : 2) * 100000000 - a.k)
-  let idle = all.filter(a => a.status == "idle")
+  let busy = all.filter(a => a.status != "idle").sortBy(a => (a.status == "blocked" ? 0 : a.status == "working" ? 1 : 2) * 10000000000000 - num(a.seq, 0))
+  let idle = all.filter(a => a.status == "idle").sortBy(a => -num(a.seq, 0))
   // As many lines as the tile holds: about 25 dp each, after the padding and the header.
   let room = max(2, floor(((tileHeight ?? 136) - 50) / 25))
   let shown = flatten([busy.take(room), idle.take(max(0, room - len(busy)))])
@@ -42,19 +37,15 @@ widget "mercurio" {
   let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
   onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
 
-  // Hosts saved in Mercurio, as its links name them (ssh://user@host:port#nickname). An agent on one of them opens
-  // in Mercurio at its pane, the way Mercurio's own notification does; sg has no host there yet, so its agents open
-  // in a terminal here, attached with herdr (sg has no mosh-server).
-  let links = {sun: "ssh://ormus@100.92.213.61:22#Sun", mars: "ssh://aiadmin@100.107.202.72:22#mars"}
-
   component AgentLine(a) {
     Row {
       gap: 8
       align: center
+      let ago = now == null || num(a.seq, 0) <= 0 ? "" : floor((now * 1000 - num(a.seq, 0)) / 60000)
       Text { text: a.status == "blocked" ? "waiting" : a.status; style: small; width: 58; color: a.status == "blocked" ? red : a.status == "working" ? blue : muted }
-      Text { text: a.title; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
-      Text { text: "${lower(a.ws)}·${a.host}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
-      Text { text: a.ago; style: small; color: muted; width: 28; align: end; maxLines: 1 }
+      Text { text: a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" ? a.tab : a.kind; style: body; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
+      Text { text: "${lower(a.ws)}·${a.machine}"; style: small; color: muted; width: 84; align: end; maxLines: 1 }
+      Text { text: ago == "" ? "" : ago < 60 ? "${max(0, ago)}m" : ago < 1440 ? "${floor(ago / 60)}h" : "${floor(ago / 1440)}d"; style: small; color: muted; width: 28; align: end; maxLines: 1 }
     }
   }
 
@@ -64,26 +55,20 @@ widget "mercurio" {
       align: center
       // A Text fills its row unless it has a width or weight, so each gets a share.
       Text { text: "mercurio · ${len(all)}"; style: muted; weight: 1; maxLines: 1 }
-      Text { text: h == null ? "…" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
+      Text { text: f == null ? "…" : data == null ? "sg doesn't answer" : "${waiting} waiting · ${working} working · ${done} done"; style: small; color: waiting > 0 || data == null ? red : muted; weight: 2; align: end; maxLines: 1 }
     }
     if len(down) > 0 {
       Text { text: "${join(down, ", ")} didn't answer: their agents are missing"; style: small; color: red; maxLines: 1 }
     }
-    if h != null && !h.ok {
-      Text { text: "couldn't read herdr: ${trim(h.err) ?? ""}"; style: small; color: red; maxLines: 2 }
+    if stale {
+      Text { text: "as of ${floor((now - data.generated) / 60)}m ago"; style: small; color: red; maxLines: 1 }
     }
-    for a in shown key a.pane {
-      // Handlers take one action, not a choice between two, so the choice is two nodes.
-      if mercurio != null && get(links, a.host, null) != null {
-        Box {
-          onTap: androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.host, ""), extras: {"solutions.ormus.logos.extra.HERD_PANE": a.pid, "solutions.ormus.logos.extra.HERD_SESSION": "default", "solutions.ormus.logos.extra.HERD_VIEW": "chat"}})
-          AgentLine { a: a }
-        }
-      } else {
-        Box {
-          onTap: terminal("ssh -t ${a.host} 'PATH=$HOME/.local/bin:$PATH exec herdr agent attach ${a.pid}'", a.title)
-          AgentLine { a: a }
-        }
+    for a in shown key "${a.machine}:${a.pane}" {
+      // A tap attaches the launcher's terminal to the agent's herdr-core terminal, over the guest's ssh to its
+      // machine (Mercurio opens no herdr-core terminal from a launcher's tap yet).
+      Box {
+        onTap: terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        AgentLine { a: a }
       }
     }
   }

@@ -8,6 +8,16 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The comms tiles' screen card shows the messages before their last one (the feed's `context`), a row of
+  reactions on their last message (👍 ❤️ 🙏 😂) and a field to write back without opening WhatsApp; each goes
+  through sg's reply tool (ormus-feeds `bin/reply`), on the chats the feed says take them (`send`, `react`). A text
+  that did not go stays in the field. The model's quick replies may now hold an emoji (owl 18 for the field).
+- The tiles reach the agents through herdr-core alone, as the old herdr TUI is gone: a tap on an agent in the
+  sessions and board tiles, and on the Mercurio tile, attaches the launcher's terminal with `hc attach` over ssh
+  to its machine (Mercurio opens no herdr-core terminal from a launcher's tap yet, and its Herdr path would start
+  a TUI session); the Mercurio tile reads sg's sessions feed instead of each machine's TUI; the kiosk starts its
+  agent with `hc run`.
+
 - The today tile 2.0 (`80-today.owl`, owl 18) reads the meetings from the phone's own calendars
   (`android.calendar`): every account Android syncs, read on the phone, with no sign-in on another
   machine and no meeting sent over the network. The phone's
