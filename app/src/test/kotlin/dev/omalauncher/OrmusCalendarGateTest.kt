@@ -4,10 +4,17 @@ import dev.omalauncher.widgets.lang.Json
 import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.sha256Hex
 import dev.omalauncher.widgets.runtime.Services
+import dev.omalauncher.widgets.runtime.WidgetInstance
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -15,9 +22,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.lang.reflect.Proxy
+import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Only the today tile exactly as the build ships it reads the phone's calendars (Ormus.calendarGate): the widgets
+ * Only the today tile exactly as the build ships it reads the phone's calendars (Ormus.calendarAllowed, Ormus.gate): the widgets
  * folder is in the Linux guest's home, so any other widget file, or a changed today tile, sees no calendar.
  */
 class OrmusCalendarGateTest {
@@ -49,6 +58,43 @@ class OrmusCalendarGateTest {
         val gated = Ormus.gate(services, allowed = false)
         assertEquals(Ormus.NO_CALENDAR, first(gated.androidUpdates("calendar")))
         assertEquals(Json.parse("""{"battery": 1}"""), first(gated.androidUpdates("battery")))
+    }
+
+    @Test fun theGatedCalendarStaysOpenAfterItsOneValue() {
+        // A flow that ended would make the widget's source loop ask again at once, without rest (review of e9304b3).
+        val seen = ArrayList<Value>()
+        val ended = runBlocking { withTimeoutOrNull(300) { Ormus.gate(services, allowed = false).androidUpdates("calendar")!!.toList(seen) } }
+        assertEquals("the flow is still open", null, ended)
+        assertEquals(listOf(Ormus.NO_CALENDAR), seen)
+    }
+
+    @Test fun aStartedGatedWidgetAsksForTheCalendarOnce() {
+        // The real source loop, as the launcher runs it, on a widget with an android.calendar source that is not the shipped tile.
+        val program = dev.omalauncher.widgets.lang.Compiler.compile("widget \"x\" {\n  meta { owl: 18 }\n  source cal = android.calendar\n  Text { text: \"x\" }\n}\n")
+        val asks = AtomicInteger()
+        val live =
+            Proxy.newProxyInstance(Services::class.java.classLoader, arrayOf(Services::class.java)) { _, method, _ ->
+                if (method.name == "androidUpdates") MutableStateFlow(events) else null
+            } as Services
+        val gated = Ormus.gate(live, allowed = false)
+        val counting =
+            Proxy.newProxyInstance(Services::class.java.classLoader, arrayOf(Services::class.java)) { _, method, args ->
+                if (method.name == "androidUpdates") asks.incrementAndGet()
+                method.invoke(gated, *(args ?: emptyArray()))
+            } as Services
+        val dir = Files.createTempDirectory("oma-gate").toFile()
+        val inst = WidgetInstance(program, counting, {}, File(dir, "x.owl.json"), File(dir, "x.owl.secret"))
+        val scope = CoroutineScope(Dispatchers.Default)
+        try {
+            inst.start(scope) { true }
+            Thread.sleep(1000)
+            assertEquals("asks for the calendar", 1, asks.get())
+            assertEquals(Ormus.NO_CALENDAR, inst.read(program.globals.indexOfFirst { it.name == "cal" }))
+        } finally {
+            inst.stop()
+            scope.cancel()
+            dir.deleteRecursively()
+        }
     }
 
     @Test fun theTodayTileGetsTheServicesThemselves() {

@@ -1251,9 +1251,11 @@ class WidgetEngine(
                 "Where everything on home is (pages in order, faces, widgets, pinned apps and folders, each tile's cell) is " +
                 "~/${HomeStore.GUEST_DIR}/${HomeStore.FILE}; edit it to move, resize or pin things or reorder pages. " +
                 "docs/home.md in the widgets folder explains it.\n\n" +
-                "The phone's approximate location, its calendar, the AirPods connected to it and its battery are `omalauncher location`, " +
-                "`omalauncher calendar [days]`, `omalauncher airpods` and `omalauncher battery` (JSON; `omalauncher --help` says more), where the " +
-                "launcher was allowed them. `omalauncher notify <title> [text]` puts a notification on the phone, to tell the user something " +
+                // Ormus: the calendar is the today tile's alone (Ormus.GUEST_CALENDAR, Ormus.calendarAllowed), so it is not offered.
+                "The phone's approximate location, the AirPods connected to it and its battery are `omalauncher location`, " +
+                "`omalauncher airpods` and `omalauncher battery` (JSON; `omalauncher --help` says more), where the " +
+                "launcher was allowed them. This build keeps the phone's calendar for its today tile: `omalauncher calendar` and " +
+                "`android.calendar` in any other widget read nothing. `omalauncher notify <title> [text]` puts a notification on the phone, to tell the user something " +
                 "they should know while away, such as a long task being done; `omalauncher share <file>...` opens Android's share sheet for " +
                 "files, to send them on with an app the user picks.\n"
     }

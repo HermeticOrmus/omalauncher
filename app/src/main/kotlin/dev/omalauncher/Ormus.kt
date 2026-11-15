@@ -10,8 +10,9 @@ import dev.omalauncher.widgets.lang.Program
 import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.sha256Hex
 import dev.omalauncher.widgets.runtime.Services
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import dev.omalauncher.linux.run
 import java.io.File
 import java.security.MessageDigest
@@ -94,7 +95,18 @@ object Ormus {
         calendarOk: Boolean,
     ): Boolean = calendarOk || !readsCalendar(previous)
 
-    /** [services] as they are when [allowed], else with android.calendar replaced by [NO_CALENDAR]. */
+    /**
+     * The gated calendar: [NO_CALENDAR] once, then open until the widget stops listening. It must not end: a widget's
+     * source loop asks an android source again at once when its flow ends (WidgetInstance.start), so a flow of one value
+     * asked again without rest on the main thread (review of e9304b3: 129,188 asks in 2 s).
+     */
+    fun noCalendar(): Flow<Value> =
+        flow {
+            emit(NO_CALENDAR)
+            awaitCancellation()
+        }
+
+    /** [services] as they are when [allowed], else with android.calendar replaced by [noCalendar]. */
     fun gate(
         services: Services,
         allowed: Boolean,
@@ -103,7 +115,7 @@ object Ormus {
             services
         } else {
             object : Services by services {
-                override fun androidUpdates(name: String): Flow<Value>? = if (name == "calendar") flowOf(NO_CALENDAR) else services.androidUpdates(name)
+                override fun androidUpdates(name: String): Flow<Value>? = if (name == "calendar") noCalendar() else services.androidUpdates(name)
             }
         }
 

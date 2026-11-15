@@ -12,21 +12,25 @@ What this fork adds to the release below it; none of it is in the Play build.
   (`android.calendar`): every account Android syncs, read on the phone, with no sign-in on another
   machine and no meeting sent over the network. The phone's
   `~/.config/omalauncher/today-calendars.json` (a JSON list of calendar names) says which calendars
-  show; without it, or with an empty one, every calendar does. All-day events are left out. Until the
+  show; only its text entries count, and without it, or with one that names no calendar, every
+  calendar does. All-day events are left out. Until the
   calendar is allowed, the header says "tap to read the calendar"; a tap asks Android. A meeting whose
   place holds a Zoom, Teams, Meet or Webex link joins that link alone on a tap; any other opens in the
   calendar app. The practice of the day still comes from the today feed.
 - Only the today tile reads the phone's calendars. Android's calendar permission is the whole app's,
   and the widgets folder is in the Linux guest's home, so `android.calendar` reads as not allowed in
-  every other widget file and in a changed today tile (`Ormus.calendarGate`: the file's name and its
-  SHA-256 must match the bundled tile), and the guest's `omalauncher calendar` answers that Linux
+  every other widget file and in a changed today tile (`Ormus.calendarAllowed`: the file's name and its
+  SHA-256 must match the bundled tile; `Ormus.gate` hands every other one the calendar as `gated`, a
+  value that stays open, so its source does not ask again), and the guest's `omalauncher calendar` answers that Linux
   can't read it (`Ormus.GUEST_CALENDAR`). A changed tile never takes the shipped tile's values
   when it replaces it (`Ormus.mayAdopt`), says "only the shipped tile reads the calendar", and no
   owl-check picture is drawn of a tile that reads the calendar.
 - The full screens of sessions (and each board), comms (and each copy), usage, pull requests and the
   kiosk refresh when their list is pulled down (`onPull`, owl 17).
 - The money and markets tiles (money's face, owed, people, pipeline, markets) left the bundle: their
-  feeds are off, so a new install no longer seeds tiles that read nothing.
+  feeds are off, so a new install no longer seeds tiles that read nothing. On an update, each of
+  them that is unchanged since the launcher wrote it is deleted from the phone's widgets folder, with
+  its place on home and its saved values; a copy changed on the phone stays.
 - On upstream 1.5.0 (versionCode 42). Upstream's 1.0 to 1.5 are below; the fork's changes follow upstream's
   new layout (home in `ui/home`, files in `storage`, widgets as full-screen widgets) and keep each space's
   page numbering in layout.toml.

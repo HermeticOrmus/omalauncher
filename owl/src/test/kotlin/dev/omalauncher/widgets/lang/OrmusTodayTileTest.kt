@@ -187,10 +187,22 @@ class OrmusTodayTileTest {
 
     @Test fun withoutThePhonesListEveryCalendarShows() {
         // The launcher reads a missing file as "" (docs/declarations.md); null is the source before its first read.
-        for (missing in listOf(Str(""), Null, Json.parse("[]"), Json.parse("{}"), Str("hello"), Num(3.0))) {
+        // A list with no text name names no calendar either, so it hides no meeting (review of e9304b3).
+        val noNames = listOf("""{"Family": 1}""", """[["Family"]]""", "[1, 2]", """[""]""").map(Json::parse)
+        for (missing in listOf(Str(""), Null, Json.parse("[]"), Json.parse("{}"), Str("hello"), Num(3.0)) + noNames) {
             val lines = tile(calendar(event("family", NOW + HOUR, "Dinner", calendar = "Family")), shown = missing).lines()
             assertEquals("shown = $missing", "today · 1 ahead [muted]", lines[0])
         }
+    }
+
+    @Test fun onlyTheTextNamesOfTheListCount() {
+        val cal = calendar(event("family", NOW + HOUR, "Dinner", calendar = "Family"), event("main", NOW + 2 * HOUR, "Call"))
+        // Numbers and lists among the names are left out; the text names still filter.
+        val mixed = tile(cal, shown = Json.parse("""["main@example.org", 1, ["Family"]]""")).lines()
+        assertEquals("today · 1 ahead [muted]", mixed[0])
+        assertTrue(mixed.toString(), mixed.contains("Call [null]") && mixed.none { it.startsWith("Dinner") })
+        // A map's values are its list.
+        assertEquals("today · 1 ahead [muted]", tile(cal, shown = Json.parse("""{"a": "Family"}""")).lines()[0])
     }
 
     @Test fun aMeetingOnNowSaysNowAndAnUntitledOneSaysSo() {

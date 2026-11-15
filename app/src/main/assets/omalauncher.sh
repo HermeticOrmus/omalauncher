@@ -17,7 +17,9 @@ usage: omalauncher location       {lat, lon, accuracy (metres), time}, approxima
        omalauncher calendar [days]
                                   the events still to come from today on, 14 days
                                   unless given: [{id, eventId, title, start, end,
-                                  allDay, calendar, color, location}]
+                                  allDay, calendar, color, location}]; Omalauncher
+                                  Ormus keeps the calendar for its today tile, so
+                                  here it is not allowed
        omalauncher airpods        the connected AirPods: batteries, mode, settings
        omalauncher airpods <control> [value]
                                   off, anc, transparency, adaptive, next;
