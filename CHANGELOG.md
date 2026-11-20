@@ -15,12 +15,12 @@ What this fork adds to the release below it; none of it is in the Play build.
   "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which refuses,
   and "send" or "enviar" press enter. Anything else is only pasted, as one paste (so a digit in it never answers a
   menu), and never sent: you see it in the prompt, then say "send" alone. A final "send" or "enviar" is dropped from
-  the paste, and "No, send." is still esc. The bar cannot tell a prompt from a menu, and at Claude Code's permission
-  and plan menus a paste then Enter says the highlighted Yes; a lone "send" there does too, so at a menu say the
-  number or "no". The dictation stops when its window goes to the background. Widgets get `pasteText(...)` (owl 23,
-  this fork only). The key at the end of the top row turns the
-  page; a long press goes back to the agent page. In a Linux terminal window the bar stays on with the keyboard down
-  too, as Mercurio's does, unless a hardware keyboard is in.
+  the paste, a line break heard is a space, and "No, send." is still esc. The bar cannot tell a prompt from a menu,
+  and at Claude Code's permission and plan menus a paste then Enter says the highlighted Yes (at the plan menu, "Yes,
+  and use auto mode"); a lone "send" there does too, so at a menu say the number or "no". The dictation stops when its
+  window goes to the background. Widgets get `pasteText(...)` (owl 23, this fork only). The key at the end of the top
+  row turns the page; a long press goes back to the agent page. In a Linux terminal window the bar stays on with the
+  keyboard down too, as Mercurio's does, unless a hardware keyboard is in.
 - On the comms tiles, a tap on the card opens its screen, picked, with the earlier messages, the reactions and
   the field to write back; WhatsApp opens from a key there (or from the card's body). The tile's card shows the one
   message before their last when it still fits.

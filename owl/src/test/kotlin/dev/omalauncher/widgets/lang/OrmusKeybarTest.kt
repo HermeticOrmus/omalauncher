@@ -197,6 +197,18 @@ class OrmusKeybarTest {
         for ((heard, key) in cases) assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
     }
 
+    /**
+     * A line break in the heard text is a space: outside a bracketed paste, foot turns a pasted "\n" into a CR, which is
+     * Enter (the review read it in foot 1.28.0), and a sentence is never sent.
+     */
+    @Test fun aLineBreakInTheTextIsASpace() {
+        val cases = listOf("fix it\n" to "fix it ", "yes\r" to "yes ", "one\r\ntwo" to "one  two", "fix\nit, send" to "fix it", "No\n, send." to "esc")
+        for ((heard, out) in cases) {
+            val want = if (out == "esc") listOf("pressKey esc") else listOf("pasteText $out")
+            assertEquals(heard, latchesOff + want, dictated(heard))
+        }
+    }
+
     /** pasteText is the fork's own action: owl 23, only where keys may go, and listed as what the file does. */
     @Test fun pasteTextIsAnActionOfItsOwn() {
         val p = Compiler.compile("keybar \"k\" {\n meta { owl: 23 }\n Text { text: \"k\"; onPress: pasteText(\"ls\") } }")

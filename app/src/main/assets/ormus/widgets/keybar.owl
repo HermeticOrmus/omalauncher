@@ -45,21 +45,23 @@ keybar "terminal key bar" {
   // highlighted Yes (measured: "No, don't", "Deny", "Cancela", "Keep planning"); a paste alone does nothing there. So
   // a sentence that ends with the word send or enviar is pasted without that word, and a "send" said alone sends it.
   // A list word before send is that key alone ("No, send." is esc, "Two, send." is 2). A lone "send" at a menu still
-  // picks the highlighted Yes: at a menu, say the number or no. A ctrl or alt left latched would change the paste or
-  // the key, so they go off first.
+  // picks the highlighted Yes (at the plan menu, "Yes, and use auto mode"): at a menu, say the number or no. A line
+  // break heard is a space. A ctrl or alt left latched would change the paste or the key, so they go off first.
   on said.final {
     if value {
       latch("ctrl", "off")
       latch("alt", "off")
       latch("shift", "off")
+      // A line break heard is a space: outside a bracketed paste foot turns a pasted line break into Enter.
+      let heard = replace(replace(value, "\r", " "), "\n", " ")
       // The heard text as the word list reads it: marks dropped, trimmed, lowercased.
-      let k = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(value, ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
+      let k = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(heard, ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
       if k != "" {
         pressKey(k)
       } else {
-        let sent = match(value, "(?is)^\\s*(.*?)[\\s,.;:!?¡¿]+(?:send|enviar)[\\s.!?¡¿]*$")
+        let sent = match(heard, "(?is)^\\s*(.*?)[\\s,.;:!?¡¿]+(?:send|enviar)[\\s.!?¡¿]*$")
         if sent == null {
-          pasteText(value)
+          pasteText(heard)
         } else {
           // The words before send, read by the list the same way.
           let before = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(sent[0], ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
@@ -205,7 +207,7 @@ keybar "terminal key bar" {
     }
   }
 
-  // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above sends the words.
+  // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above presses or pastes the words.
   // "no mic" where the phone has no recognizer; outlined in red when it couldn't listen (the microphone permission).
   component Mic(k) {
     let listening = get(said ?? {}, "listening", false)
