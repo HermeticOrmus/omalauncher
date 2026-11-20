@@ -12,8 +12,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   (esc, 1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a mic, and detach, which is `hc attach`'s ctrl+\ and acts on
   a long press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the
   shell's ctrl keys and hidden symbols on the third. The mic dictates with the phone's recognizer: tap, speak, tap;
-  "one" or "uno" (to three), "escape" and "enter" press that key for an agent's menu, and anything else is typed and
-  sent with enter. The key at the end of the top row turns the page; a long press goes back to the agent page. In a
+  "one" or "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which
+  refuses, and "send" or "enviar" press enter. Anything else is only typed, and sent when it ends with "send" or
+  "enviar". The dictation stops when its window goes to the background. The key at the end of the top row turns the page; a long press goes back to the agent page. In a
   Linux terminal window the bar stays on with the keyboard down too, as Mercurio's does, unless a hardware keyboard
   is in.
 - On the comms tiles, a tap on the card opens its screen, picked, with the earlier messages, the reactions and

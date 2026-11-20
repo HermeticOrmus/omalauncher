@@ -46,5 +46,11 @@ class OrmusKeybarTest {
         val window = File("src/main/kotlin/dev/omalauncher/LinuxWindowActivity.kt").readText()
         assertTrue(window.contains("if (Ormus.windowKeysShown(keyboard, runtime.isTerminalWindow(window.appId), hardwareKeyboard)) {"))
         assertFalse("the old keyboard-only guard is gone", window.contains("if (keyboard > 0) ExtraKeys("))
+        // The bar stays composed in a stopped window, so its mic must stop with it: on stop, not on pause (the
+        // microphone's permission dialog pauses the window).
+        val onStop = window.substringAfter("override fun onStop() {").substringBefore("\n    }")
+        assertTrue(onStop, onStop.contains("runtime.widgets.keybarInstance()?.let { runtime.dictation.act(it, \"cancel\") }"))
+        val onPause = window.substringAfter("override fun onPause() {").substringBefore("\n    }")
+        assertFalse(onPause, onPause.contains("dictation"))
     }
 }

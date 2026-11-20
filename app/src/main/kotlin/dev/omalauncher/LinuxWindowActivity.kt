@@ -101,6 +101,10 @@ class LinuxWindowActivity : InstantActivity() {
 
     override fun onStop() {
         super.onStop()
+        // A terminal keeps its key bar composed (Ormus.windowKeysShown), so the bar's mic would go on listening behind
+        // home or another app, and its end would type into whatever window has the keys then. Stopped, not paused: the
+        // microphone's permission dialog pauses the window as the first dictation starts.
+        runtime.widgets.keybarInstance()?.let { runtime.dictation.act(it, "cancel") }
         runtime.screenStopped()
     }
 

@@ -122,25 +122,51 @@ class OrmusKeybarTest {
 
     private val latchesOff = listOf("latch ctrl, off", "latch alt, off", "latch shift, off")
 
-    /** A menu word alone, in English or Spanish, a digit, any case, with the recognizer's full stop: its key, no enter. */
+    /** A menu word alone, in English or Spanish, a digit, any case, with the recognizer's marks: its key, no enter. */
     @Test fun aMenuWordPressesItsKey() {
-        for ((heard, key) in listOf("one" to "1", "Uno." to "1", "1" to "1", "two" to "2", "Dos" to "2", "2." to "2", "three!" to "3", "tres" to "3", "Escape" to "esc", "enter" to "enter", "Intro." to "enter")) {
-            assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
+        val words =
+            listOf(
+                "one" to "1", "Uno." to "1", "1" to "1", "¿Uno?" to "1", "two" to "2", "Dos" to "2", "2." to "2", "three!" to "3", "tres" to "3",
+                "four" to "4", "Cuatro." to "4", "4" to "4", "Escape" to "esc", "enter" to "enter", "Intro." to "enter", "Send." to "enter", "enviar" to "enter",
+            )
+        for ((heard, key) in words) assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
+    }
+
+    /**
+     * A refusal is esc, never enter: at Claude Code's permission menu Enter picks the highlighted "1. Yes" (measured by
+     * the review on sg, Claude Code 2.1.329), and esc refuses.
+     */
+    @Test fun aRefusalIsEscNeverEnter() {
+        for (heard in listOf("no", "No.", "¡No!", "nope", "cancel", "Cancelar.", "para", "Stop!")) {
+            assertEquals(heard, latchesOff + "pressKey esc", dictated(heard))
         }
     }
 
-    /** Anything else is typed whole, as heard, then enter sends it to the agent (Ormus's choice). */
-    @Test fun aSentenceIsTypedAndSent() {
-        for (heard in listOf("yes go ahead", "Sí, dale con la opción dos.", "two of them", "uno más")) {
-            assertEquals(heard, latchesOff + "typeText $heard" + "pressKey enter", dictated(heard))
+    /** Any other sentence is only typed, whole, as heard: at a menu its letters do nothing, so it can't say Yes. */
+    @Test fun aSentenceIsOnlyTyped() {
+        for (heard in listOf("yes go ahead", "Sí, dale con la opción dos.", "two of them", "uno más", "please resend the mail", "no thanks")) {
+            assertEquals(heard, latchesOff + "typeText $heard", dictated(heard))
         }
+    }
+
+    /** A sentence that ends with the word send or enviar is sent: the words before it, then enter. */
+    @Test fun aSentenceEndingInSendIsSent() {
+        val sent =
+            listOf(
+                "fix the tests, send" to "fix the tests", "Fix it. Send." to "Fix it", "Arregla los tests enviar." to "Arregla los tests",
+                "Sí, dale con la opción dos, enviar" to "Sí, dale con la opción dos", "yes go ahead send!" to "yes go ahead",
+            )
+        for ((heard, typed) in sent) assertEquals(heard, latchesOff + "typeText $typed" + "pressKey enter", dictated(heard))
+        // Only the whole word, at the very end.
+        assertEquals(latchesOff + "typeText please resend", dictated("please resend"))
+        assertEquals(latchesOff + "typeText send it to me", dictated("send it to me"))
     }
 
     /** The menu words name keys pressKey knows; the mic starts only from a tap, as the launcher requires. */
     @Test fun theSpokenKeysAreKeysAndTheMicStartsOnATap() {
         val let = program.globals.first { it.name == "spoken" } as Global.Let
         val spoken = (let.value(Env.root(LangTest.TestHost(program))) as Obj).fields
-        assertTrue(spoken.size >= 11)
+        assertEquals(24, spoken.size)
         for ((word, key) in spoken) assertNotNull("$word -> $key", KeyNames.combo((key as Str).v))
         assertTrue(file.readText().contains("onTap: speech(\"toggle\")"))
     }
