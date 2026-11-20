@@ -268,7 +268,9 @@ keybar "terminal key bar" {
   }
 
   // The page key shows the page on show, outlined in the accent: a tap goes to the next page, a long press back to the
-  // agent page. It turns on the tap, not as the finger goes down, so a long press doesn't turn it first.
+  // agent page. It turns on the tap, not as the finger goes down, so a long press doesn't turn it first. Turning to the
+  // agent page lets go of ctrl and alt: it has no key that shows them or lets them go, and a held ctrl would turn its
+  // 1 or enter into ctrl+1 or ctrl+enter at an agent's menu.
   component PageKey() {
     Box {
       fill: true
@@ -282,8 +284,18 @@ keybar "terminal key bar" {
         haptic()
       }
       onRelease: down = ""
-      onTap: page = page == "agent" ? "keys" : page == "keys" ? "more" : "agent"
-      onLongPress: page = "agent"
+      onTap: {
+        page = page == "agent" ? "keys" : page == "keys" ? "more" : "agent"
+        if page == "agent" {
+          latch("ctrl", "off")
+          latch("alt", "off")
+        }
+      }
+      onLongPress: {
+        page = "agent"
+        latch("ctrl", "off")
+        latch("alt", "off")
+      }
       Text { text: get(pages, page, null) == null ? "agent" : page; font: mono; fontSize: 11; maxLines: 1; align: center; color: down == "page" ? background : accent }
     }
   }

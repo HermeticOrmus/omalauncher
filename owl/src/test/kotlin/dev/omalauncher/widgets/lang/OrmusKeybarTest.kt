@@ -102,26 +102,33 @@ class OrmusKeybarTest {
         assertEquals("photos on the keys page", listOf("keys"), pages.filterValues { rows -> rows.flatten().any { it["images"] == Bool(true) } }.keys.toList())
     }
 
-    /** The page key's tap goes agent, keys, more and round again; an unknown page (a newer file's) goes to agent. */
+    /**
+     * The page key's tap goes agent, keys, more and round again; an unknown page (a newer file's) goes to agent. Turning
+     * to the agent page lets go of ctrl and alt, which it has no key for (the review: a ctrl held on the keys page would
+     * turn the agent page's 1 or enter into ctrl+1 or ctrl+enter, and nothing there shows it).
+     */
     @Test fun thePageKeyTurnsThePages() {
         val src = file.readText()
-        val tap = Regex("""onTap: (page = .*)""").find(src)?.groupValues?.get(1) ?: error("the page key's onTap is not where this test looks")
-        val longPress = Regex("""onLongPress: (page = .*)""").find(src)?.groupValues?.get(1) ?: error("the page key's onLongPress is not where this test looks")
+
+        fun handler(name: String) = Regex("""$name: (\{\s*page = .*?\n      \})""", RegexOption.DOT_MATCHES_ALL).find(src)?.groupValues?.get(1) ?: error("the page key's $name is not where this test looks")
+        val tap = handler("onTap")
+        val longPress = handler("onLongPress")
 
         fun after(
             handler: String,
             from: String,
-        ): Value {
-            val p = Compiler.compile("widget {\nmeta { owl: 16 }\nstate page = \"$from\"\nonTap: $handler\nText { text: page }\n}")
+        ): Pair<Value, List<String>> {
+            val p = Compiler.compile("widget {\nmeta { owl: 23 }\nstate page = \"$from\"\nonTap: $handler\nText { text: page }\n}")
             val host = LangTest.TestHost(p)
             p.onTap!!.run(Env.root(host), emptyList())
-            return host.slots[p.globals.indexOfFirst { it is Global.State }]
+            return host.slots[p.globals.indexOfFirst { it is Global.State }] to host.actions
         }
-        assertEquals(Str("keys"), after(tap, "agent"))
-        assertEquals(Str("more"), after(tap, "keys"))
-        assertEquals(Str("agent"), after(tap, "more"))
-        assertEquals(Str("agent"), after(tap, "gone"))
-        for (from in listOf("agent", "keys", "more")) assertEquals(Str("agent"), after(longPress, from))
+        val off = listOf("latch ctrl, off", "latch alt, off")
+        assertEquals(Str("keys") to emptyList<String>(), after(tap, "agent"))
+        assertEquals(Str("more") to emptyList<String>(), after(tap, "keys"))
+        assertEquals(Str("agent") to off, after(tap, "more"))
+        assertEquals(Str("agent") to off, after(tap, "gone"))
+        for (from in listOf("agent", "keys", "more")) assertEquals(Str("agent") to off, after(longPress, from))
     }
 
     /** The page is kept across restarts, and the bar draws the agent page for one it doesn't know. */
