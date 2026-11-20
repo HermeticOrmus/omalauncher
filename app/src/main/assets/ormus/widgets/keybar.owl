@@ -3,7 +3,7 @@ keybar "terminal key bar" {
   // a page for answering an agent through `hc attach` and a page with the rest of Mercurio's keys. The page key at the
   // end of the top row goes to the next page; a long press goes back to the agent page. In a Linux terminal window the
   // launcher keeps this bar on screen with the keyboard down too, as Mercurio's bar is.
-  meta { description: "The key bar for terminals: an agent page (1, 2, 3, enter, shift+tab, ctrl+c, detach), the stock keys, and ctrl keys"; version: "ormus-1.0"; license: "MIT"; category: "system"; owl: 16 }
+  meta { description: "The key bar for terminals: an agent page (1, 2, 3, enter, shift+tab, ctrl+c, a mic, detach), the stock keys, and ctrl keys"; version: "ormus-1.1"; license: "MIT"; category: "system"; owl: 16 }
   // The launcher's chevron; currentColor takes the tint.
   asset chevron = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNNy40MSwxNS40MUwxMiwxMC44M2w0LjU5LDQuNThMMTgsMTRsLTYsLTYgLTYsNnoiLz48L3N2Zz4="
   // Material Design Icons' copy, paste and image, for the clipboard keys and the one that pastes photos.
@@ -26,6 +26,29 @@ keybar "terminal key bar" {
   state down = ""
   // The page on show, kept across restarts: "agent", "keys" or "more". An unknown one shows the agent page.
   state page = "agent" persist
+  // The mic key's dictation: the phone's own recognizer, on the phone where it can; only the text reaches the bar.
+  source said = android.speech
+
+  // What a dictation that is only one of these words presses, for an agent's menus: Claude Code's take 1, 2, 3, esc
+  // and enter. Said in English or Spanish, as a word or a digit; full stops and the like are dropped first.
+  let spoken = {"1": "1", one: "1", uno: "1", "2": "2", two: "2", dos: "2", "3": "3", three: "3", tres: "3", escape: "esc", esc: "esc", enter: "enter", intro: "enter"}
+
+  // As a dictation ends: one of the menu words presses its key; anything else is typed, then enter sends it to the
+  // agent (Ormus's choice). A ctrl or alt left latched would turn the first letter into a shortcut, so they go off first.
+  on said.final {
+    if value {
+      latch("ctrl", "off")
+      latch("alt", "off")
+      latch("shift", "off")
+      let k = get(spoken, lower(trim(replace(replace(replace(replace(value, ".", ""), ",", ""), "!", ""), "?", ""))), "")
+      if k != "" {
+        pressKey(k)
+      } else {
+        typeText(value)
+        pressKey("enter")
+      }
+    }
+  }
 
   // Each key: what it shows, then what it sends, pressKey(...)'s names, or the modifier it latches. repeats: held, it
   // sends again and again, like a keyboard's arrows; arrow: a chevron turned that many degrees instead of the label;
@@ -35,7 +58,9 @@ keybar "terminal key bar" {
   // Every page keeps up above down, and tab, ctrl and alt in the same places, so the hand finds them on each.
   let pages = {
     // Answering an agent: Claude Code's menus take 1, 2, 3 or the arrows and enter; shift+tab changes its mode; esc
-    // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running.
+    // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running; outside hc attach,
+  // ctrl+\ ends the program running in the shell, so detach acts on a long press only. mic: dictation, tap to start and
+  // tap to stop (see spoken above); the photos key is on the keys page.
     agent: [
       [
         {label: "esc", key: "esc"},
@@ -56,8 +81,8 @@ keybar "terminal key bar" {
         {label: "down", key: "down", repeats: true, arrow: 180},
         {label: "right", key: "right", repeats: true, arrow: 90},
         {label: str.paste, key: "shift+insert", icon: pasteIcon},
-        {label: str.photos, images: true, icon: photo},
-        {label: "detach", key: "ctrl+\\", small: true}
+        {label: "mic", mic: true},
+        {label: "detach", key: "ctrl+\\", small: true, hold: true}
       ]
     ],
     // The stock bar's keys, with | moved to the next page for the page key.
@@ -156,6 +181,43 @@ keybar "terminal key bar" {
     }
   }
 
+  // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above sends the words.
+  // "no mic" where the phone has no recognizer; outlined in red when it couldn't listen (the microphone permission).
+  component Mic(k) {
+    let listening = get(said ?? {}, "listening", false)
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: listening ? accent : surface
+      border: get(said ?? {}, "error", null) != null ? 2 : 0
+      borderColor: red
+      onPress: haptic()
+      onTap: speech("toggle")
+      Text { text: get(said ?? {}, "available", true) == false ? "no mic" : listening ? "stop" : k.label; font: mono; fontSize: 14; maxLines: 1; align: center; color: listening ? background : foreground }
+    }
+  }
+
+  // A key that sends only on a long press, for one a stray tap would hurt: detach, ctrl+\, quits a shell's program.
+  component Hold(k) {
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: down == k.label ? accent : surface
+      onPress: {
+        down = k.label
+        haptic()
+      }
+      onRelease: down = ""
+      onLongPress: {
+        haptic()
+        pressKey(k.key)
+      }
+      Text { text: k.label; font: mono; fontSize: (k.small ?? false) ? 11 : 14; maxLines: 1; align: center; color: down == k.label ? background : foreground }
+    }
+  }
+
   // ctrl and alt: a tap holds them for the next key, outlined, and a long press until tapped again, filled.
   component Latched(k) {
     let held = get(kb ?? {}, k.latch, "off")
@@ -217,6 +279,10 @@ keybar "terminal key bar" {
               padding: 3
               if k.page ?? false {
                 PageKey { }
+              } else if k.mic ?? false {
+                Mic { k: k }
+              } else if k.hold ?? false {
+                Hold { k: k }
               } else if k.latch != null {
                 Latched { k: k }
               } else if k.images ?? false {

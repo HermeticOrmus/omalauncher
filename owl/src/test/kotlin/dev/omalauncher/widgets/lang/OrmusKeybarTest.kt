@@ -43,7 +43,10 @@ class OrmusKeybarTest {
         for (page in pages.keys) for (key in keysOf(page)) assertNotNull("$page: \"$key\" names no key", KeyNames.combo(key))
     }
 
-    /** What answering an agent through hc attach takes, on its own page: hc attach detaches on ctrl+\. */
+    /**
+     * What answering an agent through hc attach takes, on its own page: hc attach detaches on ctrl+\, which outside it
+     * quits a shell's program, so detach is a hold key; and the mic.
+     */
     @Test fun theAgentPageAnswersAnAgent() {
         val keys = keysOf("agent")
         for (k in listOf("esc", "1", "2", "3", "enter", "shift+tab", "ctrl+c", "up", "down", "left", "right", "tab", "shift+insert")) {
@@ -51,6 +54,9 @@ class OrmusKeybarTest {
         }
         val detach = pages.getValue("agent").flatten().single { it.text("label") == "detach" }
         assertEquals("ctrl+\\", detach.text("key"))
+        assertEquals(Bool(true), detach["hold"])
+        assertEquals("only detach waits for a hold", listOf("detach"), pages.values.flatMap { it.flatten() }.filter { it["hold"] == Bool(true) }.map { it.text("label") })
+        assertEquals("one mic, on the agent page", listOf("agent"), pages.filterValues { rows -> rows.flatten().any { it["mic"] == Bool(true) } }.keys.toList())
         assertEquals(43, KeyNames.combo("ctrl+\\")!!.code)
     }
 
@@ -63,7 +69,7 @@ class OrmusKeybarTest {
         for (k in mercurio) assertTrue("the bar has $k", k in all)
     }
 
-    /** Each page: one page key, at the end of the top row; ctrl and alt latched, the photo picker on the first two. */
+    /** Each page: one page key, at the end of the top row; ctrl and alt latched; the photo picker on the keys page. */
     @Test fun everyPageTurnsAndLatches() {
         for ((name, rows) in pages) {
             val flat = rows.flatten()
@@ -74,7 +80,7 @@ class OrmusKeybarTest {
             val up = rows[0].indexOfFirst { it.text("key") == "up" }
             if (up >= 0) assertEquals("$name: up over down", up, rows[1].indexOfFirst { it.text("key") == "down" })
         }
-        for (name in listOf("agent", "keys")) assertEquals("$name has photos", 1, pages.getValue(name).flatten().count { it["images"] == Bool(true) })
+        assertEquals("photos on the keys page", listOf("keys"), pages.filterValues { rows -> rows.flatten().any { it["images"] == Bool(true) } }.keys.toList())
     }
 
     /** The page key's tap goes agent, keys, more and round again; an unknown page (a newer file's) goes to agent. */
@@ -104,5 +110,38 @@ class OrmusKeybarTest {
         val src = file.readText()
         assertTrue(src.contains("state page = \"agent\" persist"))
         assertTrue(src.contains("for row in get(pages, page, pages.agent)"))
+    }
+
+    /** What the dictation does with what it heard, as the trigger runs on the phone: the actions it asks for, in order. */
+    private fun dictated(heard: String): List<String> {
+        val trigger = program.triggers.single { it.dictation }
+        val host = LangTest.TestHost(program)
+        trigger.action.run(Env.root(host), listOf(Str(heard)))
+        return host.actions
+    }
+
+    private val latchesOff = listOf("latch ctrl, off", "latch alt, off", "latch shift, off")
+
+    /** A menu word alone, in English or Spanish, a digit, any case, with the recognizer's full stop: its key, no enter. */
+    @Test fun aMenuWordPressesItsKey() {
+        for ((heard, key) in listOf("one" to "1", "Uno." to "1", "1" to "1", "two" to "2", "Dos" to "2", "2." to "2", "three!" to "3", "tres" to "3", "Escape" to "esc", "enter" to "enter", "Intro." to "enter")) {
+            assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
+        }
+    }
+
+    /** Anything else is typed whole, as heard, then enter sends it to the agent (Ormus's choice). */
+    @Test fun aSentenceIsTypedAndSent() {
+        for (heard in listOf("yes go ahead", "Sí, dale con la opción dos.", "two of them", "uno más")) {
+            assertEquals(heard, latchesOff + "typeText $heard" + "pressKey enter", dictated(heard))
+        }
+    }
+
+    /** The menu words name keys pressKey knows; the mic starts only from a tap, as the launcher requires. */
+    @Test fun theSpokenKeysAreKeysAndTheMicStartsOnATap() {
+        val let = program.globals.first { it.name == "spoken" } as Global.Let
+        val spoken = (let.value(Env.root(LangTest.TestHost(program))) as Obj).fields
+        assertTrue(spoken.size >= 11)
+        for ((word, key) in spoken) assertNotNull("$word -> $key", KeyNames.combo((key as Str).v))
+        assertTrue(file.readText().contains("onTap: speech(\"toggle\")"))
     }
 }
