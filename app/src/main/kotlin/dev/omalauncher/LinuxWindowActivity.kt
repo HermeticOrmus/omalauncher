@@ -2,6 +2,7 @@ package dev.omalauncher
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -176,6 +178,10 @@ private fun AppWindow(
     // Where the keyboard ends up, not each frame of its slide, and read here so the extra keys come and go in the same
     // frame: the window then resizes once, and a terminal reflows once.
     val keyboard = (WindowInsets.imeAnimationTarget.getBottom(density) - WindowInsets.navigationBars.getBottom(density)).coerceAtLeast(0)
+    // A hardware keyboard plugged in and open: it has the extra keys' keys, so a terminal doesn't keep them on for it.
+    val configuration = LocalConfiguration.current
+    val hardwareKeyboard =
+        configuration.keyboard != Configuration.KEYBOARD_NOKEYS && configuration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
     Box(
         Modifier
             .fillMaxSize()
@@ -218,9 +224,12 @@ private fun AppWindow(
                     BasicText("⌨", style = Mono.copy(color = Palette.foreground))
                 }
             }
-            // Below the window rather than over it, so the window shrinks and nothing hides behind the keys; only over a
-            // docked keyboard (a hardware keyboard's toolbar takes no height, and that keyboard has these keys).
-            if (keyboard > 0) ExtraKeys(runtime, Modifier.background(Palette.background))
+            // Below the window rather than over it, so the window shrinks and nothing hides behind the keys; over a
+            // docked keyboard (a hardware keyboard's toolbar takes no height, and that keyboard has these keys), and in a
+            // terminal with the keyboard down too (Ormus build, Ormus.windowKeysShown).
+            if (Ormus.windowKeysShown(keyboard, runtime.isTerminalWindow(window.appId), hardwareKeyboard)) {
+                ExtraKeys(runtime, Modifier.background(Palette.background))
+            }
         }
     }
 }

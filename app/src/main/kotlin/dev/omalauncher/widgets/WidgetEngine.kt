@@ -1181,7 +1181,7 @@ class WidgetEngine(
             for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") && it !in Ormus.HIDDEN_WIDGETS }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
             // Always as this launcher ships them, whatever became of drawer.owl and keybar.owl.
             add(asset("widgets/$DRAWER", File(dir, STOCK_DRAWER), Policy.Owned))
-            add(asset("widgets/$KEYBAR", File(dir, STOCK_KEYBAR), Policy.Owned))
+            add(asset(Ormus.KEYBAR_ASSET, File(dir, STOCK_KEYBAR), Policy.Owned))
             for (name in assets.list("ormus/widgets").orEmpty()) add(asset("ormus/widgets/$name", File(dir, name), Policy.Seeded))
         }
     }

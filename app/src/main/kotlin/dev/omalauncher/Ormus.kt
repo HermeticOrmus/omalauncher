@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.storage.LauncherData
+import dev.omalauncher.ui.home.TerminalTiles
 import dev.omalauncher.widgets.lang.Global
 import dev.omalauncher.widgets.lang.Json
 import dev.omalauncher.widgets.lang.Program
@@ -174,8 +175,36 @@ object Ormus {
         return spaces.indices.map { i -> firstPage(spaces[i]) + within[i] - (first[spaces[i]] ?: count.getValue(spaces[i])) }
     }
 
-    /** Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. */
-    val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl")
+    /**
+     * Upstream's home widgets this build leaves off home; assets/ormus/widgets takes their place. keybar.owl too: the
+     * build seeds its own [KEYBAR_ASSET] there instead, so one file never has two sources.
+     */
+    val HIDDEN_WIDGETS = setOf("10-today.owl", "20-fetch.owl", "50-koi.owl", "60-owl.owl", "keybar.owl")
+
+    /**
+     * The key bar this build ships, in place of upstream's: the stock keys plus an agent page (1, 2, 3, enter, shift+tab,
+     * ctrl+c and hc attach's detach) and a page of shell ctrl keys. It seeds keybar.owl through assets/ormus/widgets, and
+     * is .stock-keybar.owl too, so the fallback and settings' "back to stock" give this bar, not upstream's.
+     */
+    const val KEYBAR_ASSET = "ormus/widgets/keybar.owl"
+
+    /** Whether a Linux window is a terminal: plain foot, one [Runtime.terminal] started ([launched]), or a home tile's. */
+    fun isTerminalWindow(
+        appId: String,
+        launched: Boolean,
+    ) = appId == "foot" || launched || appId.startsWith(TerminalTiles.APP_ID_PREFIX)
+
+    /**
+     * Whether a Linux window shows the extra keys under it. Upstream shows them only over a docked soft keyboard
+     * ([keyboardPx] > 0). This build keeps them on in a terminal with the keyboard down too, as Mercurio's bar is, so
+     * an agent behind `hc attach` gets its answer keys (1, 2, 3, enter) without the keyboard. Not with a hardware
+     * keyboard in, which has these keys already.
+     */
+    fun windowKeysShown(
+        keyboardPx: Int,
+        terminal: Boolean,
+        hardwareKeyboard: Boolean,
+    ) = keyboardPx > 0 || (terminal && !hardwareKeyboard)
 
     /** Beside a seeded theme's colors.toml: the hash of the colors it was seeded from. A dotfile, so Linux never gets it. */
     const val SEED_STAMP = ".ormus-seed"

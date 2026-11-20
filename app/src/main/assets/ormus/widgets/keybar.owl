@@ -1,0 +1,233 @@
+keybar "terminal key bar" {
+  // The Ormus build's key bar (assets/ormus/widgets/keybar.owl, also its .stock-keybar.owl): the stock bar's keys, plus
+  // a page for answering an agent through `hc attach` and a page with the rest of Mercurio's keys. The page key at the
+  // end of the top row goes to the next page; a long press goes back to the agent page. In a Linux terminal window the
+  // launcher keeps this bar on screen with the keyboard down too, as Mercurio's bar is.
+  meta { description: "The key bar for terminals: an agent page (1, 2, 3, enter, shift+tab, ctrl+c, detach), the stock keys, and ctrl keys"; version: "ormus-1.0"; license: "MIT"; category: "system"; owl: 16 }
+  // The launcher's chevron; currentColor takes the tint.
+  asset chevron = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNNy40MSwxNS40MUwxMiwxMC44M2w0LjU5LDQuNThMMTgsMTRsLTYsLTYgLTYsNnoiLz48L3N2Zz4="
+  // Material Design Icons' copy, paste and image, for the clipboard keys and the one that pastes photos.
+  asset copyIcon = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNMTksMjFIOFY3SDE5TTE5LDVIOEEyLDIgMCAwLDAgNiw3VjIxQTIsMiAwIDAsMCA4LDIzSDE5QTIsMiAwIDAsMCAyMSwyMVY3QTIsMiAwIDAsMCAxOSw1TTE2LDFINEEyLDIgMCAwLDAgMiwzVjE3SDRWM0gxNlYxWiIvPjwvc3ZnPg=="
+  asset pasteIcon = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNMTksMjBINVY0SDdWN0gxN1Y0SDE5TTEyLDJBMSwxIDAgMCwxIDEzLDNBMSwxIDAgMCwxIDEyLDRBMSwxIDAgMCwxIDExLDNBMSwxIDAgMCwxIDEyLDJNMTksMkgxNC44MkMxNC40LDAuODQgMTMuMywwIDEyLDBDMTAuNywwIDkuNiwwLjg0IDkuMTgsMkg1QTIsMiAwIDAsMCAzLDRWMjBBMiwyIDAgMCwwIDUsMjJIMTlBMiwyIDAgMCwwIDIxLDIwVjRBMiwyIDAgMCwwIDE5LDJaIi8+PC9zdmc+"
+  asset photo = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNMTksMTlINVY1SDE5TTE5LDNINUEyLDIgMCAwLDAgMyw1VjE5QTIsMiAwIDAsMCA1LDIxSDE5QTIsMiAwIDAsMCAyMSwxOVY1QTIsMiAwIDAsMCAxOSwzTTEzLjk2LDEyLjI5TDExLjIxLDE1LjgzTDkuMjUsMTMuNDdMNi41LDE3SDE3LjVMMTMuOTYsMTIuMjlaIi8+PC9zdmc+"
+  // The names TalkBack reads for the icon keys, in the phone's language where it has a set.
+  strings {
+    en { copy: "copy"; paste: "paste"; photos: "photos" }
+    id { copy: "salin"; paste: "tempel"; photos: "foto" }
+    es { copy: "copiar"; paste: "pegar"; photos: "fotos" }
+    pt { copy: "copiar"; paste: "colar"; photos: "fotos" }
+    de { copy: "kopieren"; paste: "einfügen"; photos: "fotos" }
+    zh { copy: "复制"; paste: "粘贴"; photos: "照片" }
+    ru { copy: "копировать"; paste: "вставить"; photos: "фото" }
+  }
+  // Whether ctrl, alt and shift are latched: "off", "once" (for the next key) or "locked".
+  source kb = android.modifiers
+  // The key under the finger, drawn pressed.
+  state down = ""
+  // The page on show, kept across restarts: "agent", "keys" or "more". An unknown one shows the agent page.
+  state page = "agent" persist
+
+  // Each key: what it shows, then what it sends, pressKey(...)'s names, or the modifier it latches. repeats: held, it
+  // sends again and again, like a keyboard's arrows; arrow: a chevron turned that many degrees instead of the label;
+  // icon: an asset shown instead of the label; small: a label of five or six letters, drawn smaller so it fits.
+  // Ctrl+Insert and Shift+Insert are the clipboard keys foot, GTK and Qt all know. images: Android's photo picker, whose
+  // picks paste as their paths in Linux, which opencode and Claude Code attach. page: the key that turns the page.
+  // Every page keeps up above down, and tab, ctrl and alt in the same places, so the hand finds them on each.
+  let pages = {
+    // Answering an agent: Claude Code's menus take 1, 2, 3 or the arrows and enter; shift+tab changes its mode; esc
+    // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running.
+    agent: [
+      [
+        {label: "esc", key: "esc"},
+        {label: "1", key: "1"},
+        {label: "2", key: "2"},
+        {label: "3", key: "3"},
+        {label: "up", key: "up", repeats: true, arrow: 0},
+        {label: "enter", key: "enter", small: true},
+        {label: "S-tab", key: "shift+tab", small: true},
+        {label: "^C", key: "ctrl+c"},
+        {page: true}
+      ],
+      [
+        {label: "tab", key: "tab"},
+        {label: "ctrl", latch: "ctrl"},
+        {label: "alt", latch: "alt"},
+        {label: "left", key: "left", repeats: true, arrow: -90},
+        {label: "down", key: "down", repeats: true, arrow: 180},
+        {label: "right", key: "right", repeats: true, arrow: 90},
+        {label: str.paste, key: "shift+insert", icon: pasteIcon},
+        {label: str.photos, images: true, icon: photo},
+        {label: "detach", key: "ctrl+\\", small: true}
+      ]
+    ],
+    // The stock bar's keys, with | moved to the next page for the page key.
+    keys: [
+      [
+        {label: "esc", key: "esc"},
+        {label: "/", key: "/"},
+        {label: "-", key: "-"},
+        {label: "home", key: "home"},
+        {label: "up", key: "up", repeats: true, arrow: 0},
+        {label: "end", key: "end"},
+        {label: "pgup", key: "pgup", repeats: true},
+        {label: str.copy, key: "ctrl+insert", icon: copyIcon},
+        {page: true}
+      ],
+      [
+        {label: "tab", key: "tab"},
+        {label: "ctrl", latch: "ctrl"},
+        {label: "alt", latch: "alt"},
+        {label: "left", key: "left", repeats: true, arrow: -90},
+        {label: "down", key: "down", repeats: true, arrow: 180},
+        {label: "right", key: "right", repeats: true, arrow: 90},
+        {label: "pgdn", key: "pgdn", repeats: true},
+        {label: str.paste, key: "shift+insert", icon: pasteIcon},
+        {label: str.photos, images: true, icon: photo}
+      ]
+    ],
+    // The rest of Mercurio's keys: the shell's ctrl keys (eof, suspend, clear, history search, line start and end, cut
+    // the line, cut a word), the symbols a phone keyboard hides, delete and backspace.
+    more: [
+      [
+        {label: "^D", key: "ctrl+d"},
+        {label: "^Z", key: "ctrl+z"},
+        {label: "^L", key: "ctrl+l"},
+        {label: "^R", key: "ctrl+r"},
+        {label: "^A", key: "ctrl+a"},
+        {label: "^E", key: "ctrl+e"},
+        {label: "^U", key: "ctrl+u"},
+        {label: "^W", key: "ctrl+w"},
+        {page: true}
+      ],
+      [
+        {label: "tab", key: "tab"},
+        {label: "ctrl", latch: "ctrl"},
+        {label: "alt", latch: "alt"},
+        {label: "|", key: "|"},
+        {label: "~", key: "~"},
+        {label: "`", key: "`"},
+        {label: "\\", key: "\\"},
+        {label: "del", key: "delete", repeats: true},
+        {label: "bksp", key: "backspace", repeats: true}
+      ]
+    ]
+  }
+
+  // A key that sends as the finger goes down; held with repeats, again every 50 ms after 400 ms.
+  component Plain(k) {
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: down == k.label ? accent : surface
+      repeats: k.repeats ?? false
+      onPress: {
+        if repeat == 0 {
+          down = k.label
+          haptic()
+        }
+        pressKey(k.key)
+      }
+      onRelease: down = ""
+      if k.arrow != null {
+        Image { src: chevron; size: 20; rotation: k.arrow; tint: down == k.label ? background : foreground; label: k.label }
+      } else if k.icon != null {
+        Image { src: k.icon; size: 20; tint: down == k.label ? background : foreground; label: k.label }
+      } else {
+        Text { text: k.label; font: mono; fontSize: (k.small ?? false) ? 11 : 14; maxLines: 1; align: center; color: down == k.label ? background : foreground }
+      }
+    }
+  }
+
+  // The photo picker opens on a tap, not as the finger goes down: it covers the bar before the finger lifts.
+  component Images(k) {
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: down == k.label ? accent : surface
+      onPress: {
+        down = k.label
+        haptic()
+      }
+      onRelease: down = ""
+      onTap: pickImages()
+      Image { src: k.icon; size: 20; tint: down == k.label ? background : foreground; label: k.label }
+    }
+  }
+
+  // ctrl and alt: a tap holds them for the next key, outlined, and a long press until tapped again, filled.
+  component Latched(k) {
+    let held = get(kb ?? {}, k.latch, "off")
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: held == "locked" ? accent : surface
+      border: held == "once" ? 2 : 0
+      borderColor: accent
+      onPress: haptic()
+      onTap: latch(k.latch)
+      onLongPress: latch(k.latch, "locked")
+      Text { text: k.label; font: mono; fontSize: 14; align: center; color: held == "locked" ? background : held == "once" ? accent : foreground }
+    }
+  }
+
+  // The page key shows the page on show, outlined in the accent: a tap goes to the next page, a long press back to the
+  // agent page. It turns on the tap, not as the finger goes down, so a long press doesn't turn it first.
+  component PageKey() {
+    Box {
+      fill: true
+      align: center
+      radius: 8 * corners
+      background: down == "page" ? accent : surface
+      border: 2
+      borderColor: accent
+      onPress: {
+        down = "page"
+        haptic()
+      }
+      onRelease: down = ""
+      onTap: page = page == "agent" ? "keys" : page == "keys" ? "more" : "agent"
+      onLongPress: page = "agent"
+      Text { text: get(pages, page, null) == null ? "agent" : page; font: mono; fontSize: 11; maxLines: 1; align: center; color: down == "page" ? background : accent }
+    }
+  }
+
+  // Framed like the tiles above it, by the terminal key bar's gaps and border width in settings › style: gapsOut to the
+  // screen's sides and the keyboard. 6 between the keys and to the frame, half of it around each key.
+  Column {
+    padding: [gapsOut, 0, gapsOut, gapsOut]
+    gap: 0
+    Column {
+      gap: 0
+      padding: 3
+      background: background
+      border: borderWidth
+      borderColor: border
+      radius: 12 * corners
+      for row in get(pages, page, pages.agent) {
+        Row {
+          height: 40
+          gap: 0
+          for k in row {
+            Box {
+              weight: 1
+              fill: height
+              padding: 3
+              if k.page ?? false {
+                PageKey { }
+              } else if k.latch != null {
+                Latched { k: k }
+              } else if k.images ?? false {
+                Images { k: k }
+              } else {
+                Plain { k: k }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

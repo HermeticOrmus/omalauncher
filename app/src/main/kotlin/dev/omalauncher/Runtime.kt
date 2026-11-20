@@ -587,6 +587,9 @@ class Runtime(
     /** Wayland app_id -> the agent running in it, for sessions not named after their agent ("New app"). */
     private val launchedAgents = ConcurrentHashMap<String, Agent>()
 
+    /** Whether the window with [appId] is a terminal, for the extra keys a Linux window keeps on (Ormus build). */
+    fun isTerminalWindow(appId: String) = Ormus.isTerminalWindow(appId, launchedNames.containsKey(appId))
+
     /** Whether a window's foot takes its size from foot.ini, as its own terminals, plain foot and most tiles do. */
     private fun followsTerminalFont(appId: String) =
         when {
