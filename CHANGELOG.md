@@ -14,7 +14,9 @@ What this fork adds to the release below it; none of it is in the Play build.
   ctrl keys and hidden symbols on the third. The mic dictates with the phone's recognizer: tap, speak, tap; "one" or
   "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which refuses,
   and "send" or "enviar" press enter. Anything else is pasted as one paste (so a digit in it never answers a menu),
-  and sent when it ends with "send" or "enviar"; "No, send." is still esc. The dictation stops when its window goes to
+  and sent when it ends with "send" or "enviar"; "No, send." is still esc, and words before "send" with a refusal or a
+  number in them ("No, don't send.", "Option four, send.") are only pasted, then a "send" said alone sends them. At a
+  menu, Enter picks the highlighted Yes, so say the number or "no" there. The dictation stops when its window goes to
   the background. Widgets get `pasteText(...)` (owl 23, this fork only). The key at the end of the top row turns the
   page; a long press goes back to the agent page. In a Linux terminal window the bar stays on with the keyboard down
   too, as Mercurio's does, unless a hardware keyboard is in.

@@ -159,7 +159,8 @@ class OrmusKeybarTest {
         val sent =
             listOf(
                 "fix the tests, send" to "fix the tests", "Fix it. Send." to "Fix it", "Arregla los tests enviar." to "Arregla los tests",
-                "Sí, dale con la opción dos, enviar" to "Sí, dale con la opción dos", "yes go ahead send!" to "yes go ahead",
+                "Sí, dale con la opción final, enviar" to "Sí, dale con la opción final", "yes go ahead send!" to "yes go ahead",
+                "Notify nobody, it's done, send" to "Notify nobody, it's done", "Paralelo, enviar" to "Paralelo", "the fourth file, send" to "the fourth file",
             )
         for ((heard, typed) in sent) assertEquals(heard, latchesOff + "pasteText $typed" + "pressKey enter", dictated(heard))
         // Only the whole word, at the very end.
@@ -178,6 +179,25 @@ class OrmusKeybarTest {
                 "Cuatro, enviar." to "4", "Four, send." to "4", "Two, send." to "2", "Three send" to "3", "¿Uno? enviar" to "1",
             )
         for ((heard, key) in cases) assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
+    }
+
+    /**
+     * A refusal, a negation or a menu number anywhere before send, as a whole word, keeps the enter back: the words are
+     * only pasted. The review measured "No, don't send." pasting "No, don't" and the Enter after it running the command
+     * at Claude Code's menu, and "Option four, send." picking the highlighted 1. A paste alone at a menu does nothing
+     * (measured there); a "send" said alone then sends.
+     */
+    @Test fun aRefusalOrANumberBeforeSendIsOnlyPasted() {
+        val held =
+            listOf(
+                "No, don't send." to "No, don't", "Don't send." to "Don't", "Don’t, send" to "Don’t", "Do not send" to "Do not", "No no, send." to "No no",
+                "No, no enviar." to "No, no", "Nope, cancel, send" to "Nope, cancel", "Cancel that, send." to "Cancel that", "Stop it, send" to "Stop it",
+                "I can't, send" to "I can't", "Never mind, send" to "Never mind", "Nunca, enviar" to "Nunca", "Para eso, enviar" to "Para eso",
+                "Escape it, send" to "Escape it", "Option four, send." to "Option four", "Number four, send." to "Number four",
+                "No. Option four. Send." to "No. Option four", "Sí, dale con la opción dos, enviar" to "Sí, dale con la opción dos",
+                "Pick 3, send" to "Pick 3", "uno más, enviar" to "uno más", "the 2 files, send" to "the 2 files", "NO WAY, SEND" to "NO WAY",
+            )
+        for ((heard, typed) in held) assertEquals(heard, latchesOff + "pasteText $typed", dictated(heard))
     }
 
     /** pasteText is the fork's own action: owl 23, only where keys may go, and listed as what the file does. */
