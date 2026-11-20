@@ -136,6 +136,17 @@ class KeyboardBridge(
         done: () -> Unit,
     ) = insertImages(listOf(uri), mime, done)
 
+    /**
+     * `pasteText(...)`: [text] offered to the focused window's next paste, then Shift+Insert, so it arrives as one
+     * paste (bracketed, for a program that asks for it, as Claude Code does behind `hc attach`), not key by key: a digit
+     * in it then never picks an option of a menu. The clipboard stays as it was. Main thread, like [tap].
+     */
+    fun paste(text: String) {
+        if (text.isEmpty()) return
+        wm.server.insertText(text)
+        tap(Keys.KEY_INSERT, Keys.KEY_LEFTSHIFT)
+    }
+
     /** Images picked with [pickImages], pasted as [insertImage] does, their paths apart by spaces. */
     fun insertImages(
         uris: List<Uri>,

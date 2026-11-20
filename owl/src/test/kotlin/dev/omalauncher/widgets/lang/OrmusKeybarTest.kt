@@ -1,6 +1,7 @@
 package dev.omalauncher.widgets.lang
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -142,11 +143,15 @@ class OrmusKeybarTest {
         }
     }
 
-    /** Any other sentence is only typed, whole, as heard: at a menu its letters do nothing, so it can't say Yes. */
-    @Test fun aSentenceIsOnlyTyped() {
-        for (heard in listOf("yes go ahead", "Sí, dale con la opción dos.", "two of them", "uno más", "please resend the mail", "no thanks")) {
-            assertEquals(heard, latchesOff + "typeText $heard", dictated(heard))
+    /**
+     * Any other sentence is only pasted, whole, as heard: one paste, so neither its letters nor a digit in it reach a
+     * menu as keys (the review measured "the 3 files are wrong", typed key by key, picking option 3 and auto mode).
+     */
+    @Test fun aSentenceIsOnlyPasted() {
+        for (heard in listOf("yes go ahead", "Sí, dale con la opción dos.", "two of them", "uno más", "please resend the mail", "no thanks", "the 3 files are wrong", "There are 2 bugs in it")) {
+            assertEquals(heard, latchesOff + "pasteText $heard", dictated(heard))
         }
+        assertFalse("the bar never types text key by key", file.readText().contains("typeText("))
     }
 
     /** A sentence that ends with the word send or enviar is sent: the words before it, then enter. */
@@ -156,10 +161,34 @@ class OrmusKeybarTest {
                 "fix the tests, send" to "fix the tests", "Fix it. Send." to "Fix it", "Arregla los tests enviar." to "Arregla los tests",
                 "Sí, dale con la opción dos, enviar" to "Sí, dale con la opción dos", "yes go ahead send!" to "yes go ahead",
             )
-        for ((heard, typed) in sent) assertEquals(heard, latchesOff + "typeText $typed" + "pressKey enter", dictated(heard))
+        for ((heard, typed) in sent) assertEquals(heard, latchesOff + "pasteText $typed" + "pressKey enter", dictated(heard))
         // Only the whole word, at the very end.
-        assertEquals(latchesOff + "typeText please resend", dictated("please resend"))
-        assertEquals(latchesOff + "typeText send it to me", dictated("send it to me"))
+        assertEquals(latchesOff + "pasteText please resend", dictated("please resend"))
+        assertEquals(latchesOff + "pasteText send it to me", dictated("send it to me"))
+    }
+
+    /**
+     * Words of the list before send are that key alone, no enter: "No, send." refuses, it doesn't say Yes (the review
+     * measured "No" then Enter approving), and "Two, send." picks 2, not the highlighted 1.
+     */
+    @Test fun aListWordBeforeSendIsItsKeyAlone() {
+        val cases =
+            listOf(
+                "No, send." to "esc", "no send" to "esc", "Cancel, send." to "esc", "Stop. Send." to "esc", "Para, enviar" to "esc", "Escape, send." to "esc",
+                "Cuatro, enviar." to "4", "Four, send." to "4", "Two, send." to "2", "Three send" to "3", "¿Uno? enviar" to "1",
+            )
+        for ((heard, key) in cases) assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
+    }
+
+    /** pasteText is the fork's own action: owl 23, only where keys may go, and listed as what the file does. */
+    @Test fun pasteTextIsAnActionOfItsOwn() {
+        val p = Compiler.compile("keybar \"k\" {\n meta { owl: 23 }\n Text { text: \"k\"; onPress: pasteText(\"ls\") } }")
+        assertEquals(listOf("paste into the Linux window you're typing in: ls"), p.commands)
+        val old = runCatching { Compiler.compile("keybar \"k\" {\n meta { owl: 22 }\n Text { text: \"k\"; onPress: pasteText(\"ls\") } }") }
+        assertTrue(old.exceptionOrNull()?.message.orEmpty(), old.exceptionOrNull()?.message.orEmpty().contains("owl 23"))
+        val host = LangTest.TestHost(p)
+        ((p.screen!!.single() as WNode.Element).handlers["onPress"]!!).run(Env.root(host), listOf(Num(0.0), Num(0.0), Num(0.0)))
+        assertEquals(listOf("pasteText ls"), host.actions)
     }
 
     /** The menu words name keys pressKey knows; the mic starts only from a tap, as the launcher requires. */

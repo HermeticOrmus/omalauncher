@@ -643,6 +643,7 @@ class WidgetServices(
         when (name) {
             "pressKey" -> return KeyNames.combo(arg)?.let { runtime.keyboard.flush(); runtime.keyboard.press(it) } ?: Unit
             "typeText" -> return runtime.keyboard.run { flush(); type(arg) }
+            "pasteText" -> return runtime.keyboard.run { flush(); paste(arg) }
             "latch" -> return runtime.keyboard.latch(arg, args.getOrNull(1).textOrNull())
             "pickImages" -> return runtime.keyboard.pickImages()
             // Nothing to refresh: the source follows the grant itself.

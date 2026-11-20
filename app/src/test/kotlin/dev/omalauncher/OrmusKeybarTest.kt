@@ -53,4 +53,18 @@ class OrmusKeybarTest {
         val onPause = window.substringAfter("override fun onPause() {").substringBefore("\n    }")
         assertFalse(onPause, onPause.contains("dictation"))
     }
+
+    /**
+     * pasteText reaches the window as one paste: the text offered to the next paste, then Shift+Insert, on the same
+     * input thread, in that order; and, like the keys, only from a touch or the dictation that just heard it.
+     */
+    @Test fun pasteTextPastesAndIsGatedLikeTheKeys() {
+        val keyboard = File("src/main/kotlin/dev/omalauncher/ui/Keyboard.kt").readText()
+        val paste = keyboard.substringAfter("fun paste(text: String) {").substringBefore("\n    }")
+        assertTrue(paste, paste.indexOf("wm.server.insertText(text)") in 0 until paste.indexOf("tap(Keys.KEY_INSERT, Keys.KEY_LEFTSHIFT)"))
+        val services = File("src/main/kotlin/dev/omalauncher/widgets/WidgetServices.kt").readText()
+        assertTrue(services.contains("\"pasteText\" -> return runtime.keyboard.run { flush(); paste(arg) }"))
+        val instance = File("src/main/kotlin/dev/omalauncher/widgets/runtime/WidgetInstance.kt").readText()
+        assertTrue(instance.contains("name == \"typeText\" || name == \"pasteText\" || name == \"latch\") && inTrigger && !byDictation"))
+    }
 }

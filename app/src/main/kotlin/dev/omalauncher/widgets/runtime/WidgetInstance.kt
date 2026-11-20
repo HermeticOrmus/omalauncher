@@ -588,7 +588,7 @@ class WidgetInstance(
         if ((name == "ask" || name == "open" || (name == "calendar" && key == "open")) && inTrigger && !foreground()) return report("$name(...) in a trigger works only while the app or screen is open")
         // Keys go to whatever window has the keyboard: only from a touch, never on a timer or a fetched value. Or from
         // what the user just said, to this widget's dictation a tap started: on said.final { typeText(value) }.
-        if ((name == "pressKey" || name == "typeText" || name == "latch") && inTrigger && !byDictation) {
+        if ((name == "pressKey" || name == "typeText" || name == "pasteText" || name == "latch") && inTrigger && !byDictation) {
             return report("$name(...) works in handlers like onPress, or in on said.final for what android.speech heard, not in another trigger")
         }
         if (name == "pickImages" && inTrigger) return report("pickImages() works in onTap, not in a trigger")

@@ -171,6 +171,10 @@ internal val SINCE =
         mapOf("android.power" to 15) +
         // owl 16: texts per language, the phone's picked, and the language itself, for an API that takes it.
         mapOf(STRINGS_DECL to 16, "lang" to 16) +
+        // Omalauncher Ormus only, at the level it was added: text pasted into the Linux window being typed in, in one
+        // paste (bracketed where the program asks for it), not typed key by key, so a digit in it never reaches a menu
+        // as a key press of its own. The key bar's dictation sends with it.
+        mapOf("pasteText" to 23) +
         // owl 17: a list pulled down past its top, to fetch again.
         mapOf("onPull" to 17) +
         // owl 17: servers with a certificate of their own, pinned; WebSockets, and a trigger for each of their messages.

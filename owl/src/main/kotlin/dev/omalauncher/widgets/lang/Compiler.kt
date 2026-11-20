@@ -1552,6 +1552,7 @@ class Compiler private constructor(
                     commands += "press keys in the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "keys built from widget values")
                 }
                 if (call.name == "typeText") commands += "type into the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "text built from widget values")
+                if (call.name == "pasteText") commands += "paste into the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "text built from widget values")
                 if (call.name == "pickImages") {
                     // The picker would cover the node before the finger lifts: home then sees a long press under it.
                     if (handlerName == "onPress" || handlerName == "onRelease") fail("pickImages() opens Android's photo picker over the widget, before the finger lifts: put it in onTap", call.pos)

@@ -8,15 +8,16 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
-- The terminal key bar is the fork's own: a first page for answering an agent behind the sessions tiles' attach
-  (esc, 1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a mic, and detach, which is `hc attach`'s ctrl+\ and acts on
-  a long press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the
-  shell's ctrl keys and hidden symbols on the third. The mic dictates with the phone's recognizer: tap, speak, tap;
-  "one" or "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which
-  refuses, and "send" or "enviar" press enter. Anything else is only typed, and sent when it ends with "send" or
-  "enviar". The dictation stops when its window goes to the background. The key at the end of the top row turns the page; a long press goes back to the agent page. In a
-  Linux terminal window the bar stays on with the keyboard down too, as Mercurio's does, unless a hardware keyboard
-  is in.
+- The terminal key bar is the fork's own: a first page for answering an agent behind the sessions tiles' attach (esc,
+  1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a mic, and detach, which is `hc attach`'s ctrl+\ and acts on a long
+  press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the shell's
+  ctrl keys and hidden symbols on the third. The mic dictates with the phone's recognizer: tap, speak, tap; "one" or
+  "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which refuses,
+  and "send" or "enviar" press enter. Anything else is pasted as one paste (so a digit in it never answers a menu),
+  and sent when it ends with "send" or "enviar"; "No, send." is still esc. The dictation stops when its window goes to
+  the background. Widgets get `pasteText(...)` (owl 23, this fork only). The key at the end of the top row turns the
+  page; a long press goes back to the agent page. In a Linux terminal window the bar stays on with the keyboard down
+  too, as Mercurio's does, unless a hardware keyboard is in.
 - On the comms tiles, a tap on the card opens its screen, picked, with the earlier messages, the reactions and
   the field to write back; WhatsApp opens from a key there (or from the card's body). The tile's card shows the one
   message before their last when it still fits.

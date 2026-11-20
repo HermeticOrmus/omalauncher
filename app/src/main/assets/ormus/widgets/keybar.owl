@@ -3,7 +3,7 @@ keybar "terminal key bar" {
   // a page for answering an agent through `hc attach` and a page with the rest of Mercurio's keys. The page key at the
   // end of the top row goes to the next page; a long press goes back to the agent page. In a Linux terminal window the
   // launcher keeps this bar on screen with the keyboard down too, as Mercurio's bar is.
-  meta { description: "The key bar for terminals: an agent page (1, 2, 3, enter, shift+tab, ctrl+c, a mic, detach), the stock keys, and ctrl keys"; version: "ormus-1.2"; license: "MIT"; category: "system"; owl: 16 }
+  meta { description: "The key bar for terminals: an agent page (1, 2, 3, enter, shift+tab, ctrl+c, a mic, detach), the stock keys, and ctrl keys"; version: "ormus-1.3"; license: "MIT"; category: "system"; owl: 23 }
   // The launcher's chevron; currentColor takes the tint.
   asset chevron = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNNy40MSwxNS40MUwxMiwxMC44M2w0LjU5LDQuNThMMTgsMTRsLTYsLTYgLTYsNnoiLz48L3N2Zz4="
   // Material Design Icons' copy, paste and image, for the clipboard keys and the one that pastes photos.
@@ -39,24 +39,36 @@ keybar "terminal key bar" {
     send: "enter", enviar: "enter", enter: "enter", intro: "enter"
   }
 
-  // As a dictation ends: one of the words above presses its key. Anything else is only typed (Ormus's choice, after the
-  // review measured that typed letters do nothing at a menu and the Enter after them said Yes), unless it ends with the
-  // word send or enviar: then the words before it are typed and enter sends them. A ctrl or alt left latched would turn
-  // the first letter into a shortcut, so they go off first.
+  // As a dictation ends: one of the words above presses its key. Anything else is pasted (Ormus's choice, after the
+  // review measured that at a menu typed letters do nothing, the Enter after them said Yes, and a digit typed on its own
+  // picked its option): one paste, bracketed behind hc attach, so no key of it reaches a menu. It is sent only when it
+  // ends with the word send or enviar: then the words before it are pasted and enter sends them, unless those words are
+  // themselves one of the list ("No, send." is esc, "Two, send." is 2), so a refusal never becomes enter. Enter at a
+  // menu still picks the highlighted Yes: at a menu, say the number or no. A ctrl or alt left latched would change
+  // the paste or the key, so they go off first.
   on said.final {
     if value {
       latch("ctrl", "off")
       latch("alt", "off")
       latch("shift", "off")
+      // The heard text as the word list reads it: marks dropped, trimmed, lowercased.
       let k = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(value, ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
-      let sent = match(value, "(?is)^\\s*(.*?)[\\s,.;:!?¡¿]+(?:send|enviar)[\\s.!?¡¿]*$")
       if k != "" {
         pressKey(k)
-      } else if sent != null {
-        typeText(sent[0])
-        pressKey("enter")
       } else {
-        typeText(value)
+        let sent = match(value, "(?is)^\\s*(.*?)[\\s,.;:!?¡¿]+(?:send|enviar)[\\s.!?¡¿]*$")
+        if sent == null {
+          pasteText(value)
+        } else {
+          // The words before send, read by the list the same way.
+          let before = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(sent[0], ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
+          if before != "" {
+            pressKey(before)
+          } else {
+            pasteText(sent[0])
+            pressKey("enter")
+          }
+        }
       }
     }
   }
@@ -71,7 +83,8 @@ keybar "terminal key bar" {
     // Answering an agent: Claude Code's menus take 1, 2, 3 or the arrows and enter; shift+tab changes its mode; esc
     // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running; outside hc attach,
   // ctrl+\ ends the program running in the shell, so detach acts on a long press only. mic: dictation, tap to start and
-  // tap to stop (see spoken above: a sentence is sent only when it ends with "send"); the photos key is on the keys page.
+  // tap to stop (see on said.final above: a sentence is pasted, and sent only when it ends with "send"); the photos key
+  // is on the keys page.
     agent: [
       [
         {label: "esc", key: "esc"},
