@@ -154,18 +154,34 @@ class OrmusKeybarTest {
         assertFalse("the bar never types text key by key", file.readText().contains("typeText("))
     }
 
-    /** A sentence that ends with the word send or enviar is sent: the words before it, then enter. */
-    @Test fun aSentenceEndingInSendIsSent() {
-        val sent =
+    /**
+     * A sentence that ends with the word send or enviar is never sent: the words before it are only pasted, and a "send"
+     * said alone sends them (Ormus's pick after the reviews). The bar cannot tell Claude Code's prompt from its menus, and
+     * at the permission and plan menus a paste then Enter says the highlighted Yes: the reviews measured "No, don't",
+     * "Deny", "Cancela" and "Keep planning" each approving. A paste alone at a menu does nothing, or fills its answer field.
+     */
+    @Test fun aSentenceEndingInSendIsOnlyPasted() {
+        val pasted =
             listOf(
                 "fix the tests, send" to "fix the tests", "Fix it. Send." to "Fix it", "Arregla los tests enviar." to "Arregla los tests",
-                "Sí, dale con la opción final, enviar" to "Sí, dale con la opción final", "yes go ahead send!" to "yes go ahead",
-                "Notify nobody, it's done, send" to "Notify nobody, it's done", "Paralelo, enviar" to "Paralelo", "the fourth file, send" to "the fourth file",
+                "yes go ahead send!" to "yes go ahead", "Add two tests, send" to "Add two tests", "Escribe un test para el parser, enviar." to "Escribe un test para el parser",
+                // The reviews' refusals, waits and later options, each of which said Yes at a menu with an Enter after it.
+                "No, don't send." to "No, don't", "Do not send" to "Do not", "No, no enviar." to "No, no", "Option four, send." to "Option four",
+                "Deny, send." to "Deny", "Nah, send." to "Nah", "Nooo, send." to "Nooo", "Reject, send." to "Reject", "Abort, send." to "Abort",
+                "Wait, send." to "Wait", "Hold on, send." to "Hold on", "Keep planning, send." to "Keep planning", "Use git mv instead, send." to "Use git mv instead",
+                "Skip it, send." to "Skip it", "Forget it, send." to "Forget it", "Nevermind, send." to "Nevermind", "Second option, send." to "Second option",
+                "Option for, send." to "Option for", "Number to, send." to "Number to", "The 4th, send." to "The 4th", "Fourth, send." to "Fourth",
+                "Don´t, send." to "Don´t", "Donʼt run it, send." to "Donʼt run it",
+                "Cancela, enviar." to "Cancela", "Cancélalo, enviar." to "Cancélalo", "Cancele, enviar." to "Cancele", "Detente, enviar." to "Detente",
+                "Espera, enviar." to "Espera", "Alto, enviar." to "Alto", "Basta, enviar." to "Basta", "Rechaza, enviar." to "Rechaza", "Nada, enviar." to "Nada",
+                "La última, enviar." to "La última", "La cuarta, enviar." to "La cuarta", "Cuarta opción, enviar." to "Cuarta opción", "Ninguna, enviar." to "Ninguna",
+                "Usa git mv mejor, enviar." to "Usa git mv mejor", "No. Option four. Send." to "No. Option four", "NO WAY, SEND" to "NO WAY",
             )
-        for ((heard, typed) in sent) assertEquals(heard, latchesOff + "pasteText $typed" + "pressKey enter", dictated(heard))
-        // Only the whole word, at the very end.
+        for ((heard, typed) in pasted) assertEquals(heard, latchesOff + "pasteText $typed", dictated(heard))
+        // Only the whole word, at the very end, is dropped.
         assertEquals(latchesOff + "pasteText please resend", dictated("please resend"))
         assertEquals(latchesOff + "pasteText send it to me", dictated("send it to me"))
+        assertFalse("only a list word presses enter", file.readText().contains("pressKey(\"enter\")"))
     }
 
     /**
@@ -179,25 +195,6 @@ class OrmusKeybarTest {
                 "Cuatro, enviar." to "4", "Four, send." to "4", "Two, send." to "2", "Three send" to "3", "¿Uno? enviar" to "1",
             )
         for ((heard, key) in cases) assertEquals(heard, latchesOff + "pressKey $key", dictated(heard))
-    }
-
-    /**
-     * A refusal, a negation or a menu number anywhere before send, as a whole word, keeps the enter back: the words are
-     * only pasted. The review measured "No, don't send." pasting "No, don't" and the Enter after it running the command
-     * at Claude Code's menu, and "Option four, send." picking the highlighted 1. A paste alone at a menu does nothing
-     * (measured there); a "send" said alone then sends.
-     */
-    @Test fun aRefusalOrANumberBeforeSendIsOnlyPasted() {
-        val held =
-            listOf(
-                "No, don't send." to "No, don't", "Don't send." to "Don't", "Don’t, send" to "Don’t", "Do not send" to "Do not", "No no, send." to "No no",
-                "No, no enviar." to "No, no", "Nope, cancel, send" to "Nope, cancel", "Cancel that, send." to "Cancel that", "Stop it, send" to "Stop it",
-                "I can't, send" to "I can't", "Never mind, send" to "Never mind", "Nunca, enviar" to "Nunca", "Para eso, enviar" to "Para eso",
-                "Escape it, send" to "Escape it", "Option four, send." to "Option four", "Number four, send." to "Number four",
-                "No. Option four. Send." to "No. Option four", "Sí, dale con la opción dos, enviar" to "Sí, dale con la opción dos",
-                "Pick 3, send" to "Pick 3", "uno más, enviar" to "uno más", "the 2 files, send" to "the 2 files", "NO WAY, SEND" to "NO WAY",
-            )
-        for ((heard, typed) in held) assertEquals(heard, latchesOff + "pasteText $typed", dictated(heard))
     }
 
     /** pasteText is the fork's own action: owl 23, only where keys may go, and listed as what the file does. */

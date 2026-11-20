@@ -39,14 +39,14 @@ keybar "terminal key bar" {
     send: "enter", enviar: "enter", enter: "enter", intro: "enter"
   }
 
-  // As a dictation ends: one of the words above presses its key. Anything else is pasted (Ormus's choice, after the
-  // review measured that at a menu typed letters do nothing, the Enter after them said Yes, and a digit typed on its own
-  // picked its option): one paste, bracketed behind hc attach, so no key of it reaches a menu. It is sent only when it
-  // ends with the word send or enviar: then the words before it are pasted and enter sends them, unless those words are
-  // themselves one of the list ("No, send." is esc, "Two, send." is 2), or hold a refusal, a negation or a menu number
-  // (no, don't, not, cancel, para, two, 3...: "No, don't send." is only pasted), so a refusal never becomes enter; then
-  // a "send" said alone sends. A lone "send" at a menu still picks the highlighted Yes: at a menu, say the number or
-  // no. A ctrl or alt left latched would change the paste or the key, so they go off first.
+  // As a dictation ends: one of the words above presses its key. Anything else is only pasted, never sent (Ormus's
+  // choice, after the reviews): one paste, bracketed behind hc attach, so no key of it reaches a menu. The bar cannot
+  // tell Claude Code's prompt from its menus, and at the permission and plan menus a paste then Enter says the
+  // highlighted Yes (measured: "No, don't", "Deny", "Cancela", "Keep planning"); a paste alone does nothing there. So
+  // a sentence that ends with the word send or enviar is pasted without that word, and a "send" said alone sends it.
+  // A list word before send is that key alone ("No, send." is esc, "Two, send." is 2). A lone "send" at a menu still
+  // picks the highlighted Yes: at a menu, say the number or no. A ctrl or alt left latched would change the paste or
+  // the key, so they go off first.
   on said.final {
     if value {
       latch("ctrl", "off")
@@ -63,16 +63,10 @@ keybar "terminal key bar" {
         } else {
           // The words before send, read by the list the same way.
           let before = get(spoken, lower(trim(replace(replace(replace(replace(replace(replace(replace(replace(sent[0], ".", ""), ",", ""), "!", ""), "?", ""), "¡", ""), "¿", ""), ";", ""), ":", ""))), "")
-          // A refusal, a negation or a menu number anywhere in them, as a whole word: only pasted, never enter, since
-          // Enter at a menu says the highlighted Yes ("No, don't send." ran the command; "Option four, send." picked 1).
-          let held = match(sent[0], "(?iu)(?<![\\p{L}\\p{N}'’])(?:no|nope|not|never|nunca|cancel|cancelar|para|stop|escape|esc|dont|cant|wont|\\p{L}*n['’]t|[1-4]|one|two|three|four|uno|dos|tres|cuatro)(?![\\p{L}\\p{N}'’])")
           if before != "" {
             pressKey(before)
-          } else if held != null {
-            pasteText(sent[0])
           } else {
             pasteText(sent[0])
-            pressKey("enter")
           }
         }
       }
@@ -89,7 +83,7 @@ keybar "terminal key bar" {
     // Answering an agent: Claude Code's menus take 1, 2, 3 or the arrows and enter; shift+tab changes its mode; esc
     // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running; outside hc attach,
     // ctrl+\ ends the program running in the shell, so detach acts on a long press only. mic: dictation, tap to start and
-    // tap to stop (see on said.final above: a sentence is pasted, and sent only when it ends with "send"); the photos key
+    // tap to stop (see on said.final above: a sentence is only pasted; "send" said alone sends it); the photos key
     // is on the keys page.
     agent: [
       [

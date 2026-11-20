@@ -13,11 +13,12 @@ What this fork adds to the release below it; none of it is in the Play build.
   press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the shell's
   ctrl keys and hidden symbols on the third. The mic dictates with the phone's recognizer: tap, speak, tap; "one" or
   "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which refuses,
-  and "send" or "enviar" press enter. Anything else is pasted as one paste (so a digit in it never answers a menu),
-  and sent when it ends with "send" or "enviar"; "No, send." is still esc, and words before "send" with a refusal or a
-  number in them ("No, don't send.", "Option four, send.") are only pasted, then a "send" said alone sends them. At a
-  menu, Enter picks the highlighted Yes, so say the number or "no" there. The dictation stops when its window goes to
-  the background. Widgets get `pasteText(...)` (owl 23, this fork only). The key at the end of the top row turns the
+  and "send" or "enviar" press enter. Anything else is only pasted, as one paste (so a digit in it never answers a
+  menu), and never sent: you see it in the prompt, then say "send" alone. A final "send" or "enviar" is dropped from
+  the paste, and "No, send." is still esc. The bar cannot tell a prompt from a menu, and at Claude Code's permission
+  and plan menus a paste then Enter says the highlighted Yes; a lone "send" there does too, so at a menu say the
+  number or "no". The dictation stops when its window goes to the background. Widgets get `pasteText(...)` (owl 23,
+  this fork only). The key at the end of the top row turns the
   page; a long press goes back to the agent page. In a Linux terminal window the bar stays on with the keyboard down
   too, as Mercurio's does, unless a hardware keyboard is in.
 - On the comms tiles, a tap on the card opens its screen, picked, with the earlier messages, the reactions and
