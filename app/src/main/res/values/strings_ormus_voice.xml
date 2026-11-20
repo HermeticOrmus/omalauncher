@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Omalauncher Ormus only: the widgets' dictation on Ormus's voice (voice-flow-api on sg). Not translated: Ormus's own build. -->
+<resources>
+    <string name="ormus_voice_no_mic" translatable="false">the microphone didn\'t start</string>
+    <string name="ormus_voice_mic_stopped" translatable="false">the microphone stopped</string>
+    <string name="ormus_voice_not_reachable" translatable="false">sg\'s voice isn\'t reachable: nothing was sent elsewhere</string>
+    <string name="ormus_voice_server" translatable="false">sg\'s voice didn\'t give a text</string>
+</resources>

@@ -8,6 +8,10 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The widgets' dictation, the key bar's mic among them, hears with Ormus's voice: the take is recorded in memory and
+  sent once, as it ends, to voice-flow-api on sg (over the tailnet), the engine of his desktop dictation and of Ormus
+  Keys Voice, not to the phone's recognizer, and with no fallback to it. The mic shows "..." while sg works on the
+  take; when sg isn't reachable nothing is heard and the mic is outlined in red.
 - The terminal key bar is the fork's own: a first page for answering an agent behind the sessions tiles' attach (esc,
   1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a mic, and detach, which is `hc attach`'s ctrl+\ and acts on a long
   press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the shell's

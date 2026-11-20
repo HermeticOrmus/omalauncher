@@ -207,10 +207,13 @@ keybar "terminal key bar" {
     }
   }
 
-  // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above presses or pastes the words.
-  // "no mic" where the phone has no recognizer; outlined in red when it couldn't listen (the microphone permission).
+  // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above presses or
+  // pastes the words. Ormus's voice on sg hears the take as it ends: "..." until its words come. Outlined in red when
+  // it couldn't listen or sg didn't answer (the microphone permission, sg out of reach).
   component Mic(k) {
     let listening = get(said ?? {}, "listening", false)
+    // sg works on the take: its words come next.
+    let busy = get(said ?? {}, "busy", false)
     Box {
       fill: true
       align: center
@@ -220,7 +223,7 @@ keybar "terminal key bar" {
       borderColor: red
       onPress: haptic()
       onTap: speech("toggle")
-      Text { text: get(said ?? {}, "available", true) == false ? "no mic" : listening ? "stop" : k.label; font: mono; fontSize: 14; maxLines: 1; align: center; color: listening ? background : foreground }
+      Text { text: get(said ?? {}, "available", true) == false ? "no mic" : listening ? "stop" : busy ? "..." : k.label; font: mono; fontSize: 14; maxLines: 1; align: center; color: listening ? background : foreground }
     }
   }
 

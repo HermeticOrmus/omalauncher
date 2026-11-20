@@ -533,5 +533,10 @@ class Speech(
 
         /** The one started last: the phone has one microphone, and a second recognizer would get nothing. */
         private var active: Speech? = null
+
+        /** Omalauncher Ormus: stops the one listening, for the widgets' dictation on Ormus's voice to have the microphone. */
+        fun cancelActive() {
+            active?.cancel()
+        }
     }
 }
