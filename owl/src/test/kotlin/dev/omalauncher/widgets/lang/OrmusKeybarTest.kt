@@ -30,13 +30,20 @@ class OrmusKeybarTest {
         assertEquals("terminal key bar", program.name)
     }
 
-    /** Three pages of two rows of nine, like the stock bar's two rows: the keys stay as wide on every page. */
+    /** How many key widths a key takes: `wide`, else one. */
+    private fun Map<String, Value>.width() = (this["wide"] as? Num)?.v?.toInt() ?: 1
+
+    /**
+     * Three pages of two rows nine keys wide, like the stock bar's two rows: the keys stay as wide on every page. A
+     * wide key, the agent page's space bar, takes the room of two.
+     */
     @Test fun threePagesOfTwoRowsOfNine() {
         assertEquals(setOf("agent", "keys", "more"), pages.keys)
         for ((name, rows) in pages) {
             assertEquals("$name has two rows", 2, rows.size)
-            for (row in rows) assertEquals("$name: nine keys a row", 9, row.size)
+            for (row in rows) assertEquals("$name: nine keys wide a row", 9, row.sumOf { it.width() })
         }
+        assertTrue("the row draws each key as wide as it says", file.readText().contains("weight: k.wide ?? 1"))
     }
 
     /** Every key names one pressKey sends: a typo here would press nothing on the phone and only report it there. */
@@ -50,9 +57,15 @@ class OrmusKeybarTest {
      */
     @Test fun theAgentPageAnswersAnAgent() {
         val keys = keysOf("agent")
-        for (k in listOf("esc", "1", "2", "3", "enter", "shift+tab", "ctrl+c", "up", "down", "left", "right", "tab", "shift+insert")) {
+        for (k in listOf("esc", "1", "2", "3", "enter", "shift+tab", "ctrl+c", "up", "down", "left", "right", "tab", "shift+insert", "space")) {
             assertTrue("agent page has $k", k in keys)
         }
+        // Ormus: "the arrow keys are important in the default view, so is a space bar which is often used to select
+        // multiple choice, ctrl and alt are not so necessary". Space ticks a choice in Claude Code's multi-select menus.
+        val space = pages.getValue("agent").flatten().single { it.text("key") == "space" }
+        assertEquals("the space bar is two keys wide", 2, space.width())
+        assertEquals("the space bar sits on the bottom row", 1, pages.getValue("agent").indexOfFirst { row -> space in row })
+        assertTrue("no ctrl or alt on the agent page", pages.getValue("agent").flatten().none { it["latch"] != null })
         val detach = pages.getValue("agent").flatten().single { it.text("label") == "detach" }
         assertEquals("ctrl+\\", detach.text("key"))
         assertEquals(Bool(true), detach["hold"])
@@ -70,16 +83,21 @@ class OrmusKeybarTest {
         for (k in mercurio) assertTrue("the bar has $k", k in all)
     }
 
-    /** Each page: one page key, at the end of the top row; ctrl and alt latched; the photo picker on the keys page. */
+    /** Each page: one page key, at the end of the top row; ctrl and alt latched on the keys and more pages; photos on keys. */
     @Test fun everyPageTurnsAndLatches() {
         for ((name, rows) in pages) {
             val flat = rows.flatten()
             assertEquals("$name: one page key", 1, flat.count { it["page"] == Bool(true) })
             assertEquals("$name: the page key ends the top row", Bool(true), rows[0].last()["page"])
-            assertEquals("$name: ctrl and alt latch", listOf("ctrl", "alt"), flat.mapNotNull { it.text("latch") })
-            // Up over down, so the arrows sit the same way on every page that has them.
-            val up = rows[0].indexOfFirst { it.text("key") == "up" }
-            if (up >= 0) assertEquals("$name: up over down", up, rows[1].indexOfFirst { it.text("key") == "down" })
+            if (name != "agent") assertEquals("$name: ctrl and alt latch", listOf("ctrl", "alt"), flat.mapNotNull { it.text("latch") })
+            // Up over down, so the arrows sit the same way on every page that has them: the same column, counted in
+            // key widths, as a wide key takes two.
+            fun column(row: List<Map<String, Value>>, key: String): Int {
+                val at = row.indexOfFirst { it.text("key") == key }
+                return if (at < 0) -1 else row.take(at).sumOf { it.width() }
+            }
+            val up = column(rows[0], "up")
+            if (up >= 0) assertEquals("$name: up over down", up, column(rows[1], "down"))
         }
         assertEquals("photos on the keys page", listOf("keys"), pages.filterValues { rows -> rows.flatten().any { it["images"] == Bool(true) } }.keys.toList())
     }

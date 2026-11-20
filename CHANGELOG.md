@@ -15,9 +15,10 @@ What this fork adds to the release below it; none of it is in the Play build.
   then; when sg isn't reachable nothing is heard and the mic is outlined in red. sg's voice-flow keeps the text of
   each take in its history (VOICE_FLOW_LOG_TEXT on sg).
 - The terminal key bar is the fork's own: a first page for answering an agent behind the sessions tiles' attach (esc,
-  1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a mic, and detach, which is `hc attach`'s ctrl+\ and acts on a long
-  press, since outside `hc attach` that key quits the shell's program), the stock keys on the second, and the shell's
-  ctrl keys and hidden symbols on the third. The mic dictates with Ormus's voice on sg: tap, speak, tap; "one" or
+  1, 2, 3, the arrows, enter, shift+tab, ctrl+c, a space bar two keys wide that ticks a choice in a multi-select menu,
+  a mic, and detach, which is `hc attach`'s ctrl+\ and acts on a long press, since outside `hc attach` that key quits
+  the shell's program; ctrl and alt are on the other pages), the stock keys on the second, and the shell's ctrl keys
+  and hidden symbols on the third. The mic dictates with Ormus's voice on sg: tap, speak, tap; "one" or
   "uno" (to four) press that number for an agent's menu, "no", "cancel", "para" or "stop" press esc, which refuses,
   and "send" or "enviar" press enter. Anything else is only pasted, as one paste (so a digit in it never answers a
   menu), and never sent: you see it in the prompt, then say "send" alone. A final "send" or "enviar" is dropped from

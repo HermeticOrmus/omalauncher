@@ -81,13 +81,15 @@ keybar "terminal key bar" {
   // icon: an asset shown instead of the label; small: a label of five or six letters, drawn smaller so it fits.
   // Ctrl+Insert and Shift+Insert are the clipboard keys foot, GTK and Qt all know. images: Android's photo picker, whose
   // picks paste as their paths in Linux, which opencode and Claude Code attach. page: the key that turns the page.
-  // Every page keeps up above down, and tab, ctrl and alt in the same places, so the hand finds them on each.
+  // Every page keeps up above down and tab in the same places, so the hand finds them on each; ctrl and alt too on the
+  // keys and more pages. wide: a key that takes the room of that many keys.
   let pages = {
     // Answering an agent: Claude Code's menus take 1, 2, 3 or the arrows and enter; shift+tab changes its mode; esc
     // stops it. hc attach lets go of the terminal on ctrl+\ (detach), and the agent keeps running; outside hc attach,
     // ctrl+\ ends the program running in the shell, so detach acts on a long press only. mic: dictation, tap to start and
     // tap to stop (see on said.final above: a sentence is only pasted; "send" said alone sends it); the photos key
-    // is on the keys page.
+    // is on the keys page. space, two keys wide, ticks a choice in Claude Code's multi-select menus; ctrl and alt are
+    // on the other pages (Ormus: "ctrl and alt are not so necessary" here, the arrows and a space bar are).
     agent: [
       [
         {label: "esc", key: "esc"},
@@ -102,8 +104,7 @@ keybar "terminal key bar" {
       ],
       [
         {label: "tab", key: "tab"},
-        {label: "ctrl", latch: "ctrl"},
-        {label: "alt", latch: "alt"},
+        {label: "space", key: "space", wide: 2},
         {label: "left", key: "left", repeats: true, arrow: -90},
         {label: "down", key: "down", repeats: true, arrow: 180},
         {label: "right", key: "right", repeats: true, arrow: 90},
@@ -305,7 +306,7 @@ keybar "terminal key bar" {
           gap: 0
           for k in row {
             Box {
-              weight: 1
+              weight: k.wide ?? 1
               fill: height
               padding: 3
               if k.page ?? false {
