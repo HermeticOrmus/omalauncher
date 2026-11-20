@@ -30,6 +30,12 @@ object OrmusVoiceConfig {
     /** A take shorter than this is dropped without a request: a tap and a tap again. */
     const val MIN_TAKE_MS = 300
 
+    /**
+     * An answer later than this from the stop is dropped, never heard: the keys may go elsewhere by then. sg answers a
+     * sentence in well under a second (415 ms measured on 2026-11-19); a 120 s take on a slow link takes longer.
+     */
+    const val ANSWER_DEADLINE_MS = 20_000
+
     const val CONNECT_TIMEOUT_MS = 5_000
     const val READ_TIMEOUT_MS = 60_000
     const val MAX_RESPONSE_BYTES = 1 shl 20
@@ -199,7 +205,6 @@ class VoiceFlowClient(
         try {
             val c = URL(url).openConnection() as HttpURLConnection
             conn = c
-            cancel.onCancel { c.disconnect() } // closes the socket: a blocked read or write ends at once
             c.requestMethod = "POST"
             c.doOutput = true
             c.instanceFollowRedirects = false // a redirect must never carry the audio elsewhere
@@ -208,6 +213,9 @@ class VoiceFlowClient(
             c.readTimeout = OrmusVoiceConfig.READ_TIMEOUT_MS
             c.setFixedLengthStreamingMode(wav.size)
             c.setRequestProperty("Content-Type", "audio/wav")
+            // Connected first: a disconnect before the connect does nothing, and the audio would still go.
+            c.connect()
+            cancel.onCancel { c.disconnect() } // closes the socket: a blocked read or write ends at once
             c.outputStream.use { it.write(wav) }
             val code = c.responseCode
             if (code != HttpURLConnection.HTTP_OK) return TranscribeResult.ServerError(code)

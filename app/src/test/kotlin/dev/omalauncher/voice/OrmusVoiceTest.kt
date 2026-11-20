@@ -199,6 +199,11 @@ class OrmusVoiceTest {
     /** The request runs when the test says so: [queued] holds it, as a worker thread would. */
     private val queued = ArrayList<Runnable>()
 
+    /** What the engine asked to run later, and after how many ms: [later] runs them as their time comes. */
+    private val timers = ArrayList<Pair<Long, Runnable>>()
+
+    private fun later() = timers.toList().also { timers.clear() }.forEach { it.second.run() }
+
     private fun voice(sync: Boolean = true) =
         OrmusVoice(
             recorder = recorder,
@@ -208,6 +213,7 @@ class OrmusVoiceTest {
             },
             work = { if (sync) it.run() else queued.add(it) },
             post = { it.run() },
+            postDelayed = { ms, r -> timers.add(ms to r) },
             text = { it.name },
         )
 
@@ -285,6 +291,65 @@ class OrmusVoiceTest {
         queued.removeAt(0).run()
         assertTrue(sent.last().token.isCancelled)
         assertEquals(1, heard.size)
+    }
+
+    /**
+     * A late answer is dropped, never heard: past the deadline from the stop the request is stopped and the error says
+     * so (the review: "one" said to agent A, answered after a detach, would press 1 at agent B's menu).
+     */
+    @Test fun anAnswerPastTheDeadlineIsDropped() {
+        val v = voice(sync = false)
+        val heard = ArrayList<String>()
+        v.start { heard.add(it) }
+        recorder.speak(1_000)
+        v.stop()
+        assertEquals(listOf(OrmusVoiceConfig.ANSWER_DEADLINE_MS.toLong()), timers.map { it.first })
+        later()
+        assertFalse(v.busy)
+        assertEquals("TOO_SLOW", v.error)
+        queued.removeAt(0).run()
+        assertTrue(sent.single().token.isCancelled)
+        assertTrue(heard.isEmpty())
+        // In time, the deadline does nothing.
+        v.start { heard.add(it) }
+        recorder.speak(1_000)
+        v.stop()
+        queued.removeAt(0).run()
+        assertEquals(listOf("fix the tests"), heard)
+        later()
+        assertNull(v.error)
+        assertEquals(listOf("fix the tests"), heard)
+    }
+
+    /** A tap on the mic while sg works drops the take: its answer is never heard. */
+    @Test fun aTapWhileBusyDropsTheTake() {
+        val v = voice(sync = false)
+        val heard = ArrayList<String>()
+        v.tap { heard.add(it) }
+        assertTrue(v.listening)
+        recorder.speak(1_000)
+        v.tap { heard.add("again") }
+        assertTrue(v.busy)
+        v.tap { heard.add("again") }
+        assertFalse(v.busy)
+        assertFalse("a tap while busy only drops, it starts no take", v.listening)
+        queued.removeAt(0).run()
+        assertTrue(heard.isEmpty())
+        v.tap { heard.add(it) }
+        assertTrue("then a tap starts a take", v.listening)
+    }
+
+    /** A crash in the client is an error, not the end of the send thread and the launcher. */
+    @Test fun aClientThatThrowsIsAnError() {
+        val v =
+            OrmusVoice(recorder, { _, _ -> throw IllegalStateException("boom") }, { it.run() }, { it.run() }, { _, _ -> }, { it.name })
+        var heard = false
+        v.start { heard = true }
+        recorder.speak(1_000)
+        v.stop()
+        assertFalse(heard)
+        assertEquals("SERVER", v.error)
+        assertFalse(v.busy)
     }
 
     @Test fun aNewTakeDropsTheAnswerOfTheOldOne() {

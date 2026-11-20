@@ -85,6 +85,7 @@ class Speech(
         onDone: (String) -> Unit,
     ) {
         cancel()
+        beforeStart?.invoke()
         active?.takeIf { it !== this }?.cancel()
         active = this
         error = null
@@ -538,5 +539,8 @@ class Speech(
         fun cancelActive() {
             active?.cancel()
         }
+
+        /** Omalauncher Ormus: runs as one starts, for the widgets' dictation on Ormus's voice to let the microphone go. */
+        var beforeStart: (() -> Unit)? = null
     }
 }

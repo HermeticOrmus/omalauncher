@@ -26,7 +26,8 @@ keybar "terminal key bar" {
   state down = ""
   // The page on show, kept across restarts: "agent", "keys" or "more". An unknown one shows the agent page.
   state page = "agent" persist
-  // The mic key's dictation: the phone's own recognizer, on the phone where it can; only the text reaches the bar.
+  // The mic key's dictation: Ormus's voice on sg (voice-flow-api over the tailnet) hears the take as it ends; the
+  // audio goes there and nowhere else, and only its text reaches the bar.
   source said = android.speech
 
   // What a dictation that is only one of these words presses, for an agent's menus. Claude Code's permission menu is
@@ -208,8 +209,9 @@ keybar "terminal key bar" {
   }
 
   // The mic: a tap starts the dictation, filled while it listens, and a tap ends it; on said.final above presses or
-  // pastes the words. Ormus's voice on sg hears the take as it ends: "..." until its words come. Outlined in red when
-  // it couldn't listen or sg didn't answer (the microphone permission, sg out of reach).
+  // pastes the words. Ormus's voice on sg hears the take as it ends: "..." until its words come, and a tap on "..."
+  // drops the take. Outlined in red when it couldn't listen or sg didn't answer in time (the microphone permission,
+  // sg out of reach).
   component Mic(k) {
     let listening = get(said ?? {}, "listening", false)
     // sg works on the take: its words come next.

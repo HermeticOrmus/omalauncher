@@ -27,7 +27,8 @@ import dev.omalauncher.system.hasPermission
  * Dictation for widgets: `source said = android.speech` and `speech("start")`. One widget listens at a time, the one
  * that started last, and each sees only its own: the others read it as not listening, with nothing heard. It listens
  * across pauses until stopped, and stops as its widget stops reading the source: its screen closed, home went away.
- * The prompt bar has a [Speech] of its own; one starting cancels the other. Main thread only.
+ * The prompt bar has a [Speech] of its own; one starting cancels the other (both ways: [Speech.beforeStart]). Main
+ * thread only.
  *
  * Omalauncher Ormus: the widgets hear with Ormus's voice ([OrmusVoice], voice-flow-api on sg), not the phone's
  * recognizer, and with no fallback to it: when sg doesn't answer, nothing is heard and `error` says so.
@@ -42,8 +43,14 @@ class Dictation(
             transcriber = VoiceFlowClient(),
             work = Executors.newSingleThreadExecutor { Thread(it, "ormus-voice-send") }::execute,
             post = main::post,
+            postDelayed = { ms, r -> main.postDelayed(r, ms) },
             text = { context.getString(it.string) },
         )
+
+    init {
+        // The phone has one microphone: the prompt bar's recognizer, starting, ends a widget's take.
+        Speech.beforeStart = { speech.cancel() }
+    }
 
     private val OrmusVoice.Problem.string
         get() =
@@ -52,6 +59,7 @@ class Dictation(
                 OrmusVoice.Problem.MIC_STOPPED -> R.string.ormus_voice_mic_stopped
                 OrmusVoice.Problem.NOT_REACHABLE -> R.string.ormus_voice_not_reachable
                 OrmusVoice.Problem.SERVER -> R.string.ormus_voice_server
+                OrmusVoice.Problem.TOO_SLOW -> R.string.ormus_voice_too_slow
             }
 
     /**
@@ -104,8 +112,8 @@ class Dictation(
         val mine = this.owner === owner && speech.listening
         when (word) {
             "start" -> start(owner)
-            // A tap while sg works on the take leaves it be: its answer is on the way.
-            "toggle" -> if (mine) speech.stop() else if (!(this.owner === owner && speech.busy)) start(owner)
+            // A tap while it listens ends the take; while sg works on it, drops it (OrmusVoice.tap).
+            "toggle" -> if (this.owner === owner && (speech.listening || speech.busy)) speech.tap { } else start(owner)
             "stop" -> if (mine) speech.stop()
             "cancel" -> if (this.owner === owner) speech.cancel()
         }

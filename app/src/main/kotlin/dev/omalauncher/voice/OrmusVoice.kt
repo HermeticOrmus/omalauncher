@@ -117,16 +117,19 @@ class AudioRecorder(
  * The widgets' dictation on Ormus's voice: a tap starts a take, a tap ends it, and the take goes once to sg; its text
  * is what was heard. While sg works on it [busy] is on. Nothing is heard when sg doesn't answer: [error] says so, and
  * no other recognizer is tried. The same surface as [dev.omalauncher.ui.voice.Speech] for [dev.omalauncher.widgets.runtime.Dictation].
- * Main thread only; [work] runs the request off it, [post] brings the answer back.
+ * Main thread only; [work] runs the request off it, [post] brings the answer back, [postDelayed] runs the deadline.
+ * An answer that comes past [OrmusVoiceConfig.ANSWER_DEADLINE_MS] from the stop is dropped: by then the keys may go to
+ * another window or another agent than the one spoken to.
  */
 class OrmusVoice(
     private val recorder: Recorder,
     private val transcriber: Transcriber,
     private val work: (Runnable) -> Unit,
     private val post: (Runnable) -> Unit,
+    private val postDelayed: (Long, Runnable) -> Unit,
     private val text: (Problem) -> String,
 ) {
-    enum class Problem { NO_MIC, MIC_STOPPED, NOT_REACHABLE, SERVER }
+    enum class Problem { NO_MIC, MIC_STOPPED, NOT_REACHABLE, SERVER, TOO_SLOW }
 
     var listening by mutableStateOf(false)
         private set
@@ -187,9 +190,35 @@ class OrmusVoice(
         token = mine
         busy = true
         work {
-            val result = transcriber.transcribe(wav, mine)
+            val result =
+                try {
+                    transcriber.transcribe(wav, mine)
+                } catch (_: RuntimeException) {
+                    // Not the end of this thread, and of the launcher with it.
+                    TranscribeResult.ServerError(-1)
+                }
             wav.fill(0)
             post { answer(mine, result, done) }
+        }
+        postDelayed(
+            OrmusVoiceConfig.ANSWER_DEADLINE_MS.toLong(),
+            Runnable {
+                if (token === mine) {
+                    mine.cancel()
+                    token = null
+                    busy = false
+                    error = text(Problem.TOO_SLOW)
+                }
+            },
+        )
+    }
+
+    /** The mic key: a tap starts a take, ends it while it listens, and drops it while sg works on it. */
+    fun tap(onDone: (String) -> Unit) {
+        when {
+            listening -> stop()
+            busy -> cancel()
+            else -> start(onDone)
         }
     }
 

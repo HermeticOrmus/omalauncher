@@ -5,4 +5,5 @@
     <string name="ormus_voice_mic_stopped" translatable="false">the microphone stopped</string>
     <string name="ormus_voice_not_reachable" translatable="false">sg\'s voice isn\'t reachable: nothing was sent elsewhere</string>
     <string name="ormus_voice_server" translatable="false">sg\'s voice didn\'t give a text</string>
+    <string name="ormus_voice_too_slow" translatable="false">sg\'s voice answered too late: nothing was typed</string>
 </resources>
