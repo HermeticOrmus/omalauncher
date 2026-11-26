@@ -343,4 +343,88 @@ class OrmusSessionsTileTest {
         assertFalse("no chat on the screen: $screen", screen.any { "Ana" in it || "can you look?" in it || "WAITS ON YOU" in it })
         assertTrue("the counts are the agents' alone: $tile", "1 working · 0 done" in tile)
     }
+
+    // The answer keys of two blocked agents, on the host that also fires triggers: card A is the approval (keys 1 Yes, 2 No), card B the pick
+    // list (1 Moonlight ...). What the answer tool prints back is {"n": the tap's own number, "r": its answer, "x": ssh's exit code}.
+    private val cardA = "sg:raven:w4:p1"
+    private val cardB = "sg:raven:w4:p2"
+
+    private fun TileHost.tapKey(card: String, word: String): String? {
+        set("pick", Str(card))
+        return tap(program.root, word).firstOrNull { it.startsWith("run ") }
+    }
+
+    private fun TileHost.mark() = (let("sentMark") as Num).v.toLong()
+
+    private fun TileHost.reply(r: String, n: Long = mark()) = fire("sent", Str("""{"n":$n,"r":$r,"x":0}"""))
+
+    private fun TileHost.said() = (let("said") as Str).v
+
+    private fun TileHost.busy() = (let("busy") as Str).v
+
+    @Test fun anAnswerTapIsFreeAgainWhenItsReplyComesSoTheNextCardCanBeAnswered() {
+        val t = TileHost(program, feed(approval(), pick))
+        assertTrue("card A's first key runs the answer tool", t.tapKey(cardA, "1 Yes")!!.contains("\"key\":\"1\""))
+        assertTrue("the tapped key waits", t.hasKey(program.root, "…"))
+        assertFalse("busy while its request is in flight", t.busy() == "")
+        t.actions.clear()
+        t.reply("""{"ok": true, "game": {"today": 2}}""")
+        assertEquals("the reply frees the keys", "", t.busy())
+        assertEquals("and tells what happened", "unlocked · 2 today", t.said())
+        assertTrue("with a haptic", t.actions.any { it.startsWith("haptic") })
+        assertTrue("so card B's key runs the answer tool a second time", t.tapKey(cardB, "1 Moonlight")!!.contains("\"id\":\"30be825843dd\""))
+    }
+
+    @Test fun anEmptySshOutputIsAValidReplyThatSaysSgDidNotAnswerAndFreesTheKeys() {
+        val t = TileHost(program, feed(approval(), pick))
+        val command = t.tapKey(cardA, "1 Yes")!!.removePrefix("run ")
+        // Run the command itself with an ssh that prints nothing: what reaches the tile must still be JSON.
+        val bin = java.nio.file.Files.createTempDirectory("fake-ssh")
+        val ssh = bin.resolve("ssh").toFile().apply { writeText("#!/bin/sh\ncat >/dev/null\nexit 255\n"); setExecutable(true) }
+        val out = ProcessBuilder("sh", "-c", command).also { it.environment()["PATH"] = bin.toString() + ":" + System.getenv("PATH") }.start().let { p -> p.inputStream.bufferedReader().readText().also { p.waitFor() } }
+        ssh.delete()
+        bin.toFile().delete()
+        val got = Json.parse(out)
+        assertTrue("valid JSON with the tap's number and a null answer: $out", got != Null)
+        t.fire("sent", Str(out))
+        assertEquals("sg did not answer", t.said())
+        assertEquals("", t.busy())
+    }
+
+    @Test fun anOutcomeOfTheAnswerToolShowsItsLineAndFreesTheKeys() {
+        val t = TileHost(program, feed(approval(), pick))
+        t.tapKey(cardA, "1 Yes")
+        t.reply("""{"ok": false, "outcome": "changed"}""")
+        assertEquals("the question changed: look again", t.said())
+        assertEquals("", t.busy())
+        assertEquals("the line belongs to the card tapped", "sg:raven:w4:p1:101:484b6b02717f", (t.let("saidFor") as Str).v)
+    }
+
+    @Test fun aLateReplyOfAnOlderRequestNeverFreesANewerOne() {
+        val t = TileHost(program, feed(approval(), pick))
+        t.tapKey(cardA, "1 Yes")
+        val older = t.mark()
+        t.reply("""{"ok": true, "game": {"today": 1}}""")
+        t.tapKey(cardB, "1 Moonlight")
+        assertFalse("a newer request is in flight", t.busy() == "")
+        t.reply("""{"ok": true, "game": {"today": 9}}""", older)
+        assertFalse("the older reply, late, leaves it in flight", t.busy() == "")
+        assertEquals("and says nothing for it", "", t.said())
+        t.reply("""{"ok": true, "game": {"today": 3}}""")
+        assertEquals("its own reply frees it", "", t.busy())
+        assertEquals("unlocked · 3 today", t.said())
+    }
+
+    @Test fun anAnswerThatNeverComesFreesTheKeysWithALineThatDoesNotSayTryAgain() {
+        val now = 1_794_166_000.0
+        val t = TileHost(program, feed(approval(), pick), now = now)
+        t.tapKey(cardA, "1 Yes")
+        t.fire("now", Num(now + 60), Num(now))
+        assertFalse("a minute in, still waiting", t.busy() == "")
+        t.fire("now", Num(now + 120), Num(now + 60))
+        assertEquals("freed", "", t.busy())
+        assertEquals("no answer: open the agent to check", t.said())
+        assertFalse("the key may have gone: no word of trying again", t.said().contains("again"))
+        assertTrue("the next card can be answered", t.tapKey(cardB, "1 Moonlight") != null)
+    }
 }
