@@ -4,7 +4,7 @@ widget "sessions-clients" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card attaches to the agent's herdr-core terminal; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.1"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -130,19 +130,14 @@ widget "sessions-clients" {
     }
   }
 
-  // What moved, told while the phone sleeps. A widget's own sources run only while its page is on screen, so sg
-  // sends each move here (owl-send sets `alert`) and the tile posts it as a notification. Nothing else alerts.
-  // It starts as a move that is none: `on` does not run for a state's first value, and a null is not a value.
-  state alert = {n: 0}
-  on alert {
-    if value != null && value.title != null {
-      notify(value.title, value.text ?? "")
-    }
-  }
+  // No alert of its own: Mercurio alerts (Ormus, 2026-11-26, "Adopt it"); this tile is the home-screen glance.
   // Quiet: Do Not Disturb with his own exceptions. It is his switch; this tile never turns it on by itself.
   source modes = android.modes
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
+  // How Mercurio names each machine (`ssh://user@host:port`) and the machine's tailnet names: a tap opens the agent there.
+  let links = data != null ? (data.links ?? {}) : {}
+  let hosts = data != null ? (data.hosts ?? {}) : {}
   let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
   // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
   let stale = data != null && now != null && now - data.generated > 180
@@ -327,17 +322,16 @@ widget "sessions-clients" {
     }
   }
 
-  // One row that attaches to the agent's herdr-core terminal.
+  // One row that opens the agent in Mercurio.
   component Item(i, where) {
     Box {
       onTap: {
-        if i.session == "core" {
-          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
-          // saved host's id), and its Herdr path would start an old herdr TUI session. So the launcher's own
-          // terminal attaches to it with hc, over the guest's ssh to that machine.
-          terminal("ssh -t ${sh(i.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + i.pane)}", i.title != "" ? i.title : "agent")
+        if i.session == "core" && mercurio != null && get(links, i.machine, null) != null {
+          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
+          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": i.pane, "solutions.ormus.logos.extra.CORE_SPACE": i.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": i.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
         } else {
-          // No other kind of session is left (the old herdr TUI is gone): Mercurio itself.
+          // No link for the machine, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
@@ -356,18 +350,17 @@ widget "sessions-clients" {
     }
   }
 
-  // Attach to an agent's herdr-core terminal, or open Mercurio itself for an agent of any other kind.
+  // Open an agent in Mercurio: its herdr-core terminal's watch view, or Mercurio itself.
   component OpenAgent(a, word) {
     Box {
       fill: width
       onTap: {
-        if a.session == "core" {
-          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
-          // saved host's id), and its Herdr path would start an old herdr TUI session. So the launcher's own
-          // terminal attaches to it with hc, over the guest's ssh to that machine.
-          terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
+          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
-          // No other kind of session is left (the old herdr TUI is gone): Mercurio itself.
+          // No link for the machine, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
@@ -413,13 +406,12 @@ widget "sessions-clients" {
       radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: {
-        if a.session == "core" {
-          // A herdr-core agent: Mercurio opens no herdr-core terminal from a launcher's tap yet (it asks for the
-          // saved host's id), and its Herdr path would start an old herdr TUI session. So the launcher's own
-          // terminal attaches to it with hc, over the guest's ssh to that machine.
-          terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
+          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
+          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
-          // No other kind of session is left (the old herdr TUI is gone): Mercurio itself.
+          // No link for the machine, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
@@ -494,7 +486,7 @@ widget "sessions-clients" {
           }
         }
       } else {
-        OpenAgent { a: a; word: a.session == "core" ? "attach" : "open in Mercurio"; fill: width }
+        OpenAgent { a: a; word: "open in Mercurio"; fill: width }
       }
       if said != "" && busy == "" && saidFor == q {
         Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 2 }

@@ -8,6 +8,10 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- A tap on an agent in the sessions tile, the four board tiles and the Mercurio tile opens it in Mercurio, on its
+  herdr-core terminal's watch view (Mercurio 1.27.97 and later), instead of the launcher's own `ssh … hc attach`
+  terminal; a machine with no Mercurio link opens Mercurio itself. The sessions tile no longer posts notifications of
+  its own: Mercurio alerts (Ormus, 2026-11-26: one app owns alerts, opening and answering agents).
 - The home A-Z rail follows the grid's height for as long as it is on screen, instead of keeping the height it first saw:
   the letters no longer squeeze together after the grid changes size (keyboard, another app, a rotation). When the
   rail really is short it shows fewer letters, each whole, and the touch picks among those shown.

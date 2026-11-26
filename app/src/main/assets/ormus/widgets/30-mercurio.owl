@@ -4,7 +4,7 @@ widget "mercurio" {
   size: 6x4
   minSize: 3x2
 
-  meta { owl: 17; description: "Ormus's herdr-core agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with project, machine and how long ago. Tap one to attach to its terminal."; version: "3.0"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Ormus's herdr-core agents on Sun, sg and Mars: who waits on him, who works, who finished, then the latest idle ones, with project, machine and how long ago. Tap one to open it in Mercurio."; version: "3.1"; license: "MIT"; category: "productivity" }
 
   // Every machine's agents from sg's sessions feed (ormus-feeds), which reads herdr-core (`hc`) on Sun, sg and Mars
   // each minute. The old herdr TUI is gone (Ormus, 2026-11-15: "make sure that mercurio and all widgets are connected
@@ -13,6 +13,9 @@ widget "mercurio" {
   source now = clock every 1m
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
+  // How Mercurio names each machine (`ssh://user@host:port`) and the machine's tailnet names: a tap opens the agent there.
+  let links = data != null ? (data.links ?? {}) : {}
+  let hosts = data != null ? (data.hosts ?? {}) : {}
   // Each project's agents, with the project's name; one agent counts once even when two boards list it.
   let listed = data == null ? [] : flatten(data.boards.map(b => flatten((b.projects ?? []).map(p => (p.top ?? []).map(a => merge(a, {ws: p.name}))))))
   let ids = listed.map(a => "${a.machine}:${a.pane}")
@@ -68,10 +71,18 @@ widget "mercurio" {
       Text { text: "as of ${floor((now - data.generated) / 60)}m ago"; style: small; color: red; maxLines: 1 }
     }
     for a in shown key "${a.machine}:${a.pane}" {
-      // A tap attaches the launcher's terminal to the agent's herdr-core terminal, over the guest's ssh to its
-      // machine (Mercurio opens no herdr-core terminal from a launcher's tap yet).
+      // A tap opens the agent in Mercurio.
       Box {
-        onTap: terminal("ssh -t ${sh(a.machine)} ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + a.pane)}", a.title != "" ? a.title : "agent")
+        onTap: {
+          if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+            // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
+            // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
+            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
+          } else {
+            // No link for the machine, or no herdr-core agent: Mercurio itself.
+            androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+          }
+        }
         AgentLine { a: a }
       }
     }
