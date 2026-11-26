@@ -92,6 +92,13 @@ internal class TileHost(
         actions += "run $command"
     }
 
+    /** Runs every element's onTap in the env it renders in, in order; the actions they asked for. */
+    fun tapAll(nodes: List<WNode>): List<String> {
+        actions.clear()
+        budget.run { visit(nodes, Env.root(this)) { n, env -> n.handlers["onTap"]?.run?.invoke(env, emptyList()) } }
+        return actions.toList()
+    }
+
     /** Taps the one element with an onTap whose Texts read [word] (all of them joined with a space), and returns what that asked for. */
     fun tap(
         nodes: List<WNode>,

@@ -26,13 +26,14 @@ class OrmusHerdrCoreTest {
         vararg agents: String,
         machines: String = """{"sg": "ok", "sun": "ok", "mars": "ok"}""",
         totals: String? = null,
+        hosts: String = """{"sg": ["sg", "sg.tail.ts.net"], "mars": ["mars"]}""",
     ): Value {
         // The counts by state, as the feed writes them beside the agents.
         val counts = listOf("blocked", "working", "done", "idle").joinToString(", ") { s -> "\"$s\": ${agents.count { it.contains("\"status\": \"$s\"") }}" }
         return Json.parse(
             """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": $machines, "errors": {}, "needs": 0,
             "agents": ${totals ?: "{$counts}"}, "waiting": 0, "unsorted": [],
-            "links": {"sg": "ssh://ormus@sg:22#sg", "mars": "ssh://ops@mars:22#mars"}, "hosts": {"sg": ["sg", "sg.tail.ts.net"], "mars": ["mars"]}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+            "links": {"sg": "ssh://ormus@sg:22#sg", "mars": "ssh://ops@mars:22#mars"}, "hosts": $hosts, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
             "boards": [{"name": "raven", "agents": {$counts}, "waiting": 0,
               "projects": [{"name": "PORTALS", "agents": {$counts}, "chats": [], "top": [${agents.joinToString(",")}]}]}]}}""",
         )
@@ -71,7 +72,7 @@ class OrmusHerdrCoreTest {
     @Test fun aHerdrCoreAgentsRowOnTheSessionsScreenOpensItInMercurio() {
         val program = compile("10-sessions.owl")
         val t = TileHost(program, feed(agent("working", "t15")))
-        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos.debug", "label": "Mercurio"}]"""))
+        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos.debug", "label": "Mercurio", "versionCode": 12797000}]"""))
         val tapped = t.tap(program.screen!!, "working RAV-1 claude · sg")
         assertTrue("$tapped", opensInMercurio(tapped, "sg", "t15", names = "sg,sg.tail.ts.net"))
         assertTrue("the tab names the watch view: $tapped", tapped.any { it.contains("solutions.ormus.logos.extra.CORE_TAB") && it.contains("4 · RAV-1") })
@@ -80,10 +81,35 @@ class OrmusHerdrCoreTest {
     @Test fun anAgentOnAMachineWithNoLink_opensMercurio_neverTheLaunchersTerminal() {
         val program = compile("10-sessions.owl")
         val t = TileHost(program, feed(agent("working", "t4", machine = "sun", title = "builds")))
-        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio"}]"""))
+        t.set("apps", Json.parse(mercurio))
         val tapped = t.tap(program.screen!!, "working builds claude · sun")
         assertTrue("$tapped", tapped.any { it.startsWith("androidApp") && it.contains("solutions.ormus.logos") })
         assertTrue("$tapped", tapped.none { it.startsWith("terminal") })
+    }
+
+    // Mercurio before 1.27.97 (versionCode 12797000) sends this intent down its Herdr TUI path, and so does any build
+    // when the names are blank: the tap opens Mercurio itself then.
+    private val mercurio = """[{"package": "solutions.ormus.logos", "label": "Mercurio", "versionCode": 12797000}]"""
+
+    @Test fun theCardThatNeedsHim_opensTheAgentInMercurio() {
+        val program = compile("10-sessions.owl")
+        val t = TileHost(program, feed(agent("blocked", "t21")))
+        t.set("apps", Json.parse(mercurio))
+        val taps = t.tapAll(program.root)
+        assertTrue("$taps", opensInMercurio(taps, "sg", "t21", names = "sg,sg.tail.ts.net"))
+    }
+
+    @Test fun aLinkWithNoNames_orAMercurioBefore1_27_97_opensMercurioItself() {
+        val program = compile("10-sessions.owl")
+        val noNames = TileHost(program, feed(agent("working", "t15"), hosts = "{}"))
+        noNames.set("apps", Json.parse(mercurio))
+        val a = noNames.tap(program.screen!!, "working RAV-1 claude · sg")
+        assertTrue("$a", a.any { it.startsWith("androidApp solutions.ormus.logos") } && a.none { it.startsWith("androidIntent") })
+
+        val old = TileHost(program, feed(agent("working", "t15")))
+        old.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio", "versionCode": 12796000}]"""))
+        val b = old.tap(program.screen!!, "working RAV-1 claude · sg")
+        assertTrue("$b", b.any { it.startsWith("androidApp solutions.ormus.logos") } && b.none { it.startsWith("androidIntent") })
     }
 
     @Test fun theSessionsTilePostsNoNotification_MercurioOwnsTheAlerts() {
@@ -102,9 +128,10 @@ class OrmusHerdrCoreTest {
         assertTrue("waiting first, then working, then idle: $lines", order.all { it >= 0 } && order == order.sorted())
         assertTrue("project and machine: $lines", "portals·mars" in lines)
         assertTrue("how long ago, from the agent's state time: $lines", "5m" in lines)
-        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio"}]"""))
+        t.set("apps", Json.parse(mercurio))
         val tapped = t.tap(program.root, "waiting needs you portals·mars 5m")
         assertTrue("$tapped", opensInMercurio(tapped, "mars", "t9"))
+        assertTrue("the project names the watch view's space: $tapped", tapped.any { it.contains("solutions.ormus.logos.extra.CORE_SPACE") && it.contains("PORTALS") })
     }
 
     @Test fun theMercurioTilesCountsAreTheFeedsTotalsNotTheShortLists() {
