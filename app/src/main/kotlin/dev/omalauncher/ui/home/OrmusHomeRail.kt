@@ -66,6 +66,7 @@ private const val HomeWaveSpread = 4.6f
 private val PanelRow = 40.dp
 private val PanelHeader = 48.dp
 private const val PanelMaxRows = 9
+private const val RailPoll = 400L
 
 /**
  * Omalauncher Ormus: Niagara's alphabet on the home screen. Sliding along the right edge bends the letters toward the
@@ -91,8 +92,12 @@ internal fun HomeLetterRail(
     var pinned by remember { mutableStateOf(false) }
     val touching = !touch.isNaN()
     val wave by animateFloatAsState(if (touching) 1f else 0f, label = "home letter wave")
-    val shownLetters by rememberUpdatedState(letters)
     val shownGroups by rememberUpdatedState(groups)
+    // A short rail shows every other letter or so, so each one stays whole; the touch picks among the ones shown.
+    val lineHeight = with(density) { (TextSize.Small * RailLineSpacing).toPx() }
+    val shown = railShown(letters.size, height, lineHeight)
+    val shownLetters by rememberUpdatedState(shown)
+    val allLetters by rememberUpdatedState(letters)
     if (letters.size < 2) return
 
     val apps: List<AndroidApp> = if (picked in letters.indices) groups[letters[picked]].orEmpty().take(PanelMaxRows) else emptyList()
@@ -158,7 +163,8 @@ internal fun HomeLetterRail(
                         var x = down.position.x
                         var y = down.position.y
                         fun follow() {
-                            val all = shownLetters
+                            val all = allLetters
+                            val shownNow = shownLetters
                             // Left of the wave the finger is over the list: pick the row under it instead of a letter.
                             if (x < -lean - 16.dp.toPx() && picked in all.indices) {
                                 val row = ((y - panelTop - headerPx) / rowPx).toInt()
@@ -170,7 +176,7 @@ internal fun HomeLetterRail(
                             }
                             hover = -1
                             touch = y
-                            val i = (y / height * all.size).toInt().coerceIn(0, all.lastIndex)
+                            val i = railPick(y, height, shownNow)
                             if (i != picked) {
                                 picked = i
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -188,7 +194,7 @@ internal fun HomeLetterRail(
                             y = change.position.y
                             follow()
                         }
-                        val all = shownLetters
+                        val all = allLetters
                         val target = if (picked in all.indices) shownGroups[all[picked]].orEmpty().getOrNull(hover) else null
                         touch = Float.NaN
                         hover = -1
@@ -196,13 +202,13 @@ internal fun HomeLetterRail(
                     }
                 },
         ) {
-            letters.forEachIndexed { i, letter ->
+            shown.forEachIndexed { k, i ->
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     BasicText(
-                        letter.toString(),
+                        letters[i].toString(),
                         Modifier.graphicsLayer {
                             val slot = height.toFloat() / shownLetters.size
-                            val d = if (touch.isNaN()) Float.POSITIVE_INFINITY else (touch - slot * (i + 0.5f)) / (slot * HomeWaveSpread)
+                            val d = if (touch.isNaN()) Float.POSITIVE_INFINITY else (touch - slot * (k + 0.5f)) / (slot * HomeWaveSpread)
                             translationX = -HomeWaveLean.toPx() * exp(-d * d / 2f) * wave
                         },
                         style = Mono.copy(color = if (i == picked && (touching || pinned)) Palette.accent else Palette.muted, fontSize = TextSize.Small, textAlign = TextAlign.Center),
@@ -228,11 +234,12 @@ internal fun Modifier.homeRailBounds(
     @OptIn(ExperimentalLayoutApi::class)
     val bars = (if (LauncherStyle.style[Style.STATUS_BAR_SHOWN]) WindowInsets.systemBarsIgnoringVisibility else WindowInsets.systemBars).union(WindowInsets.displayCutout)
     val top = with(density) { bars.getTop(density).toDp() } + EdgeGap
-    // The grid's size is plain fields HomeGrid sets once laid out, not state: asked again until it's there.
+    // The grid's size is plain fields HomeGrid sets when laid out, not state: asked again for as long as the rail is on
+    // screen, since the grid can change (keyboard, insets, another app) and the rail goes with it.
     val tall by produceState<Float?>(null, layout) {
         followRail(
             read = { railTall(layout.gridSize()?.second, layout.geometry?.second) },
-            pause = { delay(100) },
+            pause = { delay(RailPoll) },
             emit = { value = it },
         )
     }
@@ -243,18 +250,44 @@ internal fun Modifier.homeRailBounds(
 /** The height of the grid's rows, or null until HomeGrid has reported both the rows and the cell. */
 internal fun railTall(rows: Int?, cell: Float?): Float? = if (rows != null && cell != null) rows * cell else null
 
-/** Reads the rail's height with [read], asking again after each [pause], and hands each height it finds to [emit]. */
+/** Reads the rail's height with [read] after each [pause], for as long as it runs, and hands each new height to [emit]. */
 internal suspend fun followRail(
     read: () -> Float?,
     pause: suspend () -> Unit,
     emit: (Float) -> Unit,
 ) {
+    var last: Float? = null
     while (true) {
         val now = read()
-        if (now != null) {
+        if (now != null && now != last) {
+            last = now
             emit(now)
-            break
         }
         pause()
     }
 }
+
+/** A letter's line is about this much taller than its font size. */
+private const val RailLineSpacing = 1.25f
+
+/**
+ * The letters (indexes into the rail's [count]) a rail [height] px tall shows, each in a slot at least [line] px high so
+ * none is squeezed or clipped: all of them when they fit, else evenly spread from the first to the last.
+ */
+internal fun railShown(
+    count: Int,
+    height: Int,
+    line: Float,
+): List<Int> {
+    if (count <= 2 || height <= 0 || line <= 0f) return List(count) { it }
+    val fit = (height / line).toInt().coerceIn(2, count)
+    if (fit >= count) return List(count) { it }
+    return List(fit) { k -> (k * (count - 1).toFloat() / (fit - 1)).roundToInt() }
+}
+
+/** The letter (an entry of [shown]) under [y] px on a rail [height] px tall whose slots hold the [shown] letters. */
+internal fun railPick(
+    y: Float,
+    height: Int,
+    shown: List<Int>,
+): Int = shown[(y / height * shown.size).toInt().coerceIn(0, shown.lastIndex)]

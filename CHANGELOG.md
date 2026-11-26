@@ -8,6 +8,9 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The home A-Z rail follows the grid's height for as long as it is on screen, instead of keeping the height it first saw:
+  the letters no longer squeeze together after the grid changes size (keyboard, another app, a rotation). When the
+  rail really is short it shows fewer letters, each whole, and the touch picks among those shown.
 - The sessions tile and the four board tiles free their answer keys again when sg's reply comes: after one tap on a card's
   answer key the keys stayed on "..." for every card until the widget restarted. Now the reply shows "unlocked" or why it
   did not go, an empty answer says "sg did not answer", a late reply of an older tap is ignored, and with no reply at all
