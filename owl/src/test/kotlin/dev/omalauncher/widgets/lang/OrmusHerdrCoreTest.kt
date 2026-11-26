@@ -7,8 +7,9 @@ import org.junit.Test
 
 /**
  * The tiles that reach Ormus's agents use herdr-core alone (Ormus, 2026-11-15: "make sure that mercurio and all widgets
- * are connected properly to herdr core and not to old herdr tui workboard/terminals"): a tap attaches the launcher's
- * terminal with `hc attach`, the Mercurio tile reads sg's sessions feed, and the kiosk starts its agent with `hc run`.
+ * are connected properly to herdr core and not to old herdr tui workboard/terminals"): a tap opens the agent's
+ * herdr-core terminal in Mercurio (Ormus, 2026-11-26: one app owns alerts, opening and answering agents, and that app
+ * is Mercurio), the Mercurio tile reads sg's sessions feed, and the kiosk starts its agent with `hc run`.
  */
 class OrmusHerdrCoreTest {
     private fun compile(name: String) = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/$name").readText())
@@ -31,7 +32,7 @@ class OrmusHerdrCoreTest {
         return Json.parse(
             """{"ok": true, "code": 200, "out": {"generated": 1794166000, "machines": $machines, "errors": {}, "needs": 0,
             "agents": ${totals ?: "{$counts}"}, "waiting": 0, "unsorted": [],
-            "links": {"sg": "ssh://ormus@sg:22#sg"}, "hosts": {"sg": ["sg"]}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
+            "links": {"sg": "ssh://ormus@sg:22#sg", "mars": "ssh://ops@mars:22#mars"}, "hosts": {"sg": ["sg", "sg.tail.ts.net"], "mars": ["mars"]}, "game": {"today": 0, "into": 0, "need": 3, "level": 1, "streak": 0}, "moves": [],
             "boards": [{"name": "raven", "agents": {$counts}, "waiting": 0,
               "projects": [{"name": "PORTALS", "agents": {$counts}, "chats": [], "top": [${agents.joinToString(",")}]}]}]}}""",
         )
@@ -42,6 +43,19 @@ class OrmusHerdrCoreTest {
         machine: String,
         pane: String,
     ) = actions.any { it.startsWith("terminal ssh -t ") && it.contains(machine) && it.contains("exec hc attach $pane") }
+
+    // Mercurio's core watch from a launcher's tap (Mercurio #350): the machine's link and tailnet names, the terminal's
+    // address, and no session (a session name is its Herdr TUI path).
+    private fun opensInMercurio(
+        actions: List<String>,
+        machine: String,
+        pane: String,
+        names: String = machine,
+    ) = actions.any {
+        it.startsWith("androidIntent") && it.contains("solutions.ormus.logos") && it.contains("org.connectbot.ui.MainActivity") &&
+            it.contains("ssh://") && it.contains("@$machine:22") && it.contains("solutions.ormus.logos.extra.CORE_ADDRESS") &&
+            it.contains(pane) && it.contains("solutions.ormus.logos.extra.HERD_HOSTS") && it.contains(names) && !it.contains("HERD_SESSION")
+    } && actions.none { it.startsWith("terminal") }
 
     @Test fun noOrmusTileCallsTheOldHerdrTui() {
         val dir = java.io.File("../app/src/main/assets/ormus/widgets")
@@ -54,16 +68,32 @@ class OrmusHerdrCoreTest {
         assertEquals("tiles that open Mercurio's Herdr path", emptyList<String>(), herd)
     }
 
-    @Test fun aHerdrCoreAgentsRowOnTheSessionsScreenAttachesWithHc() {
+    @Test fun aHerdrCoreAgentsRowOnTheSessionsScreenOpensItInMercurio() {
         val program = compile("10-sessions.owl")
         val t = TileHost(program, feed(agent("working", "t15")))
         t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos.debug", "label": "Mercurio"}]"""))
         val tapped = t.tap(program.screen!!, "working RAV-1 claude · sg")
-        assertTrue("$tapped", attaches(tapped, "sg", "t15"))
-        assertFalse("no Mercurio intent that would start a TUI session: $tapped", tapped.any { it.contains("HERD_SESSION") })
+        assertTrue("$tapped", opensInMercurio(tapped, "sg", "t15", names = "sg,sg.tail.ts.net"))
+        assertTrue("the tab names the watch view: $tapped", tapped.any { it.contains("solutions.ormus.logos.extra.CORE_TAB") && it.contains("4 · RAV-1") })
     }
 
-    @Test fun theMercurioTileListsEveryMachinesAgentsFromTheFeedAndAttachesWithHc() {
+    @Test fun anAgentOnAMachineWithNoLink_opensMercurio_neverTheLaunchersTerminal() {
+        val program = compile("10-sessions.owl")
+        val t = TileHost(program, feed(agent("working", "t4", machine = "sun", title = "builds")))
+        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio"}]"""))
+        val tapped = t.tap(program.screen!!, "working builds claude · sun")
+        assertTrue("$tapped", tapped.any { it.startsWith("androidApp") && it.contains("solutions.ormus.logos") })
+        assertTrue("$tapped", tapped.none { it.startsWith("terminal") })
+    }
+
+    @Test fun theSessionsTilePostsNoNotification_MercurioOwnsTheAlerts() {
+        // Ormus, 2026-11-26 ("Adopt it"): only Mercurio alerts; the launcher keeps the home-screen glance.
+        val text = java.io.File("../app/src/main/assets/ormus/widgets/10-sessions.owl").readText()
+        assertFalse("10-sessions.owl still posts a notification", Regex("""\bnotify\(""").containsMatchIn(text))
+        assertFalse("10-sessions.owl still takes an alert from sg", text.contains("on alert"))
+    }
+
+    @Test fun theMercurioTileListsEveryMachinesAgentsFromTheFeedAndOpensThemInMercurio() {
         val program = compile("30-mercurio.owl")
         val t = TileHost(program, feed(agent("idle", "t3", title = "old one"), agent("blocked", "t9", machine = "mars", title = "needs you"), agent("working", "t4", machine = "sun", title = "builds")))
         val lines = t.lines(program.root)
@@ -72,7 +102,9 @@ class OrmusHerdrCoreTest {
         assertTrue("waiting first, then working, then idle: $lines", order.all { it >= 0 } && order == order.sorted())
         assertTrue("project and machine: $lines", "portals·mars" in lines)
         assertTrue("how long ago, from the agent's state time: $lines", "5m" in lines)
-        assertTrue(attaches(t.tap(program.root, "waiting needs you portals·mars 5m"), "mars", "t9"))
+        t.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio"}]"""))
+        val tapped = t.tap(program.root, "waiting needs you portals·mars 5m")
+        assertTrue("$tapped", opensInMercurio(tapped, "mars", "t9"))
     }
 
     @Test fun theMercurioTilesCountsAreTheFeedsTotalsNotTheShortLists() {
