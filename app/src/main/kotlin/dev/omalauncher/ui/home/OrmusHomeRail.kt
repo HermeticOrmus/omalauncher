@@ -230,16 +230,31 @@ internal fun Modifier.homeRailBounds(
     val top = with(density) { bars.getTop(density).toDp() } + EdgeGap
     // The grid's size is plain fields HomeGrid sets once laid out, not state: asked again until it's there.
     val tall by produceState<Float?>(null, layout) {
-        while (true) {
-            val rows = layout.gridSize()?.second
-            val cell = layout.geometry?.second
-            if (rows != null && cell != null) {
-                value = rows * cell
-                break
-            }
-            delay(100)
-        }
+        followRail(
+            read = { railTall(layout.gridSize()?.second, layout.geometry?.second) },
+            pause = { delay(100) },
+            emit = { value = it },
+        )
     }
     val h = tall
     return if (h == null) fillMaxHeight().padding(top = top, bottom = barRoom) else padding(top = top).height(with(density) { h.toDp() })
+}
+
+/** The height of the grid's rows, or null until HomeGrid has reported both the rows and the cell. */
+internal fun railTall(rows: Int?, cell: Float?): Float? = if (rows != null && cell != null) rows * cell else null
+
+/** Reads the rail's height with [read], asking again after each [pause], and hands each height it finds to [emit]. */
+internal suspend fun followRail(
+    read: () -> Float?,
+    pause: suspend () -> Unit,
+    emit: (Float) -> Unit,
+) {
+    while (true) {
+        val now = read()
+        if (now != null) {
+            emit(now)
+            break
+        }
+        pause()
+    }
 }
