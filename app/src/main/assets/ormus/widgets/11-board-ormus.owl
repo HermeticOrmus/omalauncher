@@ -15,6 +15,9 @@ widget "sessions-ormus" {
   // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
   source apps = android.apps every 10m
   let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+  // Mercurio opens a herdr-core terminal from a launcher's tap since 1.27.97 (versionCode 12797000); a build before
+  // it sends the same intent down its old Herdr TUI path, so a tap opens Mercurio itself there.
+  let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
 
   // One-tap answers. `busy` is the question being answered, `sent` what came back for it, and `said` the line shown
   // for it. sg's answer tool checks everything again before a key goes to the agent. What comes back is wrapped as
@@ -326,12 +329,12 @@ widget "sessions-ormus" {
   component Item(i, where) {
     Box {
       onTap: {
-        if i.session == "core" && mercurio != null && get(links, i.machine, null) != null {
+        if i.session == "core" && watches && get(links, i.machine, null) != null && len(get(hosts, i.machine, [])) > 0 {
           // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
           // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": i.pane, "solutions.ormus.logos.extra.CORE_SPACE": i.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": i.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
         } else {
-          // No link for the machine, or no herdr-core agent: Mercurio itself.
+          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
@@ -355,12 +358,12 @@ widget "sessions-ormus" {
     Box {
       fill: width
       onTap: {
-        if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+        if a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 {
           // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
           // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
-          // No link for the machine, or no herdr-core agent: Mercurio itself.
+          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }
@@ -394,7 +397,7 @@ widget "sessions-ormus" {
   // `summary`: the dialog's heading and the agent's line about the command, a pick list's question, what the agent
   // needs at a free prompt), under it where it is; then numbered keys that move it forward: on the tile (`compact`:
   // little room) up to three (`choices`: the dialog's answers, or his replies at a free prompt), on the screen every
-  // answer the dialog offers. A tap anywhere else on the card attaches to the agent's terminal. The tile's card shows
+  // answer the dialog offers. A tap anywhere else on the card opens the agent in Mercurio. The tile's card shows
   // no command, but the first line of one whose summary is the agent's own line about it; the screen also shows
   // the question, what a yes would run and why, and the whole command (`wide` is the characters one line holds).
   // A command the screen did not show whole, or too long to carry, has no keys anywhere, whatever the feed says:
@@ -406,12 +409,12 @@ widget "sessions-ormus" {
       radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: {
-        if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+        if a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 {
           // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
           // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
           androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
         } else {
-          // No link for the machine, or no herdr-core agent: Mercurio itself.
+          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
           androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
         }
       }

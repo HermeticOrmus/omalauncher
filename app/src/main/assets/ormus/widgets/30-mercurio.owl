@@ -42,6 +42,9 @@ widget "mercurio" {
   // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
   source apps = android.apps every 10m
   let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+  // Mercurio opens a herdr-core terminal from a launcher's tap since 1.27.97 (versionCode 12797000); a build before
+  // it sends the same intent down its old Herdr TUI path, so a tap opens Mercurio itself there.
+  let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
   onTap: androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
 
   component AgentLine(a) {
@@ -74,12 +77,12 @@ widget "mercurio" {
       // A tap opens the agent in Mercurio.
       Box {
         onTap: {
-          if a.session == "core" && mercurio != null && get(links, a.machine, null) != null {
+          if a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 {
             // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
             // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
-            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
+            androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.ws ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
           } else {
-            // No link for the machine, or no herdr-core agent: Mercurio itself.
+            // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
             androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
           }
         }
