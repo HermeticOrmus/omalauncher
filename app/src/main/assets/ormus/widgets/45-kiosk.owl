@@ -103,7 +103,7 @@ except Exception as e:
     opening = ""
     if got != null && got.ok && got.pane != null {
       haptic()
-      // The launcher's own terminal attaches to the new agent (Mercurio opens no herdr-core terminal from a tap yet).
+      // The launcher's own terminal attaches to the agent it just started: starting agents stays the launcher's (2026-11-26).
       terminal("ssh -t sg ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + got.pane)}", got.title ?? "mercury")
     } else {
       note = got != null && got.err != null && got.err != "" ? got.err : "sg did not open a session"

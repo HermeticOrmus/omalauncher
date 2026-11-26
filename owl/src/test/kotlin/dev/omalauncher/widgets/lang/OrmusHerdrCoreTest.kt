@@ -26,7 +26,7 @@ class OrmusHerdrCoreTest {
         vararg agents: String,
         machines: String = """{"sg": "ok", "sun": "ok", "mars": "ok"}""",
         totals: String? = null,
-        hosts: String = """{"sg": ["sg", "sg.tail.ts.net"], "mars": ["mars"]}""",
+        hosts: String = """{"sg": ["sg", "sg.tail.ts.net"], "mars": ["mars", "mars.tail.ts.net"]}""",
     ): Value {
         // The counts by state, as the feed writes them beside the agents.
         val counts = listOf("blocked", "working", "done", "idle").joinToString(", ") { s -> "\"$s\": ${agents.count { it.contains("\"status\": \"$s\"") }}" }
@@ -97,6 +97,9 @@ class OrmusHerdrCoreTest {
         t.set("apps", Json.parse(mercurio))
         val taps = t.tapAll(program.root)
         assertTrue("$taps", opensInMercurio(taps, "sg", "t21", names = "sg,sg.tail.ts.net"))
+        // The card's own tap and its "open in Mercurio" key: both the intent, neither Mercurio's home.
+        assertEquals("$taps", 2, taps.count { it.startsWith("androidIntent") })
+        assertTrue("$taps", taps.none { it.startsWith("androidApp") })
     }
 
     @Test fun aLinkWithNoNames_orAMercurioBefore1_27_97_opensMercurioItself() {
@@ -130,7 +133,7 @@ class OrmusHerdrCoreTest {
         assertTrue("how long ago, from the agent's state time: $lines", "5m" in lines)
         t.set("apps", Json.parse(mercurio))
         val tapped = t.tap(program.root, "waiting needs you portals·mars 5m")
-        assertTrue("$tapped", opensInMercurio(tapped, "mars", "t9"))
+        assertTrue("$tapped", opensInMercurio(tapped, "mars", "t9", names = "mars,mars.tail.ts.net"))
         assertTrue("the project names the watch view's space: $tapped", tapped.any { it.contains("solutions.ormus.logos.extra.CORE_SPACE") && it.contains("PORTALS") })
     }
 
