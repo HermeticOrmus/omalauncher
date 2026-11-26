@@ -21,6 +21,12 @@ widget "sessions-ormus" {
   // {"n": a number of its own, "r": the tool's answer}, so two equal answers in a row still count as two.
   state busy = ""
   state sent = ""
+  // The tap's own number (`n` in what comes back) and when it was tapped (`now`'s clock): an answer of an older request
+  // that comes late is not taken for the last one's, and an answer that never comes frees the keys (see `on now`).
+  // `sentFor` is the question of the last request, kept after `busy` is let go, so a late answer still shows on its card.
+  state sentMark = 0
+  state busyAt = 0
+  state sentFor = ""
   state said = ""
   // The question `said` is about, so the line shows on that card, or under the headline when another card shows.
   state saidFor = ""
@@ -87,12 +93,40 @@ widget "sessions-ormus" {
   // up to 8 to connect, and `now` ticks a minute at a time, so a tap's `actAt` is up to a minute older than the tap. At
   // 180 s on that clock at least two minutes have passed. It does not say "try again": the words may have been typed.
   on now {
+    // An answer that never comes (the shell died, the run timed out without a word) would keep every answer key dead.
+    // The tap's `busyAt` is up to a minute older than the tap (`now` ticks a minute at a time), so at 90 s on that
+    // clock at least 30 have passed (ssh takes 8 to connect). It does not say "try again": the key may have gone.
+    if busy != "" && now - busyAt >= 90 {
+      saidFor = busy
+      busy = ""
+      said = "no answer: open the agent to check"
+    }
     if act != "" && now - actAt >= 180 {
       actFor = act
       act = ""
       actN = 0
       actLine = "no answer: look on the desk before typing again"
       actRed = true
+    }
+  }
+
+  on sent {
+    let got = parseJson(value ?? "")
+    // Another request's answer, late: the last one's own answer is still to come, so this one changes nothing.
+    let late = sentMark > 0 && got != null && got.n != null && got.n != sentMark
+    if !late {
+      let reply = got != null ? got.r : null
+      // The question it is for: the one still busy, or, after the clock freed it, the last one sent from.
+      saidFor = busy != "" ? busy : sentFor
+      busy = ""
+      dragX = 0
+      if reply != null && reply.ok {
+        haptic()
+        said = "unlocked${reply.game != null ? " · ${reply.game.today} today" : ""}"
+      } else {
+        said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "not confirmed: open the agent" : "it did not go through: open the agent"
+      }
+      refresh()
     }
   }
 
@@ -352,8 +386,11 @@ widget "sessions-ormus" {
       onTap: {
         if busy == "" {
           busy = q
+          sentFor = q
+          sentMark = 1 + int(random(1000000000))
+          busyAt = now ?? 0
           said = ""
-          sent = run("printf '{\"n\":%s,\"r\":' ${int(random(1000000000))}; printf %s ${sh(toJson(merge({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, term: a.term ?? ""}, o.key != null ? {key: o.key} : {n: n, label: o.label})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -; printf '}'")
+          sent = run("r=$(printf %s ${sh(toJson(merge({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, term: a.term ?? ""}, o.key != null ? {key: o.key} : {n: n, label: o.label})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${sentMark} \"$r\" $x")
         }
       }
       Key { word: busy == q ? "…" : "${n} ${o.label}"; strong: strong }

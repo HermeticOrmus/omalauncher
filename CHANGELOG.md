@@ -8,6 +8,10 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The sessions tile and the four board tiles free their answer keys again when sg's reply comes: after one tap on a card's
+  answer key the keys stayed on "..." for every card until the widget restarted. Now the reply shows "unlocked" or why it
+  did not go, an empty answer says "sg did not answer", a late reply of an older tap is ignored, and with no reply at all
+  the keys come free after a minute or two with "no answer: open the agent to check", never "try again".
 - The widgets' dictation, the key bar's mic among them, hears with Ormus's voice: the take is recorded in memory and
   sent once, as it ends, to voice-flow-api on sg (over the tailnet), the engine of his desktop dictation and of Ormus
   Keys Voice, not to the phone's recognizer, and with no fallback to it. The mic shows "..." while sg works on the
