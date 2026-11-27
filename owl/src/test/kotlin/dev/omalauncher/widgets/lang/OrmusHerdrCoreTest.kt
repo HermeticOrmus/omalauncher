@@ -174,8 +174,9 @@ class OrmusHerdrCoreTest {
     private fun kiosk(
         apps: String,
         sessions: Value = feed(agent("idle", "t1")),
+        f: String = kioskFeed,
     ): TileHost {
-        val t = TileHost(compile("45-kiosk.owl"), Json.parse(kioskFeed))
+        val t = TileHost(compile("45-kiosk.owl"), Json.parse(f))
         t.set("apps", Json.parse(apps))
         t.set("sess", sessions)
         return t
@@ -249,10 +250,32 @@ class OrmusHerdrCoreTest {
         assertFalse("no \"started\" line without the intent", "started: open in Mercurio" in t.lines(program.root))
     }
 
-    @Test fun aFailedStartLeavesNoStartedLine() {
+    // A start that follows a started one clears its line at the double tap, so a failed start leaves nothing of the old one.
+    @Test fun aFailedStartAfterAStartedOneLeavesNoStartedLine() {
         val program = compile("45-kiosk.owl")
-        val t = kiosk(mercurio)
+        val picked = """{"ok": true, "code": 200, "out": {"generated": 1794166000, "picked": 1794166000, "errors": {}, "news": {"picked": 1794166000, "items": [{"title": "An article", "url": "https://example.test/a"}]}}}"""
+        val t = kiosk(mercurio, f = picked)
+        t.fire("spun", Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}"""))
+        assertTrue("${t.lines(program.root)}", "started: open in Mercurio" in t.lines(program.root))
+        t.tapAll(program.root)
+        t.tapAll(program.root)
         t.fire("spun", Str("""{"n": 2, "r": {"ok": false, "err": "hc run failed"}}"""))
+        assertEquals("hc run failed", t.text("note"))
         assertTrue("${t.lines(program.root)}", t.lines(program.root).none { it.startsWith("started") || it.startsWith("opened Mercurio") })
+    }
+
+    @Test fun theLineSaysWhyMercurioOpenedItselfOrThatItIsNotThere() {
+        val program = compile("45-kiosk.owl")
+        val answer = Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}""")
+        val old = kiosk("""[{"package": "solutions.ormus.logos", "label": "Mercurio", "versionCode": 12796000}]""")
+        old.fire("spun", answer)
+        assertTrue("${old.lines(program.root)}", "opened Mercurio (update it to open the agent)" in old.lines(program.root))
+        val noNames = kiosk(mercurio, sessions = feed(agent("idle", "t1"), hosts = "{}"))
+        noNames.fire("spun", answer)
+        assertTrue("${noNames.lines(program.root)}", "opened Mercurio (no link to sg yet)" in noNames.lines(program.root))
+        val missing = kiosk("[]")
+        missing.fire("spun", answer)
+        assertTrue("${missing.lines(program.root)}", "Mercurio is not installed" in missing.lines(program.root))
+        assertTrue("it does not claim it opened: ${missing.lines(program.root)}", missing.lines(program.root).none { it.startsWith("opened Mercurio") } && missing.actions.none { it.startsWith("android") })
     }
 }
