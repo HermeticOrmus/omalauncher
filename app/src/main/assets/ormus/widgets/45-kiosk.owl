@@ -4,7 +4,7 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.5"; license: "MIT"; category: "news" }
+  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.6"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
@@ -34,7 +34,8 @@ widget "kiosk" {
   state opening = ""
   state note = ""
   // What the last start left: "link" (Mercurio was opened on the agent, and a line in the tile opens it again), "app"
-  // (no link to sg yet: Mercurio's front page opened, and the line says so), or "". An activity started from a trigger
+  // (no link or names for sg yet: Mercurio's front page opened), "old" (Mercurio before 1.27.97: its front page opened),
+  // "missing" (no Mercurio on the phone: nothing opened), or "". The line says which. An activity started from a trigger
   // can be blocked once he has left the home screen, so the line keeps the way in visible.
   state started = ""
   state startedPane = ""
@@ -130,9 +131,14 @@ except Exception as e:
       if watches && sgLink != null && len(sgNames) > 0 {
         started = "link"
         androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": got.pane, "solutions.ormus.logos.extra.CORE_SPACE": "", "solutions.ormus.logos.extra.CORE_TAB": got.title ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(sgNames, ",")}})
+      } else if mercurio == null {
+        started = "missing"
+      } else if !watches {
+        started = "old"
+        androidApp(mercurio.package)
       } else {
         started = "app"
-        androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+        androidApp(mercurio.package)
       }
     } else {
       // The reason shows in the tile's header and on its screen.
@@ -215,6 +221,10 @@ except Exception as e:
       }
     } else if started == "app" {
       Text { text: "opened Mercurio (no link to sg yet)"; style: small; color: muted; maxLines: 1 }
+    } else if started == "old" {
+      Text { text: "opened Mercurio (update it to open the agent)"; style: small; color: muted; maxLines: 1 }
+    } else if started == "missing" {
+      Text { text: "Mercurio is not installed"; style: small; color: red; maxLines: 1 }
     }
     if data != null && n == 0 {
       Text { text: "nothing picked yet"; style: body; color: muted }

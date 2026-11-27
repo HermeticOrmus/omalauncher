@@ -12,7 +12,7 @@ What this fork adds to the release below it; none of it is in the Play build.
   `ssh … hc attach` terminal, and a session that did not start shows its reason in the tile's header, not as a
   notification. It reads sg's link and tailnet names for Mercurio from the sessions feed, every ten minutes. After a start the tile
   keeps a line, "started: open in Mercurio", that opens the agent again (Android can block an activity started
-  while he is off the home screen), or says "opened Mercurio (no link to sg yet)". The Do Not Disturb row of the
+  while he is off the home screen), or says why Mercurio only opened itself ("no link to sg yet", "update it to open the agent") or that it is not installed. The Do Not Disturb row of the
   sessions screen stays: it is his phone-wide switch. A card the feed marks answered says "answered". No Ormus widget
   attaches a terminal or posts a notification any more (Ormus, 2026-11-26: Mercurio owns alerts, opening and answering
   agents; the launcher keeps starting them).
