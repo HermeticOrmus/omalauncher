@@ -115,6 +115,28 @@ class OrmusHerdrCoreTest {
         assertTrue("$b", b.any { it.startsWith("androidApp solutions.ormus.logos") } && b.none { it.startsWith("androidIntent") })
     }
 
+    // The card's own tap and its key take the same two ways as a row of the screen's list: the intent, or Mercurio itself.
+    @Test fun aCardWithNoNames_orAMercurioBefore1_27_97_opensMercurioItselfOnItsTapAndItsKey() {
+        val program = compile("10-sessions.owl")
+        val noNames = TileHost(program, feed(agent("blocked", "t21"), hosts = "{}"))
+        noNames.set("apps", Json.parse(mercurio))
+        val a = noNames.tapAll(program.root)
+        assertEquals("$a", 2, a.count { it.startsWith("androidApp solutions.ormus.logos") })
+        assertTrue("$a", a.none { it.startsWith("androidIntent") })
+
+        val old = TileHost(program, feed(agent("blocked", "t21")))
+        old.set("apps", Json.parse("""[{"package": "solutions.ormus.logos", "label": "Mercurio", "versionCode": 12796000}]"""))
+        val b = old.tapAll(program.root)
+        assertEquals("$b", 2, b.count { it.startsWith("androidApp solutions.ormus.logos") })
+        assertTrue("$b", b.none { it.startsWith("androidIntent") })
+
+        // A card of another agent kind than herdr-core opens Mercurio itself as well, whatever the names.
+        val other = TileHost(program, feed(agent("blocked", "t21").replace("\"session\": \"core\"", "\"session\": \"raven\"")))
+        other.set("apps", Json.parse(mercurio))
+        val c = other.tapAll(program.root)
+        assertEquals("$c", 2, c.count { it.startsWith("androidApp solutions.ormus.logos") })
+    }
+
     @Test fun theSessionsTilePostsNoNotification_MercurioOwnsTheAlerts() {
         // Ormus, 2026-11-26 ("Adopt it"): only Mercurio alerts; the launcher keeps the home-screen glance.
         val text = java.io.File("../app/src/main/assets/ormus/widgets/10-sessions.owl").readText()
