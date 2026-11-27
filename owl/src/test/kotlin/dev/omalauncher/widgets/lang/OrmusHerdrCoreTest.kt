@@ -9,7 +9,7 @@ import org.junit.Test
  * The tiles that reach Ormus's agents use herdr-core alone (Ormus, 2026-11-15: "make sure that mercurio and all widgets
  * are connected properly to herdr core and not to old herdr tui workboard/terminals"): a tap opens the agent's
  * herdr-core terminal in Mercurio (Ormus, 2026-11-26: one app owns alerts, opening and answering agents, and that app
- * is Mercurio), the Mercurio tile reads sg's sessions feed, and the kiosk starts its agent with `hc run`.
+ * is Mercurio), the Mercurio tile reads sg's sessions feed, and the kiosk starts its agent with `hc run` and opens it in Mercurio.
  */
 class OrmusHerdrCoreTest {
     private fun compile(name: String) = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/$name").readText())
@@ -38,12 +38,6 @@ class OrmusHerdrCoreTest {
               "projects": [{"name": "PORTALS", "agents": {$counts}, "chats": [], "top": [${agents.joinToString(",")}]}]}]}}""",
         )
     }
-
-    private fun attaches(
-        actions: List<String>,
-        machine: String,
-        pane: String,
-    ) = actions.any { it.startsWith("terminal ssh -t ") && it.contains(machine) && it.contains("exec hc attach $pane") }
 
     // Mercurio's core watch from a launcher's tap (Mercurio #350): the machine's link and tailnet names, the terminal's
     // address, and no session (a session name is its Herdr TUI path).
@@ -174,12 +168,60 @@ class OrmusHerdrCoreTest {
         assertTrue(down.lines(program.root).toString(), "sg doesn't answer" in down.lines(program.root))
     }
 
-    @Test fun theKioskStartsItsAgentWithHcRunAndAttachesToIt() {
-        val program = compile("45-kiosk.owl")
+    private val kioskFeed = """{"ok": true, "code": 200, "out": {"generated": 1794166000, "picks": [], "errors": {}}}"""
+
+    /** The kiosk's tile with the sessions feed that names sg (its link and tailnet names) and the apps of the phone. */
+    private fun kiosk(
+        apps: String,
+        sessions: Value = feed(agent("idle", "t1")),
+    ): TileHost {
+        val t = TileHost(compile("45-kiosk.owl"), Json.parse(kioskFeed))
+        t.set("apps", Json.parse(apps))
+        t.set("sess", sessions)
+        return t
+    }
+
+    @Test fun theKioskStartsItsAgentWithHcRunAndOpensItInMercurio() {
         val text = java.io.File("../app/src/main/assets/ormus/widgets/45-kiosk.owl").readText()
         assertTrue("hc run in the script sg runs", text.contains("\"hc\", \"run\", \"--bg\""))
-        val t = TileHost(program, Json.parse("""{"ok": true, "code": 200, "out": {"generated": 1794166000, "picks": [], "errors": {}}}"""))
+        val t = kiosk(mercurio)
         t.fire("spun", Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}"""))
-        assertTrue("${t.actions}", attaches(t.actions, "sg", "t77"))
+        assertTrue("${t.actions}", opensInMercurio(t.actions, "sg", "t77", names = "sg,sg.tail.ts.net"))
+    }
+
+    @Test fun theKioskOpensMercurioItselfWhenItHasNoNamesOrMercurioIsOlder() {
+        val answer = Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}""")
+        val noNames = kiosk(mercurio, sessions = feed(agent("idle", "t1"), hosts = "{}"))
+        noNames.fire("spun", answer)
+        assertTrue("${noNames.actions}", noNames.actions.any { it.startsWith("androidApp solutions.ormus.logos") } && noNames.actions.none { it.startsWith("androidIntent") || it.startsWith("terminal") })
+        val old = kiosk("""[{"package": "solutions.ormus.logos", "label": "Mercurio", "versionCode": 12796000}]""")
+        old.fire("spun", answer)
+        assertTrue("${old.actions}", old.actions.any { it.startsWith("androidApp solutions.ormus.logos") } && old.actions.none { it.startsWith("androidIntent") || it.startsWith("terminal") })
+    }
+
+    @Test fun aSessionThatDidNotStartShowsItsReasonInTheTileAndPostsNoNotification() {
+        val program = compile("45-kiosk.owl")
+        val t = TileHost(program, Json.parse(kioskFeed))
+        t.fire("spun", Str("""{"n": 2, "r": {"ok": false, "err": "hc run failed: no space"}}"""))
+        assertEquals("hc run failed: no space", t.text("note"))
+        assertTrue("the reason is in the tile's header: ${t.lines(program.root)}", "hc run failed: no space" in t.lines(program.root))
+        assertTrue("${t.actions}", t.actions.none { it.startsWith("notify") || it.startsWith("terminal") || it.startsWith("androidIntent") })
+    }
+
+    /** The code of a widget: its `//` comment lines taken out, so a comment that names what was cut does not count. */
+    private fun code(file: java.io.File) = file.readLines().filterNot { it.trimStart().startsWith("//") }.joinToString("\n")
+
+    @Test fun noOrmusWidgetAttachesATerminalOrPostsANotification_MercurioOwnsBoth() {
+        val dir = java.io.File("../app/src/main/assets/ormus/widgets")
+        val owls = dir.listFiles()!!.filter { it.extension == "owl" }
+        assertTrue("widgets found", owls.size > 5)
+        assertEquals("widgets with `hc attach` in their code", emptyList<String>(), owls.filter { code(it).contains("hc attach") }.map { it.name })
+        assertEquals("widgets that call notify(", emptyList<String>(), owls.filter { Regex("""\bnotify\(""").containsMatchIn(code(it)) }.map { it.name })
+    }
+
+    @Test fun theSessionsTileHasNoDoNotDisturbRow_ItOnlyServedItsOldAlerts() {
+        val text = code(java.io.File("../app/src/main/assets/ormus/widgets/10-sessions.owl"))
+        assertFalse("10-sessions.owl still reads the phone's modes", text.contains("android.modes"))
+        assertFalse("10-sessions.owl still sets Do Not Disturb", Regex("""\bdnd\(""").containsMatchIn(text))
     }
 }
