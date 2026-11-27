@@ -4,7 +4,7 @@ widget "sessions-ormus" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and up to three numbered keys that move it forward (the dialog's answers, or his replies at a free prompt); a tap on the card opens the agent in Mercurio; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.1"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and where it is, with a key that opens the agent in Mercurio, where he answers it; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.2"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -18,21 +18,6 @@ widget "sessions-ormus" {
   // Mercurio opens a herdr-core terminal from a launcher's tap since 1.27.97 (versionCode 12797000); a build before
   // it sends the same intent down its old Herdr TUI path, so a tap opens Mercurio itself there.
   let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
-
-  // One-tap answers. `busy` is the question being answered, `sent` what came back for it, and `said` the line shown
-  // for it. sg's answer tool checks everything again before a key goes to the agent. What comes back is wrapped as
-  // {"n": a number of its own, "r": the tool's answer}, so two equal answers in a row still count as two.
-  state busy = ""
-  state sent = ""
-  // The tap's own number (`n` in what comes back) and when it was tapped (`now`'s clock): an answer of an older request
-  // that comes late is not taken for the last one's, and an answer that never comes frees the keys (see `on now`).
-  // `sentFor` is the question of the last request, kept after `busy` is let go, so a late answer still shows on its card.
-  state sentMark = 0
-  state busyAt = 0
-  state sentFor = ""
-  state said = ""
-  // The question `said` is about, so the line shows on that card, or under the headline when another card shows.
-  state saidFor = ""
 
   // An agent in herdr-core is steered from the screen's list through sg's agent tool (ormus-feeds bin/agent): its
   // screen, a stop, a say. One request at a time: `act` is the agent being asked ("machine:session:pane"), `actDo` what
@@ -96,40 +81,12 @@ widget "sessions-ormus" {
   // up to 8 to connect, and `now` ticks a minute at a time, so a tap's `actAt` is up to a minute older than the tap. At
   // 180 s on that clock at least two minutes have passed. It does not say "try again": the words may have been typed.
   on now {
-    // An answer that never comes (the shell died, the run timed out without a word) would keep every answer key dead.
-    // The tap's `busyAt` is up to a minute older than the tap (`now` ticks a minute at a time), so at 90 s on that
-    // clock at least 30 have passed (ssh takes 8 to connect). It does not say "try again": the key may have gone.
-    if busy != "" && now - busyAt >= 90 {
-      saidFor = busy
-      busy = ""
-      said = "no answer: open the agent to check"
-    }
     if act != "" && now - actAt >= 180 {
       actFor = act
       act = ""
       actN = 0
       actLine = "no answer: look on the desk before typing again"
       actRed = true
-    }
-  }
-
-  on sent {
-    let got = parseJson(value ?? "")
-    // Another request's answer, late: the last one's own answer is still to come, so this one changes nothing.
-    let late = sentMark > 0 && got != null && got.n != null && got.n != sentMark
-    if !late {
-      let reply = got != null ? got.r : null
-      // The question it is for: the one still busy, or, after the clock freed it, the last one sent from.
-      saidFor = busy != "" ? busy : sentFor
-      busy = ""
-      dragX = 0
-      if reply != null && reply.ok {
-        haptic()
-        said = "unlocked${reply.game != null ? " · ${reply.game.today} today" : ""}"
-      } else {
-        said = reply == null ? "sg did not answer" : reply.outcome == "changed" ? "the question changed: look again" : reply.outcome == "not blocked" ? "already moving" : reply.outcome == "already answered" ? "already answered" : reply.outcome == "refused" ? "sg refused it" : reply.outcome == "not confirmed" ? "not confirmed: open the agent" : "it did not go through: open the agent"
-      }
-      refresh()
     }
   }
 
@@ -159,8 +116,8 @@ widget "sessions-ormus" {
   let peeked = peek == "" ? null : agents.find(a => "${a.machine}:${a.session}:${a.pane}" == peek)
   let peekHead = peeked == null ? "agent" : peeked.title != "" && peeked.title != "Claude Code" ? peeked.title : peeked.tab != "" ? peeked.tab : peeked.kind
 
-  // The cards: every agent that needs him, one at a time: first the ones one tap can answer, then the ones whose
-  // question the feed read but cannot answer from here, then the rest. `pick` is the card shown, by the agent's
+  // The cards: every agent that needs him, one at a time: first the ones whose question has choices, then the ones
+  // whose question the feed read with none, then the rest. `pick` is the card shown, by the agent's
   // place, so a card keeps its place when the list changes under it; a pick that is gone shows the first. `dragX`
   // is how far the finger has pulled the card sideways.
   let blocked = agents.filter(a => a.status == "blocked")
@@ -169,12 +126,10 @@ widget "sessions-ormus" {
   state pick = ""
   state dragX = 0
   let found = indexOf(ids, pick)
-  // A card is `pinned` while it is the one picked: only then are its keys live, so a refresh that puts another card
-  // in its place cannot take a tap meant for the one he read. The first card is pinned as the feed comes in.
+  // A card is `pinned` while it is the one picked; a pick that is gone shows the first. The first card is picked as the feed comes in.
   let pinned = found != null && found >= 0
   let at = pinned ? found : 0
   let card = len(cards) > 0 ? cards[at] : null
-  let shownQ = card == null ? "" : "${card.machine}:${card.session}:${card.pane}:${card.seq}:${card.ask != null ? card.ask.id : ""}"
   on f {
     stopAsk = ""
     if pick == "" && len(ids) > 0 {
@@ -183,8 +138,6 @@ widget "sessions-ormus" {
   }
   // What moves besides: the agents at work. The finished ones are on the screen.
   let rows = agents.filter(a => a.status == "working")
-  // Characters one line of a card's command holds at least (mono, 12 sp).
-  let wide = floor(((tileWidth ?? 360) - 64) / 7.5)
   // The card's label: what the blockage is, in one line (the feed's `summary`, else the question); with no ask,
   // what the agent needs, or its title. Bold at 17 sp it holds about 10 dp a character, and wraps once at most.
   let cardLabel = card == null ? "" : card.ask != null ? (card.ask.summary ?? ((card.ask.question ?? "") != "" ? card.ask.question : "needs you")) : (card.needs ?? (card.title != "" && card.title != "Claude Code" ? card.title : card.tab != "" && !endsWith(card.tab, "Shell") ? card.tab : "needs you"))
@@ -192,15 +145,10 @@ widget "sessions-ormus" {
   // A yes on the tile shows the command it approves: its first line, when the summary carries the agent's own line
   // about it instead (the feed's rule: a yes is offered only with the command).
   let cardCommand = card != null && card.ask != null && card.ask.approval && (card.ask.about ?? "") != "" && (card.ask.what ?? "") != ""
-  // The tile's keys go side by side when each numbered label fits its share of the width, else in a stack.
-  let cardKeys = card == null || card.ask == null ? [] : (card.ask.choices ?? [])
-  let cardPer = max(6, floor(wide * 7.5 / max(1, len(cardKeys)) / 9) - 3)
-  // The keys stack only once the card is pinned: before that the pin key is one row, whatever the labels.
-  let cardStack = pinned && len(cardKeys) > 0 && !(len(cardKeys) <= 3 && all(cardKeys, o => len(o.label) + 2 <= cardPer))
   // Rows the tile holds under the headline, the score and the card. Measured on the emulator at 420 dpi, font scale 1
-  // (2026-11-08): a card with one line of label and one row of keys is 126 dp, each stacked key 47 (its 41 and the
-  // gap), a second line of label 22, a line of command 16; the title and the headline above the card 81, a row 24.
-  let cardHeight = card == null ? 0 : (cardStack ? 79 + 47 * len(cardKeys) : 126) + 22 * (cardLabelRows - 1) + (cardCommand ? 16 : 0)
+  // (2026-11-08): a card with one line of label and one row of keys is 126 dp (the open key is the same height as a
+  // key then), a second line of label 22, a line of command 16; the title and the headline above the card 81, a row 24.
+  let cardHeight = card == null ? 0 : 126 + 22 * (cardLabelRows - 1) + (cardCommand ? 16 : 0)
   let room = max(0, floor(((tileHeight ?? 400) - 100 - cardHeight) / 28))
 
   component Age(m) {
@@ -342,14 +290,14 @@ widget "sessions-ormus" {
     }
   }
 
-  // A key: a wide button a thumb finds. `strong` is the one answer the card leads with.
-  component Key(word, strong = false) {
+  // A key: a wide button a thumb finds.
+  component Key(word) {
     Box {
       fill: width
       padding: [14, 12]
       radius: 8 * corners
-      background: strong ? accent : alpha(foreground, 0.09)
-      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2; color: strong ? background : foreground }
+      background: alpha(foreground, 0.09)
+      Text { text: word; fontSize: 15; bold: true; align: center; maxLines: 2; color: foreground }
     }
   }
 
@@ -371,38 +319,13 @@ widget "sessions-ormus" {
     }
   }
 
-  // One choice, numbered: a dialog's answer sends its key, a reply at a free prompt sends its number and the label
-  // this key showed (the text is sg's, from his registry, and sg sends it only when it is still that label; the
-  // phone never sends text of its own). It goes to sg's answer tool as JSON on stdin, so no shell on the way reads
-  // it as code. `term` is the terminal the question was seen in: after a Herdr restart the same pane asks at the
-  // same state number again, and a tap from before it must not answer the question after it.
-  component Answer(a, o, n, q, strong) {
-    Box {
-      fill: width
-      onTap: {
-        if busy == "" {
-          busy = q
-          sentFor = q
-          sentMark = 1 + int(random(1000000000))
-          busyAt = now ?? 0
-          said = ""
-          sent = run("r=$(printf %s ${sh(toJson(merge({machine: a.machine, session: a.session, pane: a.pane, seq: a.seq, id: a.ask.id, term: a.term ?? ""}, o.key != null ? {key: o.key} : {n: n, label: o.label})))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 sg projects/ormus-feeds/bin/answer -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${sentMark} \"$r\" $x")
-        }
-      }
-      Key { word: busy == q ? "…" : "${n} ${o.label}"; strong: strong }
-    }
-  }
-
   // The one agent that needs him now (`card`). `label` is one line that says what the blockage is (the feed's
   // `summary`: the dialog's heading and the agent's line about the command, a pick list's question, what the agent
-  // needs at a free prompt), under it where it is; then numbered keys that move it forward: on the tile (`compact`:
-  // little room) up to three (`choices`: the dialog's answers, or his replies at a free prompt), on the screen every
-  // answer the dialog offers. A tap anywhere else on the card opens the agent in Mercurio. The tile's card shows
-  // no command, but the first line of one whose summary is the agent's own line about it; the screen also shows
-  // the question, what a yes would run and why, and the whole command (`wide` is the characters one line holds).
-  // A command the screen did not show whole, or too long to carry, has no keys anywhere, whatever the feed says:
-  // he opens the agent.
-  component NeedCard(a, label, compact, wide) {
+  // needs at a free prompt), under it where it is, then one key that opens the agent in Mercurio, where he
+  // answers it (Ormus, 2026-11-26: Mercurio owns answering); a tap anywhere else on the card does the same. The tile's
+  // card (`compact`: little room) shows no command, but the first line of one whose summary is the agent's own line
+  // about it; the screen also shows the question, what a yes would run and why, and the whole command.
+  component NeedCard(a, label, compact) {
     Column {
       gap: 6
       padding: [12, 10]
@@ -419,18 +342,7 @@ widget "sessions-ormus" {
         }
       }
       let ask = a.ask
-      let q = "${a.machine}:${a.session}:${a.pane}:${a.seq}:${ask != null ? ask.id : ""}"
       let shown = ask != null ? (ask.run ?? ask.what ?? "") : ""
-      // A yes also needs the whole command from the feed (`run`): a feed from before it carried one has only the
-      // command's first line (`what`), and that is shown with no answers.
-      // A command the screen did not show whole, or too long to carry, gets no keys here either, whatever the feed says.
-      let whole = ask != null && !ask.cut && !(ask.more ?? false) && (!ask.approval || (ask.run ?? "") != "")
-      // The keys: the tile's `choices`, or on the screen every option of the dialog (a pick list can have four).
-      let every = ask == null ? [] : len(ask.options ?? []) > 0 ? ask.options : (ask.choices ?? [])
-      let answers = ask != null && !(ask.sent ?? false) ? (compact ? (ask.choices ?? []) : every) : []
-      // Keys side by side when each numbered label fits its share of the card's width (about 9 dp a character at this size).
-      let per = max(6, floor(wide * 7.5 / max(1, len(answers)) / 9) - 3)
-      let short = len(answers) <= 3 && all(answers, o => len(o.label) + 2 <= per)
       Row {
         gap: 8
         align: center
@@ -467,39 +379,15 @@ widget "sessions-ormus" {
           Text { text: "answered from here"; fontSize: 13; color: foreground; weight: 1; maxLines: 1 }
           OpenAgent { a: a; word: "open" }
         }
-      } else if len(answers) > 0 && whole && !pinned {
-        // The card came in under the thumb, not by his hand: one tap pins it, and its keys show.
-        Box {
-          fill: width
-          onTap: pick = ids[at]
-          Key { word: "show ${join(range(len(answers)).map(i => "${i + 1}"), " · ")}"; strong: true }
-        }
-      } else if len(answers) > 0 && whole && short {
-        Row {
-          gap: 8
-          for o, i in answers key "${i}" {
-            Answer { a: a; o: o; n: i + 1; q: q; strong: i == 0; weight: 1 }
-          }
-        }
-      } else if len(answers) > 0 && whole {
-        Column {
-          gap: 6
-          for o, i in answers key "${i}" {
-            Answer { a: a; o: o; n: i + 1; q: q; strong: i == 0; fill: width }
-          }
-        }
       } else {
         OpenAgent { a: a; word: "open in Mercurio"; fill: width }
-      }
-      if said != "" && busy == "" && saidFor == q {
-        Text { text: said; fontSize: 13; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 2 }
       }
     }
   }
 
   // The cards, one at a time: swipe sideways for the next or the one before, or tap the arrows. The card follows
   // the finger a little and springs back; a pull past 70 dp, or a flick, turns it.
-  component Cards(compact, wide) {
+  component Cards(compact) {
     Column {
       gap: 4
       Box {
@@ -520,7 +408,7 @@ widget "sessions-ormus" {
         opacity: 1 - min(0.5, abs(dragX) / 400)
         animate offset: spring()
         animate opacity: tween(150ms, "out")
-        NeedCard { a: card; label: cardLabel; compact: compact; wide: wide }
+        NeedCard { a: card; label: cardLabel; compact: compact }
       }
       if len(cards) > 1 {
         // Up to seven dots (the card's header counts them all), the one shown bigger and brighter.
@@ -552,11 +440,7 @@ widget "sessions-ormus" {
           Text { text: "${game.today} today"; fontSize: 12; color: muted; maxLines: 1 }
         }
       }
-      if said != "" && busy == "" && saidFor != shownQ {
-        Text { text: said; fontSize: 12; color: startsWith(said, "unlocked") ? foreground : red; maxLines: 1 }
-      } else {
-        Text { text: "${working} working · ${done} done${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
-      }
+      Text { text: "${working} working · ${done} done${full && game != null ? " · level ${game.level}${game.streak > 1 ? " · ${game.streak} days" : ""}" : ""}"; fontSize: 12; color: muted; maxLines: 1 }
     }
   }
 
@@ -574,7 +458,7 @@ widget "sessions-ormus" {
     } else if data != null {
       Headline { full: false }
       if card != null {
-        Cards { compact: true; wide: wide }
+        Cards { compact: true }
       }
       if only == "" && card == null {
         Row {
@@ -657,7 +541,7 @@ widget "sessions-ormus" {
         } else {
           Headline { full: true }
           if card != null {
-            Cards { compact: false; wide: floor(((screenWidth ?? 360) - 64) / 7.5) }
+            Cards { compact: false }
           }
           if stale || len(down) > 0 {
             Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }

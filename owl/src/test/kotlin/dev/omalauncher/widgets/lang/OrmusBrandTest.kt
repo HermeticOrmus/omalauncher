@@ -54,8 +54,9 @@ class OrmusBrandTest {
         }
     }
 
+    // The sessions tile has no strong key since it stopped answering agents (Ormus, 2026-11-26): its one key opens Mercurio.
     @Test fun theStrongKeyOfACardIsTheOneGoldFillAndItsTextReadsOnIt() {
-        for (name in listOf("10-sessions.owl", "12-comms.owl", "31-needs.owl")) {
+        for (name in listOf("12-comms.owl", "31-needs.owl")) {
             val text = java.io.File(dir, name).readText()
             assertTrue("$name: strong key is gold", text.contains("background: strong ? accent : alpha(foreground, 0.09)"))
             assertTrue("$name: the text on gold is the ground", text.contains("color: strong ? background : foreground"))

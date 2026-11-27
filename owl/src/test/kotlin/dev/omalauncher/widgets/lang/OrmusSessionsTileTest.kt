@@ -181,16 +181,16 @@ class OrmusSessionsTileTest {
 
     private fun keys(lines: List<String>) = lines.filter { Regex("^[1-9] (?!need you)").containsMatchIn(it) }
 
-    @Test fun theCardIsOneLineOfTheBlockageWhereItIsAndThePinKeyNamesItsKeys() {
+    @Test fun theCardIsOneLineOfTheBlockageWhereItIsAndOneKeyThatOpensTheAgent() {
         val t = Tile(feed(approval()))
         val lines = t.tile()
         assertTrue("the summary is the label: $lines", "Bash command: rm -rf build/" in lines)
         assertTrue("the agent and its machine, not the tool again: $lines", "claude on sg" in lines)
         assertFalse("the tool is in the summary already: $lines", "Bash command on sg" in lines)
-        assertTrue("two keys, so the pin key names two: $lines", "show 1 · 2" in lines)
-        assertFalse("no key shows before the card is pinned: $lines", "1 Yes" in lines)
+        assertTrue("the one key opens the agent: $lines", "open in Mercurio" in lines)
+        assertFalse("the dialog's answers are Mercurio's: $lines", "1 Yes" in lines || lines.any { it.startsWith("show ") })
         assertFalse("the tile's card shows no command: $lines", lines.any { it.startsWith("rm -rf build/") })
-        assertEquals("one line of label, two keys side by side", 126.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one line of label and the open key", 126.0, (t.let("cardHeight") as Num).v, 0.0)
     }
 
     @Test fun anApprovalWhoseSummaryIsTheAgentsOwnLineShowsTheCommandsFirstLineOnTheTile() {
@@ -198,70 +198,35 @@ class OrmusSessionsTileTest {
         val lines = t.tile()
         assertTrue("the agent's line is the label: $lines", "Bash command: clean the build" in lines)
         assertTrue("the first line of the command, marked as not all of it: $lines", "rm -rf build/ …" in lines)
-        assertEquals("one line of label, the command's line, two keys side by side", 142.0, (t.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one line of label, the command's line, the open key", 142.0, (t.let("cardHeight") as Num).v, 0.0)
         val screen = t.screen()
         assertTrue("the screen shows the whole command: $screen", "rm -rf build/\nmake all" in screen)
         assertFalse("and not its first line twice: $screen", "rm -rf build/ …" in screen)
     }
 
-    @Test fun aPinnedDialogCardSendsTheKeyOfTheChoiceTapped() {
+    @Test fun aCardsOwnTapOpensMercurioAndNeverItsTuiPath() {
         val t = Tile(feed(approval()))
-        t.pin("sg:raven:w4:p1")
-        val lines = t.tile()
-        assertEquals(listOf("1 Yes", "2 No"), keys(lines))
-        val runs = t.taps(program.root).filter { it.startsWith("run ") }
-        assertEquals("the first key's tap runs the answer tool; the second finds it busy", 1, runs.size)
-        val sent = runs[0]
-        assertTrue(sent, sent.contains("projects/ormus-feeds/bin/answer -"))
-        for (part in listOf("\"machine\":\"sg\"", "\"session\":\"raven\"", "\"pane\":\"w4:p1\"", "\"seq\":101", "\"id\":\"484b6b02717f\"", "\"key\":\"1\"", "\"term\":\"term_t\"")) {
-            assertTrue("$part in $sent", sent.contains(part))
-        }
-        assertFalse("a dialog's answer carries no reply text: $sent", sent.contains("\"label\""))
+        val taps = t.taps(program.root)
         // An agent of no herdr-core session (the old herdr TUI is gone): Mercurio itself, never its TUI path.
-        assertTrue("the card's own tap opens Mercurio", t.taps(program.root).any { it.startsWith("androidApp solutions.ormus.logos") })
-        assertFalse("no intent that would start a TUI session", t.taps(program.root).any { it.contains("HERD_SESSION") })
+        assertTrue("the card's own tap opens Mercurio: $taps", taps.any { it.startsWith("androidApp solutions.ormus.logos") })
+        assertFalse("no intent that would start a TUI session", taps.any { it.contains("HERD_SESSION") })
     }
 
-    @Test fun aPinnedPromptCardSendsTheNumberAndTheLabelOfTheReplyTapped() {
-        val t = Tile(feed(prompt("the merge word")))
-        t.pin("sg:raven:w4:p3")
-        val lines = t.tile()
-        assertTrue("where it is, at its prompt: $lines", "claude on sg · at its prompt" in lines)
-        assertEquals(listOf("1 go on", "2 no, stop", "3 later"), keys(lines))
-        val sent = t.taps(program.root).first { it.startsWith("run ") }
-        for (part in listOf("\"n\":1", "\"label\":\"go on\"", "\"id\":\"a1b2c3d4e5f6\"")) assertTrue("$part in $sent", sent.contains(part))
-        assertFalse("a reply sends no key: $sent", sent.contains("\"key\""))
-    }
-
-    @Test fun thePickListShowsThreeKeysOnTheTileAndEveryPickOnTheScreen() {
-        val t = Tile(feed(pick))
-        t.pin("sg:raven:w4:p2")
-        assertEquals(listOf("1 Moonlight", "2 Quicksilver", "3 Aurum"), keys(t.tile()))
-        assertEquals("the stack of three", 220.0, (t.let("cardHeight") as Num).v, 0.0)
-        assertEquals(listOf("1 Moonlight", "2 Quicksilver", "3 Aurum", "4 Something else"), keys(t.screen()))
-        val sent = t.taps(program.screen!!).first { it.startsWith("run ") }
-        assertTrue("the screen's key sends the dialog's own key: $sent", sent.contains("\"key\":\"1\""))
-        t.actions.clear()
-        val unpinned = Tile(feed(pick))
-        assertTrue("four keys on the screen, four numbers on its pin key", "show 1 · 2 · 3 · 4" in unpinned.screen())
-        assertTrue("three on the tile", "show 1 · 2 · 3" in unpinned.tile())
-    }
-
-    @Test fun aLabelOfTwoLinesTakesItsRoomFromTheRowsUnderTheCardAndTheKeysStackOnlyOncePinned() {
+    @Test fun aLabelOfTwoLinesTakesItsRoomFromTheRowsUnderTheCardAndPinningChangesNothing() {
         val short = Tile(feed(prompt("the merge word")))
         val long = Tile(feed(prompt("the merge word for the Corvin site PRs")))
-        assertEquals("one row of keys before the pin, whatever the labels", 126.0, (short.let("cardHeight") as Num).v, 0.0)
+        assertEquals("one label line and the open key", 126.0, (short.let("cardHeight") as Num).v, 0.0)
         assertEquals("a second line of label at 17 sp is 22 dp", 148.0, (long.let("cardHeight") as Num).v, 0.0)
         short.pin("sg:raven:w4:p3")
         long.pin("sg:raven:w4:p3")
-        assertEquals("pinned, three labels too long for one row stack: 79 + 3 × 47", 220.0, (short.let("cardHeight") as Num).v, 0.0)
-        assertEquals(242.0, (long.let("cardHeight") as Num).v, 0.0)
+        assertEquals("no keys to stack once pinned", 126.0, (short.let("cardHeight") as Num).v, 0.0)
+        assertEquals(148.0, (long.let("cardHeight") as Num).v, 0.0)
     }
 
     /**
      * Measured on the emulator (420 dpi, font scale 1) on 2026-11-08: a 6x6 tile is 384 dp tall and 377 wide inside its
      * border (`tileHeight`, `tileWidth`), its title and headline 81 dp, the card with a two-line label and its pin key
-     * 148 dp, the same card pinned with its three keys stacked 242 dp; a row of an agent at work 24 dp. The agents at work
+     * 148 dp (it had a stack of keys when pinned, 242 dp, before the keys were cut); a row of an agent at work 24 dp. The agents at work
      * have room under the card either way; the build before counted the unpinned card as a stack and hid them.
      */
     @Test fun theAgentsAtWorkShowUnderACardOnASixBySixTile() {
@@ -283,8 +248,8 @@ class OrmusSessionsTileTest {
         assertFalse("and is not folded into a count: $lines", lines.any { it.startsWith("+1 more") })
         val pinned = Tile(one, height = 384, width = 377)
         pinned.pin("sg:raven:w4:p3")
-        assertEquals("the stack of three under two lines", 242.0, (pinned.let("cardHeight") as Num).v, 0.0)
-        assertTrue("the row still fits under the stack: ${pinned.tile()}", "RAV-4031" in pinned.tile())
+        assertEquals("pinned, the card is as tall as before", 148.0, (pinned.let("cardHeight") as Num).v, 0.0)
+        assertTrue("the row still fits under it: ${pinned.tile()}", "RAV-4031" in pinned.tile())
     }
 
     /** A board copy (11-board-raven.owl, this tile with `only`): its board's agents alone, its own count, its name. */
@@ -357,89 +322,5 @@ class OrmusSessionsTileTest {
         assertFalse("no chat on the tile: $tile", tile.any { "Ana" in it || "can you look?" in it || "chats wait" in it })
         assertFalse("no chat on the screen: $screen", screen.any { "Ana" in it || "can you look?" in it || "WAITS ON YOU" in it })
         assertTrue("the counts are the agents' alone: $tile", "1 working · 0 done" in tile)
-    }
-
-    // The answer keys of two blocked agents, on the host that also fires triggers: card A is the approval (keys 1 Yes, 2 No), card B the pick
-    // list (1 Moonlight ...). What the answer tool prints back is {"n": the tap's own number, "r": its answer, "x": ssh's exit code}.
-    private val cardA = "sg:raven:w4:p1"
-    private val cardB = "sg:raven:w4:p2"
-
-    private fun TileHost.tapKey(card: String, word: String): String? {
-        set("pick", Str(card))
-        return tap(program.root, word).firstOrNull { it.startsWith("run ") }
-    }
-
-    private fun TileHost.mark() = (let("sentMark") as Num).v.toLong()
-
-    private fun TileHost.reply(r: String, n: Long = mark()) = fire("sent", Str("""{"n":$n,"r":$r,"x":0}"""))
-
-    private fun TileHost.said() = (let("said") as Str).v
-
-    private fun TileHost.busy() = (let("busy") as Str).v
-
-    @Test fun anAnswerTapIsFreeAgainWhenItsReplyComesSoTheNextCardCanBeAnswered() {
-        val t = TileHost(program, feed(approval(), pick))
-        assertTrue("card A's first key runs the answer tool", t.tapKey(cardA, "1 Yes")!!.contains("\"key\":\"1\""))
-        assertTrue("the tapped key waits", t.hasKey(program.root, "…"))
-        assertFalse("busy while its request is in flight", t.busy() == "")
-        t.actions.clear()
-        t.reply("""{"ok": true, "game": {"today": 2}}""")
-        assertEquals("the reply frees the keys", "", t.busy())
-        assertEquals("and tells what happened", "unlocked · 2 today", t.said())
-        assertTrue("with a haptic", t.actions.any { it.startsWith("haptic") })
-        assertTrue("so card B's key runs the answer tool a second time", t.tapKey(cardB, "1 Moonlight")!!.contains("\"id\":\"30be825843dd\""))
-    }
-
-    @Test fun anEmptySshOutputIsAValidReplyThatSaysSgDidNotAnswerAndFreesTheKeys() {
-        val t = TileHost(program, feed(approval(), pick))
-        val command = t.tapKey(cardA, "1 Yes")!!.removePrefix("run ")
-        // Run the command itself with an ssh that prints nothing: what reaches the tile must still be JSON.
-        val bin = java.nio.file.Files.createTempDirectory("fake-ssh")
-        val ssh = bin.resolve("ssh").toFile().apply { writeText("#!/bin/sh\ncat >/dev/null\nexit 255\n"); setExecutable(true) }
-        val out = ProcessBuilder("sh", "-c", command).also { it.environment()["PATH"] = bin.toString() + ":" + System.getenv("PATH") }.start().let { p -> p.inputStream.bufferedReader().readText().also { p.waitFor() } }
-        ssh.delete()
-        bin.toFile().delete()
-        val got = Json.parse(out)
-        assertTrue("valid JSON with the tap's number and a null answer: $out", got != Null)
-        t.fire("sent", Str(out))
-        assertEquals("sg did not answer", t.said())
-        assertEquals("", t.busy())
-    }
-
-    @Test fun anOutcomeOfTheAnswerToolShowsItsLineAndFreesTheKeys() {
-        val t = TileHost(program, feed(approval(), pick))
-        t.tapKey(cardA, "1 Yes")
-        t.reply("""{"ok": false, "outcome": "changed"}""")
-        assertEquals("the question changed: look again", t.said())
-        assertEquals("", t.busy())
-        assertEquals("the line belongs to the card tapped", "sg:raven:w4:p1:101:484b6b02717f", (t.let("saidFor") as Str).v)
-    }
-
-    @Test fun aLateReplyOfAnOlderRequestNeverFreesANewerOne() {
-        val t = TileHost(program, feed(approval(), pick))
-        t.tapKey(cardA, "1 Yes")
-        val older = t.mark()
-        t.reply("""{"ok": true, "game": {"today": 1}}""")
-        t.tapKey(cardB, "1 Moonlight")
-        assertFalse("a newer request is in flight", t.busy() == "")
-        t.reply("""{"ok": true, "game": {"today": 9}}""", older)
-        assertFalse("the older reply, late, leaves it in flight", t.busy() == "")
-        assertEquals("and says nothing for it", "", t.said())
-        t.reply("""{"ok": true, "game": {"today": 3}}""")
-        assertEquals("its own reply frees it", "", t.busy())
-        assertEquals("unlocked · 3 today", t.said())
-    }
-
-    @Test fun anAnswerThatNeverComesFreesTheKeysWithALineThatDoesNotSayTryAgain() {
-        val now = 1_794_166_000.0
-        val t = TileHost(program, feed(approval(), pick), now = now)
-        t.tapKey(cardA, "1 Yes")
-        t.fire("now", Num(now + 60), Num(now))
-        assertFalse("a minute in, still waiting", t.busy() == "")
-        t.fire("now", Num(now + 120), Num(now + 60))
-        assertEquals("freed", "", t.busy())
-        assertEquals("no answer: open the agent to check", t.said())
-        assertFalse("the key may have gone: no word of trying again", t.said().contains("again"))
-        assertTrue("the next card can be answered", t.tapKey(cardB, "1 Moonlight") != null)
     }
 }
