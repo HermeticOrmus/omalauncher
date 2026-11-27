@@ -308,6 +308,15 @@ class OrmusSessionsTileTest {
         assertTrue("a tap opens Mercurio: $taps", taps.any { it.startsWith("androidApp solutions.ormus.logos") })
     }
 
+    /** The feed's `sent` flag: the card says "answered", and no longer which app. */
+    @Test fun anAnsweredCardSaysAnsweredAndNoMoreAndStillOpensTheAgent() {
+        val t = Tile(feed(approval().replace("\"approval\": true", "\"approval\": true, \"sent\": true")))
+        val lines = t.tile()
+        assertTrue("$lines", "answered" in lines)
+        assertFalse("$lines", lines.any { it.contains("from here") })
+        assertTrue("$lines", "open" in lines)
+    }
+
     @Test fun aCardWithNoAskOpensTheAgent() {
         val t = Tile(feed("""{"kind": "claude", "status": "blocked", "title": "RAV-1", "tab": "4 · RAV-1", "machine": "sg", "session": "raven", "pane": "w4:p9", "seq": 9, "term": "t", "needs": "his eyes on the diff"}"""))
         val lines = t.tile()

@@ -219,9 +219,40 @@ class OrmusHerdrCoreTest {
         assertEquals("widgets that call notify(", emptyList<String>(), owls.filter { Regex("""\bnotify\(""").containsMatchIn(code(it)) }.map { it.name })
     }
 
-    @Test fun theSessionsTileHasNoDoNotDisturbRow_ItOnlyServedItsOldAlerts() {
+    // Do Not Disturb is Ormus's phone-wide switch, not an alert of the tile: the decision of record does not cover it.
+    @Test fun theSessionsScreenKeepsItsDoNotDisturbRow() {
         val text = code(java.io.File("../app/src/main/assets/ormus/widgets/10-sessions.owl"))
-        assertFalse("10-sessions.owl still reads the phone's modes", text.contains("android.modes"))
-        assertFalse("10-sessions.owl still sets Do Not Disturb", Regex("""\bdnd\(""").containsMatchIn(text))
+        assertTrue("10-sessions.owl reads the phone's modes", text.contains("source modes = android.modes"))
+        assertTrue("10-sessions.owl sets Do Not Disturb only from his tap", Regex("""onTap: dnd\(""").containsMatchIn(text))
+        for (b in listOf("alqvimia", "clients", "ormus", "raven")) {
+            assertTrue("the $b copy keeps it", code(java.io.File("../app/src/main/assets/ormus/widgets/11-board-$b.owl")).contains("source modes = android.modes"))
+        }
+    }
+
+    // A background activity start can be blocked: a started agent also leaves a line in the tile that opens the same intent.
+    @Test fun aStartedAgentLeavesALineInTheTileThatOpensItInMercurio() {
+        val program = compile("45-kiosk.owl")
+        val t = kiosk(mercurio)
+        t.fire("spun", Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}"""))
+        assertTrue("${t.lines(program.root)}", "started: open in Mercurio" in t.lines(program.root))
+        val tapped = t.tap(program.root, "started: open in Mercurio")
+        assertTrue("$tapped", opensInMercurio(tapped, "sg", "t77", names = "sg,sg.tail.ts.net"))
+    }
+
+    @Test fun withNoLinkToSgTheKioskSaysItOpenedMercurioItself() {
+        val program = compile("45-kiosk.owl")
+        val t = TileHost(program, Json.parse(kioskFeed))
+        t.set("apps", Json.parse(mercurio))
+        t.fire("spun", Str("""{"n": 1, "r": {"ok": true, "pane": "t77", "session": "core", "title": "An article"}}"""))
+        assertTrue("${t.actions}", t.actions.any { it.startsWith("androidApp solutions.ormus.logos") })
+        assertTrue("${t.lines(program.root)}", "opened Mercurio (no link to sg yet)" in t.lines(program.root))
+        assertFalse("no \"started\" line without the intent", "started: open in Mercurio" in t.lines(program.root))
+    }
+
+    @Test fun aFailedStartLeavesNoStartedLine() {
+        val program = compile("45-kiosk.owl")
+        val t = kiosk(mercurio)
+        t.fire("spun", Str("""{"n": 2, "r": {"ok": false, "err": "hc run failed"}}"""))
+        assertTrue("${t.lines(program.root)}", t.lines(program.root).none { it.startsWith("started") || it.startsWith("opened Mercurio") })
     }
 }
