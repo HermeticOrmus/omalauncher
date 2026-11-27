@@ -4,7 +4,7 @@ widget "sessions-ormus" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and where it is, with a key that opens the agent in Mercurio, where he answers it; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.2"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and where it is, with a key that opens the agent in Mercurio, where he answers it; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.3"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -18,77 +18,6 @@ widget "sessions-ormus" {
   // Mercurio opens a herdr-core terminal from a launcher's tap since 1.27.97 (versionCode 12797000); a build before
   // it sends the same intent down its old Herdr TUI path, so a tap opens Mercurio itself there.
   let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
-
-  // An agent in herdr-core is steered from the screen's list through sg's agent tool (ormus-feeds bin/agent): its
-  // screen, a stop, a say. One request at a time: `act` is the agent being asked ("machine:session:pane"), `actDo` what
-  // was asked, `go` the request ({"n": a number of its own, "body": what sg gets on stdin}) and `actN` that same n, kept:
-  // sg's answer comes back wrapped as {"n", "r": the tool's answer, "x": ssh's exit code}, and an answer whose n is not
-  // `actN` is another request's (a late one) and is dropped, so it never shows under another agent, frees another
-  // request or puts one agent's screen in another's view. `actLine` is the one quiet line about the last request and
-  // `actFor` the agent it is about; `peek` is the agent whose screen is open (the list gives way to it), `peekText` the
-  // text sg returned and `peekStatus` the agent's status then. `stopAsk` is the agent ("machine:pane:term") whose stop
-  // key waits for a second tap, `stopAt` the `time` of the first. `sayText` is what he typed, kept until it went.
-  state go = ""
-  state act = ""
-  state actDo = ""
-  state actN = 0
-  state actAt = 0
-  state acted = ""
-  state actLine = ""
-  state actRed = false
-  state actFor = ""
-  state peek = ""
-  state peekText = ""
-  state peekStatus = ""
-  state stopAsk = ""
-  state stopAt = 0
-  state sayText = ""
-  state sayFor = ""
-  on go {
-    let req = value != null && value != "" ? parseJson(value) : null
-    if req != null {
-      acted = run("r=$(printf %s ${sh(toJson(req.body))} | ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=5 -o ServerAliveCountMax=20 sg projects/ormus-feeds/bin/agent -); x=$?; [ -n \"$r\" ] || r=null; printf '{\"n\":%s,\"r\":%s,\"x\":%s}' ${int(req.n)} \"$r\" $x")
-    }
-  }
-  on acted {
-    let got = parseJson(value ?? "")
-    if got != null && act != "" && actN != 0 && got.n == actN {
-      let r = got.r
-      let o = r != null && r.outcome != null ? r.outcome : ""
-      actFor = act
-      act = ""
-      actN = 0
-      if actDo == "screen" && o == "screen" {
-        peekText = r.text ?? ""
-        peekStatus = r.status ?? ""
-        actLine = ""
-        actRed = false
-      } else {
-        actLine = r == null ? "no answer: look again" : o == "sent" ? "sent" : o == "stopped" ? "stopped" : o == "held" ? "waits for a draft at the desk" : o == "not waiting" ? "not waiting for a word" : o == "not working" ? "not working now" : o == "changed" ? "the agent moved on: look again" : o == "refused" ? "sg refused it" : "it did not go through"
-        actRed = r == null || o == "refused" || o == "failed" || (o != "sent" && o != "stopped" && o != "held" && o != "not waiting" && o != "not working" && o != "changed")
-        // His words stay to be mended unless they went (or were held: sg never tries a held say again).
-        if actDo == "say" && (o == "sent" || o == "held") {
-          sayText = ""
-        }
-        if o == "sent" || o == "stopped" {
-          haptic()
-          refresh()
-        }
-      }
-    }
-  }
-  // A request whose answer never comes frees the agent, but not early: sg holds a say up to 70 s for a draft, ssh takes
-  // up to 8 to connect, and `now` ticks a minute at a time, so a tap's `actAt` is up to a minute older than the tap. At
-  // 180 s on that clock at least two minutes have passed. It does not say "try again": the words may have been typed.
-  on now {
-    if act != "" && now - actAt >= 180 {
-      actFor = act
-      act = ""
-      actN = 0
-      actLine = "no answer: look on the desk before typing again"
-      actRed = true
-    }
-  }
 
   // No alert of its own: Mercurio alerts (Ormus, 2026-11-26, "Adopt it"); this tile is the home-screen glance.
   // Quiet: Do Not Disturb with his own exceptions. It is his switch; this tile never turns it on by itself.
@@ -112,10 +41,6 @@ widget "sessions-ormus" {
   let game = data != null ? data.game : null
   // Boards with an agent in them; a board with none stays out of the way.
   let live = boards.filter(b => b.agents.blocked + b.agents.working + b.agents.done + b.agents.idle > 0)
-  // The agent whose screen is open, and its head: its title, else its tab.
-  let peeked = peek == "" ? null : agents.find(a => "${a.machine}:${a.session}:${a.pane}" == peek)
-  let peekHead = peeked == null ? "agent" : peeked.title != "" && peeked.title != "Claude Code" ? peeked.title : peeked.tab != "" ? peeked.tab : peeked.kind
-
   // The cards: every agent that needs him, one at a time: first the ones whose question has choices, then the ones
   // whose question the feed read with none, then the rest. `pick` is the card shown, by the agent's
   // place, so a card keeps its place when the list changes under it; a pick that is gone shows the first. `dragX`
@@ -131,7 +56,6 @@ widget "sessions-ormus" {
   let at = pinned ? found : 0
   let card = len(cards) > 0 ? cards[at] : null
   on f {
-    stopAsk = ""
     if pick == "" && len(ids) > 0 {
       pick = ids[0]
     }
@@ -165,111 +89,6 @@ widget "sessions-ormus" {
       // What it needs when the priorities tool knows; else its title, or its tab when the title says nothing.
       Text { text: a.needs ?? (a.title != "" && a.title != "Claude Code" ? a.title : a.tab != "" && !endsWith(a.tab, "Shell") ? a.tab : "${a.kind} in ${lower(a.project ?? "")}"); fontSize: 14; maxLines: 1; weight: 1; color: a.status == "idle" ? muted : foreground }
       Text { text: where; fontSize: 12; color: muted; width: 90; align: end; maxLines: 1 }
-    }
-  }
-
-  // A quiet key for the agent's own actions: never gold, which belongs to the card's lead answer.
-  component Pill(word) {
-    Box {
-      padding: [7, 12]
-      radius: 8 * corners
-      background: alpha(foreground, 0.09)
-      Text { text: word; fontSize: 13; color: foreground; maxLines: 1 }
-    }
-  }
-
-  // An agent's own actions on the screen's list. What sg's agent tool gets on stdin is `body`: what to do, and the agent
-  // as the feed names it; `term` is the terminal seen, and sg answers `changed` when the pane's terminal is another one now.
-  component AgentActions(a) {
-    let k = "${a.machine}:${a.session}:${a.pane}"
-    let sk = "${a.machine}:${a.pane}:${a.term ?? ""}"
-    let working = a.status == "working" || a.status == "blocked"
-    let waits = a.status == "idle" || a.status == "done"
-    Column {
-      gap: 4
-      padding: [0, 4]
-      Row {
-        gap: 8
-        align: center
-        Box {
-          onTap: {
-            stopAsk = ""
-            if act == "" {
-              let n = 1 + int(random(1000000000))
-              peek = k
-              peekText = ""
-              peekStatus = ""
-              actLine = ""
-              act = k
-              actDo = "screen"
-              actN = n
-              actAt = now ?? 0
-              go = toJson({n: n, body: {do: "screen", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
-            }
-          }
-          Pill { word: "screen" }
-        }
-        if working {
-          Box {
-            onTap: {
-              if act == "" && stopAsk != sk {
-                // The first tap only asks. It is kept by agent and terminal, and spent by the next feed, any other key or back.
-                stopAsk = sk
-                stopAt = time
-              } else if act == "" && time - stopAt >= 0.6 {
-                // A second tap closer than that is one tap landing twice, not a yes.
-                let n = 1 + int(random(1000000000))
-                stopAsk = ""
-                actLine = ""
-                act = k
-                actDo = "stop"
-                actN = n
-                actAt = now ?? 0
-                go = toJson({n: n, body: {do: "stop", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? ""}})
-              }
-            }
-            Pill { word: stopAsk == sk ? "tap again to stop" : "stop" }
-          }
-        }
-        Text { text: actFor == k && act == "" ? actLine : act == k ? "…" : ""; fontSize: 12; color: actRed ? red : muted; weight: 1; maxLines: 1 }
-      }
-      if waits {
-        // His words are kept in `sayText` while this field is the one he typed in, and given back to the field until they
-        // went; a text bin/agent would refuse (over 600 characters, a leading / ! # @ ?, a trailing backslash) is
-        // refused here with a line and never leaves the phone.
-        Input {
-          placeholder: "say something to ${lower(a.kind)}"
-          fontSize: 14
-          text: sayFor == k ? sayText : ""
-          onChange: {
-            sayFor = k
-            sayText = value
-          }
-          onSubmit: {
-            stopAsk = ""
-            let t = trim(value)
-            if act == "" && t != "" {
-              if len(t) > 600 || startsWith(t, "/") || startsWith(t, "!") || startsWith(t, "#") || startsWith(t, "@") || startsWith(t, "?") || endsWith(t, "\\") {
-                sayFor = k
-                sayText = value
-                actFor = k
-                actLine = len(t) > 600 ? "not sent: 600 characters at most" : "not sent: a word cannot start with / ! # @ ? or end with a backslash"
-                actRed = false
-              } else {
-                let n = 1 + int(random(1000000000))
-                sayFor = k
-                sayText = value
-                actLine = ""
-                act = k
-                actDo = "say"
-                actN = n
-                actAt = now ?? 0
-                go = toJson({n: n, body: {do: "say", machine: a.machine, session: a.session, pane: a.pane, term: a.term ?? "", text: value}})
-              }
-            }
-          }
-        }
-      }
     }
   }
 
@@ -479,125 +298,73 @@ widget "sessions-ormus" {
   }
 
   screen {
-    title: peek != "" ? peekHead : only == "" ? "sessions" : only
-    if peek != "" {
-      // One agent's screen, as sg read it: the last lines of its terminal in mono, from the end, with a way back and a
-      // refresh. An outcome that is not the screen (changed, failed) is one line under the keys.
-      Column {
-        gap: 8
-        weight: 1
-        padding: [4, 8]
+    title: only == "" ? "sessions" : only
+    Column {
+      scroll: true
+      // Pulled down past its top: every source asks again now, not at its next interval.
+      onPull: refresh()
+      gap: 12
+      padding: [4, 8]
+      if data == null {
+        Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
+      } else if only != "" && len(boards) == 0 {
+        Text { text: "no ${only} board in the feed"; style: body; color: red }
+      } else {
+        Headline { full: true }
+        if card != null {
+          Cards { compact: false }
+        }
+        if stale || len(down) > 0 {
+          Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }
+        }
+        let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
+        if len(moves) > 0 {
+          Column {
+            gap: 2
+            Text { text: "MOVED LATELY"; style: label }
+            for m in reverse(moves).take(8) key "${m.n}" {
+              Row {
+                gap: 8
+                align: center
+                padding: [0, 3]
+                Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "needs" ? red : m.kind == "done" || m.kind == "chat" ? muted : foreground }
+                Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
+                Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
+              }
+            }
+          }
+        }
         Row {
           gap: 8
           align: center
-          Box {
-            onTap: {
-              stopAsk = ""
-              peek = ""
-              actLine = ""
+          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
+          Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
+        }
+        for b in live key b.name {
+          Column {
+            gap: 4
+            Row {
+              align: center
+              Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
+              Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
             }
-            Pill { word: "back" }
-          }
-          Box {
-            onTap: {
-              stopAsk = ""
-              if act == "" && peeked != null {
-                let n = 1 + int(random(1000000000))
-                actLine = ""
-                act = peek
-                actDo = "screen"
-                actN = n
-                actAt = now ?? 0
-                go = toJson({n: n, body: {do: "screen", machine: peeked.machine, session: peeked.session, pane: peeked.pane, term: peeked.term ?? ""}})
-              }
-            }
-            Pill { word: "refresh" }
-          }
-          Text { text: act == peek ? "…" : peekStatus; fontSize: 12; color: muted; weight: 1; align: end; maxLines: 1 }
-        }
-        if actLine != "" && act == "" {
-          Text { text: actLine; fontSize: 13; color: actRed ? red : muted; maxLines: 2 }
-        }
-        Column {
-          lazy: true
-          reverse: true
-          weight: 1
-          for ln, i in reverse(split(peekText, "\n")) key "${i}" {
-            Text { text: ln; font: mono; fontSize: 11; maxLines: 4 }
-          }
-        }
-      }
-    } else {
-      Column {
-        scroll: true
-        // Pulled down past its top: every source asks again now, not at its next interval.
-        onPull: refresh()
-        gap: 12
-        padding: [4, 8]
-        if data == null {
-          Text { text: f == null ? "…" : "sg doesn't answer"; style: body; color: red }
-        } else if only != "" && len(boards) == 0 {
-          Text { text: "no ${only} board in the feed"; style: body; color: red }
-        } else {
-          Headline { full: true }
-          if card != null {
-            Cards { compact: false }
-          }
-          if stale || len(down) > 0 {
-            Text { text: stale ? "as of ${floor((now - data.generated) / 60)}m ago" : "${join(down, ", ")} didn't answer: their agents are missing"; fontSize: 13; color: red }
-          }
-          let moves = (data.moves ?? []).filter(m => only == "" || m.board == only)
-          if len(moves) > 0 {
-            Column {
-              gap: 2
-              Text { text: "MOVED LATELY"; style: label }
-              for m in reverse(moves).take(8) key "${m.n}" {
-                Row {
-                  gap: 8
-                  align: center
-                  padding: [0, 3]
-                  Text { text: m.kind == "needs" ? "needs you" : m.kind == "done" ? "done" : m.kind == "chat" ? "chat" : "moved"; fontSize: 12; width: 66; maxLines: 1; color: m.kind == "needs" ? red : m.kind == "done" || m.kind == "chat" ? muted : foreground }
-                  Text { text: "${m.title} · ${m.text}"; fontSize: 13; weight: 1; maxLines: 1 }
-                  Age { m: now != null ? max(0, floor((now - m.at) / 60)) : null }
+            for p in b.projects.filter(p => len(p.top) > 0) key p.name {
+              Column {
+                gap: 2
+                padding: [0, 2]
+                Text { text: p.name; fontSize: 13; bold: true; color: muted }
+                for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
+                  Item { i: merge(a, {project: p.name}); where: "${a.kind} · ${a.machine}" }
                 }
               }
             }
           }
-          Row {
-            gap: 8
-            align: center
-            Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
-            Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
-          }
-          for b in live key b.name {
-            Column {
-              gap: 4
-              Row {
-                align: center
-                Text { text: upper(b.name); style: label; color: foreground; weight: 1 }
-                Text { text: "${b.agents.blocked} need you · ${b.agents.working} working · ${b.agents.done} done · ${b.agents.idle} idle"; fontSize: 12; color: muted; align: end; maxLines: 1 }
-              }
-              for p in b.projects.filter(p => len(p.top) > 0) key p.name {
-                Column {
-                  gap: 2
-                  padding: [0, 2]
-                  Text { text: p.name; fontSize: 13; bold: true; color: muted }
-                  for a in p.top key "${a.machine}:${a.session}:${a.pane}" {
-                    Item { i: merge(a, {project: p.name}); where: "${a.kind} · ${a.machine}" }
-                    if a.session == "core" {
-                      AgentActions { a: a }
-                    }
-                  }
-                }
-              }
-            }
-          }
-          for n in data.notes ?? [] {
-            Text { text: n; fontSize: 13; color: muted }
-          }
-          for k in failed {
-            Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
-          }
+        }
+        for n in data.notes ?? [] {
+          Text { text: n; fontSize: 13; color: muted }
+        }
+        for k in failed {
+          Text { text: "${k}: ${data.errors[k]}"; fontSize: 13; color: red }
         }
       }
     }
