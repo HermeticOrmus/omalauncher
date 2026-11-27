@@ -315,6 +315,21 @@ class OrmusSessionsTileTest {
         assertTrue("and on the screen: ${gone.lines(raven.screen!!)}", "no raven board in the feed" in gone.lines(raven.screen!!))
     }
 
+    /** Mercurio owns answering (Ormus, 2026-11-26): a card with choices still shows its label and place, and one key that opens the agent. */
+    @Test fun aCardWithChoicesShowsNoAnswerKeyOnlyTheKeyThatOpensTheAgent() {
+        for ((id, agent) in listOf("sg:raven:w4:p1" to approval(), "sg:raven:w4:p2" to pick, "sg:raven:w4:p3" to prompt("the merge word"))) {
+            val t = Tile(feed(agent))
+            t.pin(id)
+            for (nodes in listOf(program.root, program.screen!!)) {
+                val lines = t.lines(nodes)
+                assertEquals("no numbered key for $id: $lines", emptyList<String>(), keys(lines))
+                assertFalse("no pin key for $id: $lines", lines.any { it.startsWith("show ") })
+                assertTrue("the card's own key opens the agent for $id: $lines", "open in Mercurio" in lines)
+                assertTrue("no tap on the card sends anything to sg for $id", t.taps(nodes).none { it.startsWith("run ") })
+            }
+        }
+    }
+
     @Test fun aCardWithNoAskOpensTheAgent() {
         val t = Tile(feed("""{"kind": "claude", "status": "blocked", "title": "RAV-1", "tab": "4 · RAV-1", "machine": "sg", "session": "raven", "pane": "w4:p9", "seq": 9, "term": "t", "needs": "his eyes on the diff"}"""))
         val lines = t.tile()
