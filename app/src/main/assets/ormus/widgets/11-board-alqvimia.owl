@@ -27,7 +27,13 @@ widget "sessions-alqvimia" {
   // How Mercurio names each machine (`ssh://user@host:port`) and the machine's tailnet names: a tap opens the agent there.
   let links = data != null ? (data.links ?? {}) : {}
   let hosts = data != null ? (data.hosts ?? {}) : {}
-  let boards = data != null ? data.boards.filter(b => only == "" || b.name == only) : []
+  let mercurioApp = mercurio != null ? mercurio.package : "solutions.ormus.logos"
+  // Where a tap on an agent goes, built once for every agent the feed lists (`watch` on each, in `boards`): a herdr-core
+  // agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the agents; Mercurio
+  // 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab. With no link or names
+  // for the machine, an older Mercurio, or no herdr-core agent `watch` is null: the tap opens Mercurio itself. A let
+  // cannot be called and an action cannot run in an expression, so this is data and each tap runs the pair of actions.
+  let boards = data != null ? data.boards.filter(b => only == "" || b.name == only).map(b => merge(b, {projects: b.projects.map(p => merge(p, {top: p.top.map(a => merge(a, {watch: a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 ? {package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": p.name ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}} : null}))}))})) : []
   // sg is down or the phone is off the tailnet: say how old the list is instead of passing it off as live.
   let stale = data != null && now != null && now - data.generated > 180
   let down = data != null ? keys(data.machines ?? {}).filter(m => data.machines[m] != "ok") : []
@@ -96,13 +102,10 @@ widget "sessions-alqvimia" {
   component Item(i, where) {
     Box {
       onTap: {
-        if i.session == "core" && watches && get(links, i.machine, null) != null && len(get(hosts, i.machine, [])) > 0 {
-          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
-          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
-          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, i.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": i.pane, "solutions.ormus.logos.extra.CORE_SPACE": i.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": i.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, i.machine, []), ",")}})
+        if i.watch != null {
+          androidIntent(i.watch)
         } else {
-          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
-          androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+          androidApp(mercurioApp)
         }
       }
       AgentLine { a: i; where: where }
@@ -125,13 +128,10 @@ widget "sessions-alqvimia" {
     Box {
       fill: width
       onTap: {
-        if a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 {
-          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
-          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
-          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
+        if a.watch != null {
+          androidIntent(a.watch)
         } else {
-          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
-          androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+          androidApp(mercurioApp)
         }
       }
       Key { word: word }
@@ -151,13 +151,10 @@ widget "sessions-alqvimia" {
       radius: 14 * corners
       background: alpha(foreground, 0.07)
       onTap: {
-        if a.session == "core" && watches && get(links, a.machine, null) != null && len(get(hosts, a.machine, [])) > 0 {
-          // A herdr-core agent opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: one app opens the
-          // agents; Mercurio 1.27.97, #350): the machine's link and tailnet names, the terminal's address, space and tab.
-          androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: get(links, a.machine, ""), extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": a.pane, "solutions.ormus.logos.extra.CORE_SPACE": a.project ?? "", "solutions.ormus.logos.extra.CORE_TAB": a.tab ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(get(hosts, a.machine, []), ",")}})
+        if a.watch != null {
+          androidIntent(a.watch)
         } else {
-          // No link or names for the machine, an older Mercurio, or no herdr-core agent: Mercurio itself.
-          androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+          androidApp(mercurioApp)
         }
       }
       let ask = a.ask

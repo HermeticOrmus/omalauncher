@@ -8,6 +8,8 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The sessions tile and its board copies build the open-in-Mercurio intent once for every agent in the feed (`watch`), where
+  each of the three taps (a row, a card, the card's key) kept its own copy. No change in what a tap does.
 - The sessions screen and the four board screens no longer steer agents: the screen key (an agent's last lines), the stop
   key with its second tap, the "say something" field and the screen's own view of an agent are gone, and so is every call
   to sg's `bin/agent`. The list opens an agent in Mercurio, where he watches, stops and answers it (Ormus, 2026-11-26:
