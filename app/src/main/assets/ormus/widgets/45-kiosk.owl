@@ -4,13 +4,24 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.3"; license: "MIT"; category: "news" }
+  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.4"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
   requires { pacman: ["openssh"] }
   source f = http("https://sg.tailb43a3a.ts.net/feeds/kiosk.json") every 5m json timeout 20s status
   source now = clock every 1m
+  // The agent it starts opens in Mercurio (Ormus, 2026-11-26: one app owns opening agents). Mercurio names sg by the link
+  // and tailnet names that sg's sessions feed carries; the feed is read for those two and nothing else.
+  source sess = http("https://sg.tailb43a3a.ts.net/feeds/sessions.json") every 10m json timeout 20s status
+  // Mercurio ships as solutions.ormus.logos, or .debug from a dev build: open whichever the phone has.
+  source apps = android.apps every 10m
+  let mercurio = (apps ?? []).find(a => a.package == "solutions.ormus.logos") ?? (apps ?? []).find(a => a.package == "solutions.ormus.logos.debug")
+  // Mercurio opens a herdr-core terminal from a launcher's tap since 1.27.97 (versionCode 12797000); a build before
+  // it sends the same intent down its old Herdr TUI path, so a tap opens Mercurio itself there.
+  let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
+  let sgLink = sess != null && sess.ok && sess.out != null ? get(sess.out.links ?? {}, "sg", null) : null
+  let sgNames = sess != null && sess.ok && sess.out != null ? get(sess.out.hosts ?? {}, "sg", []) : []
   // A second clock, finer than `now`, so a second tap can be told from the first before the link opens.
   source tick = clock every 250ms
   state at = 0 persist
@@ -40,7 +51,7 @@ widget "kiosk" {
 
   // Runs on sg. Reads the article as JSON on stdin. Starts a Claude agent in herdr-core (`hc run`), asks it to
   // integrate the article into the solar system, and prints {ok, pane} with the agent's terminal for the phone to
-  // attach to. The old herdr TUI is gone (Ormus, 2026-11-15); before, this opened a tab of TUI session "ormus".
+  // open in Mercurio. The old herdr TUI is gone (Ormus, 2026-11-15); before, this opened a tab of TUI session "ormus".
   let script = """
 import json, os, subprocess, sys, time
 
@@ -103,11 +114,17 @@ except Exception as e:
     opening = ""
     if got != null && got.ok && got.pane != null {
       haptic()
-      // The launcher's own terminal attaches to the agent it just started: starting agents stays the launcher's (2026-11-26).
-      terminal("ssh -t sg ${sh("PATH=$HOME/.local/bin:$PATH exec hc attach " + got.pane)}", got.title ?? "mercury")
+      // The agent it just started opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: starting agents
+      // stays the launcher's, opening them is Mercurio's; Mercurio 1.27.97, #350): sg's link and tailnet names, the
+      // terminal's address and its title. With no link or names, or an older Mercurio, Mercurio itself opens.
+      if watches && sgLink != null && len(sgNames) > 0 {
+        androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": got.pane, "solutions.ormus.logos.extra.CORE_SPACE": "", "solutions.ormus.logos.extra.CORE_TAB": got.title ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(sgNames, ",")}})
+      } else {
+        androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
+      }
     } else {
+      // The reason shows in the tile's header and on its screen.
       note = got != null && got.err != null && got.err != "" ? got.err : "sg did not open a session"
-      notify("mercury", note)
     }
   }
 

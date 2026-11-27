@@ -8,6 +8,12 @@ Dates are when the build was uploaded to Play.
 
 What this fork adds to the release below it; none of it is in the Play build.
 
+- The kiosk opens the agent it starts in Mercurio, on its terminal's watch view, instead of attaching the launcher's own
+  `ssh … hc attach` terminal, and a session that did not start shows its reason in the tile's header, not as a
+  notification. It reads sg's link and tailnet names for Mercurio from the sessions feed, every ten minutes. The sessions
+  screen and the board screens lose the Do Not Disturb row that only served the tile's old alerts. No Ormus widget
+  attaches a terminal or posts a notification any more (Ormus, 2026-11-26: Mercurio owns alerts, opening and answering
+  agents; the launcher keeps starting them).
 - The sessions tile and its board copies build the open-in-Mercurio intent once for every agent in the feed (`watch`), where
   each of the three taps (a row, a card, the card's key) kept its own copy. No change in what a tap does.
 - The sessions screen and the four board screens no longer steer agents: the screen key (an agent's last lines), the stop

@@ -20,8 +20,6 @@ widget "sessions-ormus" {
   let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
 
   // No alert of its own: Mercurio alerts (Ormus, 2026-11-26, "Adopt it"); this tile is the home-screen glance.
-  // Quiet: Do Not Disturb with his own exceptions. It is his switch; this tile never turns it on by itself.
-  source modes = android.modes
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
   // How Mercurio names each machine (`ssh://user@host:port`) and the machine's tailnet names: a tap opens the agent there.
@@ -330,12 +328,6 @@ widget "sessions-ormus" {
               }
             }
           }
-        }
-        Row {
-          gap: 8
-          align: center
-          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
-          Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
         }
         for b in live key b.name {
           Column {
