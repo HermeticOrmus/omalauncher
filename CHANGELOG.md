@@ -10,8 +10,10 @@ What this fork adds to the release below it; none of it is in the Play build.
 
 - The kiosk opens the agent it starts in Mercurio, on its terminal's watch view, instead of attaching the launcher's own
   `ssh … hc attach` terminal, and a session that did not start shows its reason in the tile's header, not as a
-  notification. It reads sg's link and tailnet names for Mercurio from the sessions feed, every ten minutes. The sessions
-  screen and the board screens lose the Do Not Disturb row that only served the tile's old alerts. No Ormus widget
+  notification. It reads sg's link and tailnet names for Mercurio from the sessions feed, every ten minutes. After a start the tile
+  keeps a line, "started: open in Mercurio", that opens the agent again (Android can block an activity started
+  while he is off the home screen), or says "opened Mercurio (no link to sg yet)". The Do Not Disturb row of the
+  sessions screen stays: it is his phone-wide switch. A card the feed marks answered says "answered". No Ormus widget
   attaches a terminal or posts a notification any more (Ormus, 2026-11-26: Mercurio owns alerts, opening and answering
   agents; the launcher keeps starting them).
 - The sessions tile and its board copies build the open-in-Mercurio intent once for every agent in the feed (`watch`), where

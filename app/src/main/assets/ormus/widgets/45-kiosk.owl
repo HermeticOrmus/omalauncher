@@ -4,7 +4,7 @@ widget "kiosk" {
   size: 6x4
   minSize: 4x3
 
-  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.4"; license: "MIT"; category: "news" }
+  meta { owl: 17; description: "Mercury's picks for Ormus: the news that matters to his work and how other engineers work, one at a time, a craft pick with the one move to take. Swipe for the next, tap to open it, double-tap to open a session that integrates it into the development solar system, tap the header for the whole list."; version: "1.5"; license: "MIT"; category: "news" }
 
   // Picked on sg by the Mercury loops (mercury-news, mercury-craft) and republished by ormus-feeds. The phone and
   // the Mercury board show the same picks; this tile calls no model.
@@ -22,6 +22,8 @@ widget "kiosk" {
   let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
   let sgLink = sess != null && sess.ok && sess.out != null ? get(sess.out.links ?? {}, "sg", null) : null
   let sgNames = sess != null && sess.ok && sess.out != null ? get(sess.out.hosts ?? {}, "sg", []) : []
+  // The intent that opens the started agent on its terminal's watch view; null without Mercurio 1.27.97, sg's link or its names.
+  let startIntent = watches && sgLink != null && len(sgNames) > 0 && startedPane != "" ? {package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": startedPane, "solutions.ormus.logos.extra.CORE_SPACE": "", "solutions.ormus.logos.extra.CORE_TAB": startedTitle, "solutions.ormus.logos.extra.HERD_HOSTS": join(sgNames, ",")}} : null
   // A second clock, finer than `now`, so a second tap can be told from the first before the link opens.
   source tick = clock every 250ms
   state at = 0 persist
@@ -31,6 +33,12 @@ widget "kiosk" {
   state tapped = 0
   state opening = ""
   state note = ""
+  // What the last start left: "link" (Mercurio was opened on the agent, and a line in the tile opens it again), "app"
+  // (no link to sg yet: Mercurio's front page opened, and the line says so), or "". An activity started from a trigger
+  // can be blocked once he has left the home screen, so the line keeps the way in visible.
+  state started = ""
+  state startedPane = ""
+  state startedTitle = ""
   // The article a double tap asked to integrate. A fresh `n` so the same article can be asked again.
   state go = ""
   state spun = ""
@@ -117,9 +125,13 @@ except Exception as e:
       // The agent it just started opens in Mercurio, on its terminal's watch view (Ormus, 2026-11-26: starting agents
       // stays the launcher's, opening them is Mercurio's; Mercurio 1.27.97, #350): sg's link and tailnet names, the
       // terminal's address and its title. With no link or names, or an older Mercurio, Mercurio itself opens.
+      startedPane = got.pane
+      startedTitle = got.title ?? ""
       if watches && sgLink != null && len(sgNames) > 0 {
+        started = "link"
         androidIntent({package: mercurio.package, component: "org.connectbot.ui.MainActivity", action: "android.intent.action.VIEW", data: sgLink, extras: {"solutions.ormus.logos.extra.CORE_ADDRESS": got.pane, "solutions.ormus.logos.extra.CORE_SPACE": "", "solutions.ormus.logos.extra.CORE_TAB": got.title ?? "", "solutions.ormus.logos.extra.HERD_HOSTS": join(sgNames, ",")}})
       } else {
+        started = "app"
         androidApp(mercurio != null ? mercurio.package : "solutions.ormus.logos")
       }
     } else {
@@ -172,6 +184,7 @@ except Exception as e:
           pending = ""
           opening = item.url
           note = ""
+          started = ""
           haptic()
           go = toJson({n: random(1000000000), title: item.title ?? "", url: item.url ?? "", source: item.source ?? "", who: item.who ?? "", why: item.why ?? "", summary: item.summary ?? "", kind: item.kind ?? "", move: item.gold ?? item.try ?? ""})
         } else {
@@ -194,6 +207,14 @@ except Exception as e:
         Text { text: "mercury"; style: muted; weight: 1 }
         Text { text: opening != "" ? "opening a session" : note != "" ? note : f == null ? "…" : data == null ? (f.ok && f.out != null && f.out.off != null ? "off on sg" : "sg doesn't answer") : len(failed) > 0 ? "${join(failed, ", ")} unreadable" : stale ? "picked ${fmtAgo(picked, now)} ago" : n > 0 ? "${at % n + 1} of ${n}" : ""; style: small; color: opening != "" ? foreground : note != "" || data == null || len(failed) > 0 ? red : muted; weight: 2; align: end; maxLines: 1 }
       }
+    }
+    if started == "link" && startIntent != null {
+      Box {
+        onTap: androidIntent(startIntent)
+        Text { text: "started: open in Mercurio"; style: small; color: foreground }
+      }
+    } else if started == "app" {
+      Text { text: "opened Mercurio (no link to sg yet)"; style: small; color: muted; maxLines: 1 }
     }
     if data != null && n == 0 {
       Text { text: "nothing picked yet"; style: body; color: muted }

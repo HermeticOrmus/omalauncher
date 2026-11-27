@@ -4,7 +4,7 @@ widget "sessions-raven" {
   size: 6x6
   minSize: 4x3
 
-  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and where it is, with a key that opens the agent in Mercurio, where he answers it; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.3"; license: "MIT"; category: "productivity" }
+  meta { owl: 17; description: "Who needs Ormus first, one card at a time: every agent that waits on him, on every machine, as one line that says what the blockage is and where it is, with a key that opens the agent in Mercurio, where he answers it; swipe for the next. Under it, the agents at work; the tile's screen has every workboard, project and agent with the whole question and command. The chats are the comms tile's. `only` names one workboard (the board tiles are this file with three lines changed, see scripts/ormus-board-tiles.sh)."; version: "3.4"; license: "MIT"; category: "productivity" }
 
   // Built on sg (ormus-feeds), where Herdr, the keys and the chat registry live. The phone only reads the result
   // over the tailnet. A workboard is a Herdr session, a project is a Herdr workspace. `only` is "" for every
@@ -20,6 +20,8 @@ widget "sessions-raven" {
   let watches = mercurio != null && (mercurio.versionCode ?? 0) >= 12797000
 
   // No alert of its own: Mercurio alerts (Ormus, 2026-11-26, "Adopt it"); this tile is the home-screen glance.
+  // Quiet: Do Not Disturb with his own exceptions. It is his phone-wide switch, not an alert of this tile: it stays; the tile never turns it on by itself.
+  source modes = android.modes
 
   let data = f != null && f.ok && f.out != null && f.out.boards != null ? f.out : null
   // How Mercurio names each machine (`ssh://user@host:port`) and the machine's tailnet names: a tap opens the agent there.
@@ -55,7 +57,7 @@ widget "sessions-raven" {
   state pick = ""
   state dragX = 0
   let found = indexOf(ids, pick)
-  // A card is `pinned` while it is the one picked; a pick that is gone shows the first. The first card is picked as the feed comes in.
+  // `pinned`: the picked card is still in the list; a pick that is gone shows the first. The first card is picked as the feed comes in.
   let pinned = found != null && found >= 0
   let at = pinned ? found : 0
   let card = len(cards) > 0 ? cards[at] : null
@@ -190,7 +192,7 @@ widget "sessions-raven" {
         Row {
           gap: 8
           align: center
-          Text { text: "answered from here"; fontSize: 13; color: foreground; weight: 1; maxLines: 1 }
+          Text { text: "answered"; fontSize: 13; color: foreground; weight: 1; maxLines: 1 }
           OpenAgent { a: a; word: "open" }
         }
       } else {
@@ -328,6 +330,12 @@ widget "sessions-raven" {
               }
             }
           }
+        }
+        Row {
+          gap: 8
+          align: center
+          Text { text: modes == null ? "" : modes.dndAllows == "priority" ? "quiet is on: your exceptions only" : modes.dnd ? "quiet is on: ${modes.dndAllows == "alarms" ? "alarms only" : "total silence"}" : "quiet is off: every app can alert"; fontSize: 13; color: muted; weight: 1; maxLines: 2 }
+          Button { text: modes != null && modes.dnd ? "turn off" : "quiet"; color: foreground; onTap: dnd(modes != null && modes.dnd ? "all" : "priority") }
         }
         for b in live key b.name {
           Column {
