@@ -28,6 +28,13 @@ class OrmusWidgetsTest {
         assertEquals("widgets that name bin/answer", emptyList<String>(), named)
     }
 
+    /** Mercurio owns steering agents (Ormus, 2026-11-26): no Ormus widget runs sg's agent tool (screen, stop, say). */
+    @Test fun noOrmusWidgetNamesTheAgentTool() {
+        val dir = java.io.File("../app/src/main/assets/ormus/widgets")
+        val named = dir.walk().filter { it.extension == "owl" && "bin/agent" in it.readText() }.map { it.name }.toList()
+        assertEquals("widgets that name bin/agent", emptyList<String>(), named)
+    }
+
     /** The pass tile installs from The Pass on sg alone, and the reviewer's line says so. */
     @Test fun thePassTileInstallsFromThePassAlone() {
         val p = Compiler.compile(java.io.File("../app/src/main/assets/ormus/widgets/50-pass.owl").readText())

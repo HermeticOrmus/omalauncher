@@ -295,6 +295,19 @@ class OrmusSessionsTileTest {
         }
     }
 
+    /** Mercurio owns steering agents (Ormus, 2026-11-26): the screen's list opens an agent, it has no screen, stop or say key. */
+    @Test fun theScreenListsAgentsWithNoScreenStopOrSayKey() {
+        fun core(status: String, pane: String) =
+            """{"kind": "claude", "status": "$status", "title": "RAV-$pane", "tab": "4 · RAV-$pane", "machine": "sg", "session": "core", "pane": "$pane", "seq": 1, "term": "term_t", "ask": null}"""
+        val t = Tile(feed(core("working", "t1"), core("idle", "t2"), core("done", "t3")))
+        val screen = t.screen()
+        assertTrue("the agents are listed: $screen", "RAV-t1" in screen && "RAV-t2" in screen && "RAV-t3" in screen)
+        assertTrue("no key but the agent's own: $screen", screen.none { it == "screen" || it == "stop" || it == "tap again to stop" || it == "back" || it == "refresh" })
+        val taps = t.taps(program.screen!!)
+        assertTrue("no tap sends anything to sg: $taps", taps.none { it.startsWith("run ") })
+        assertTrue("a tap opens Mercurio: $taps", taps.any { it.startsWith("androidApp solutions.ormus.logos") })
+    }
+
     @Test fun aCardWithNoAskOpensTheAgent() {
         val t = Tile(feed("""{"kind": "claude", "status": "blocked", "title": "RAV-1", "tab": "4 · RAV-1", "machine": "sg", "session": "raven", "pane": "w4:p9", "seq": 9, "term": "t", "needs": "his eyes on the diff"}"""))
         val lines = t.tile()
